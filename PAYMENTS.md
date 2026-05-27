@@ -42,7 +42,7 @@ Sandbox: https://sandbox.asaas.com · Producao: `ASAAS_ENV=production`
 Configure no painel Asaas:
 
 ```
-https://app.atlasone.com.br/payments/webhook/asaas
+https://app.atlasone.app.br/payments/webhook/asaas
 ```
 
 Eventos mapeados: pagamento confirmado → `active`, atraso → `overdue`, cancelamento → `blocked`.

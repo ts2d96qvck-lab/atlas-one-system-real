@@ -2,7 +2,7 @@
 
 API REST versionada para integrar CRM, conversas e exportacoes com sistemas externos.
 
-**Base URL:** `https://app.atlasone.com.br/v1` (local: `http://localhost:4000/v1`)
+**Base URL:** `https://app.atlasone.app.br/v1` (local: `http://localhost:4000/v1`)
 
 **OpenAPI:** `GET /v1/openapi.json`
 
@@ -49,7 +49,7 @@ Rate limit: **120 req/min** por IP.
 **Exemplo criar lead:**
 
 ```bash
-curl -X POST https://app.atlasone.com.br/v1/leads \
+curl -X POST https://app.atlasone.app.br/v1/leads \
   -H "Authorization: Bearer atlas_live_..." \
   -H "Content-Type: application/json" \
   -d '{

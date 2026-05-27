@@ -6,7 +6,7 @@ This guide covers production deployment without developer laptops or `trycloudfl
 
 - Linux VPS (Ubuntu 22.04+ recommended) or cloud VM (AWS, Azure, GCP, Hetzner)
 - Docker Engine 24+ and Docker Compose v2
-- Domain you control (e.g. `app.atlasone.com.br`)
+- Domain you control (e.g. `app.atlasone.app.br`)
 - Minimum: 2 vCPU, 4 GB RAM, 40 GB disk
 
 ## Quick start (Docker production stack)
@@ -72,17 +72,17 @@ Required in production (`NODE_ENV=production`):
 
 ### Option A — Cloudflare (recommended)
 
-1. Point `app.atlasone.com.br` A record to VPS IP (orange cloud ON).
+1. Point `app.atlasone.app.br` A record to VPS IP (orange cloud ON).
 2. SSL/TLS mode: **Full (strict)**.
-3. Set `WEBHOOK_PUBLIC_URL=https://app.atlasone.com.br`.
-4. Set `CORS_ORIGINS=https://app.atlasone.com.br`.
-5. Optional tenant subdomains: `*.atlasone.com.br` CNAME to same origin; nginx `atlas-prod.conf` already accepts wildcard `server_name`.
+3. Set `WEBHOOK_PUBLIC_URL=https://app.atlasone.app.br`.
+4. Set `CORS_ORIGINS=https://app.atlasone.app.br`.
+5. Optional tenant subdomains: `*.atlasone.app.br` CNAME to same origin; nginx `atlas-prod.conf` already accepts wildcard `server_name`.
 
 ### Option B — Let's Encrypt on VPS
 
 ```bash
 apt install certbot python3-certbot-nginx
-certbot --nginx -d app.atlasone.com.br
+certbot --nginx -d app.atlasone.app.br
 ```
 
 Mount certificates into nginx container or terminate TLS on host nginx.
@@ -132,9 +132,9 @@ Pagina publica: **`/status`** (Next.js) — consome `/api/status`.
 Configure uptime monitor (UptimeRobot, Better Stack, Datadog) on:
 
 ```
-https://app.atlasone.com.br/api/health
-https://app.atlasone.com.br/api/ready
-https://app.atlasone.com.br/api/status
+https://app.atlasone.app.br/api/health
+https://app.atlasone.app.br/api/ready
+https://app.atlasone.app.br/api/status
 ```
 
 Incidentes manuais: edite `infra/status/incidents.json` (ver [STATUS_PAGE_PLAN.md](./STATUS_PAGE_PLAN.md)).
@@ -165,7 +165,7 @@ No dependency on:
 - [ ] `/api/health` returns 200
 - [ ] `/api/ready` shows `database: true`
 - [ ] Login works on fixed domain
-- [ ] WhatsApp webhook URL points to `https://app.atlasone.com.br/webhook/evolution/{slug}`
+- [ ] WhatsApp webhook URL points to `https://app.atlasone.app.br/webhook/evolution/{slug}`
 - [ ] `ALLOW_PUBLIC_BOOTSTRAP=false`
 - [ ] **Backup scheduled** — see [BACKUP_RESTORE.md](./BACKUP_RESTORE.md)
 - [ ] **Security baseline reviewed** — see [SECURITY_BASELINE.md](./SECURITY_BASELINE.md)

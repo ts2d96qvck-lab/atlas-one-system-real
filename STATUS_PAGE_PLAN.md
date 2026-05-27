@@ -1,6 +1,6 @@
 # Atlas One — Status Page Plan
 
-Plano para página pública de status (`status.atlasone.com.br` ou similar), comunicação de incidentes e transparência operacional para clientes Enterprise.
+Plano para página pública de status (`status.atlasone.app.br` ou similar), comunicação de incidentes e transparência operacional para clientes Enterprise.
 
 **Status:** MVP implementado — `/api/status` + pagina `/status` + `infra/status/incidents.json`.
 
@@ -21,9 +21,9 @@ Plano para página pública de status (`status.atlasone.com.br` ou similar), com
 
 | Componente | Check | Endpoint / método |
 |------------|-------|-------------------|
-| **Web app** | HTTP 200 | `GET https://app.atlasone.com.br/` |
-| **API liveness** | JSON `ok: true` | `GET https://app.atlasone.com.br/api/health` |
-| **API readiness** | DB + deps | `GET https://app.atlasone.com.br/api/ready` |
+| **Web app** | HTTP 200 | `GET https://app.atlasone.app.br/` |
+| **API liveness** | JSON `ok: true` | `GET https://app.atlasone.app.br/api/health` |
+| **API readiness** | DB + deps | `GET https://app.atlasone.app.br/api/ready` |
 | **WhatsApp inbound** | Webhook recebendo | Monitor sintético ou alerta ops |
 | **Evolution API** | Health interno | Docker health / proxy |
 | **PostgreSQL** | Via `/api/ready` | Indireto |
@@ -53,7 +53,7 @@ Não expor endpoints internos (Evolution direto, Postgres) publicamente.
 ### Opção C — Mínimo viável (MVP)
 
 1. UptimeRobot monitorando `/api/health`
-2. Página estática `status.atlasone.com.br` com iframe ou link para dashboard público do monitor
+2. Página estática `status.atlasone.app.br` com iframe ou link para dashboard público do monitor
 3. Incidentes manuais via template (e-mail + atualização manual)
 
 ---
@@ -75,7 +75,7 @@ Não expor endpoints internos (Evolution direto, Postgres) publicamente.
 ### DNS
 
 ```
-status.atlasone.com.br  CNAME  → [provider status page]
+status.atlasone.app.br  CNAME  → [provider status page]
 ```
 
 ### Assinantes

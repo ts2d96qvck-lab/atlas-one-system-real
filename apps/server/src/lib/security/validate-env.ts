@@ -19,7 +19,7 @@ export function validateProductionEnv() {
     errors.push("DATABASE_URL obrigatorio");
   }
   if (!env.corsOrigins.length) {
-    errors.push("CORS_ORIGINS obrigatorio (ex: https://app.atlasone.com.br)");
+    errors.push("CORS_ORIGINS obrigatorio (ex: https://app.atlasone.app.br)");
   }
   if (env.webhookPublicUrl.startsWith("http://") && !env.webhookPublicUrl.includes("localhost")) {
     errors.push("WEBHOOK_PUBLIC_URL deve usar HTTPS em producao");

@@ -91,7 +91,7 @@ Run backup script on the VPS host (not inside app container). Ensure Docker sock
 ### Verify after restore
 
 ```bash
-curl -s https://app.atlasone.com.br/api/ready
+curl -s https://app.atlasone.app.br/api/ready
 docker compose -f docker-compose.prod.yml logs atlas-server --tail 50
 ```
 

@@ -71,7 +71,7 @@ Mapeamento em `auth-provider.types.ts` → `ExternalIdentityRecord`.
 OIDC_ISSUER=https://login.microsoftonline.com/{tenant}/v2.0
 OIDC_CLIENT_ID=
 OIDC_CLIENT_SECRET=
-OIDC_REDIRECT_URI=https://app.atlasone.com.br/auth/oidc/callback
+OIDC_REDIRECT_URI=https://app.atlasone.app.br/auth/oidc/callback
 ```
 
 Google: issuer `https://accounts.google.com`

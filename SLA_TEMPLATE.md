@@ -48,7 +48,7 @@ Ajustar por plano e negociação Enterprise.
 Disponibilidade (%) = ((Minutos no mês − Minutos de inatividade excluída) / Minutos no mês) × 100
 ```
 
-Monitor externo recomendado: `GET https://app.atlasone.com.br/api/health` a cada 1–5 min.
+Monitor externo recomendado: `GET https://app.atlasone.app.br/api/health` a cada 1–5 min.
 
 ---
 

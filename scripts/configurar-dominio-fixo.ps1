@@ -1,7 +1,7 @@
-# Atlas One - dominio fixo comercial: https://app.atlasone.com.br
+# Atlas One - dominio fixo comercial: https://app.atlasone.app.br
 $ErrorActionPreference = "Continue"
 $root = $PSScriptRoot | Split-Path -Parent
-$domain = "app.atlasone.com.br"
+$domain = "app.atlasone.app.br"
 $publicUrl = "https://$domain"
 $tunnelName = "atlas-one"
 $cfDir = Join-Path $root "infra\cloudflared"
@@ -42,7 +42,7 @@ $certFile = Join-Path $userCf "cert.pem"
 
 if (!(Test-Path $certFile)) {
   Write-Host "Passo 1/5 - Login Cloudflare (abre o navegador)..." -ForegroundColor Yellow
-  Write-Host "Selecione o dominio atlasone.com.br na tela do Cloudflare." -ForegroundColor Gray
+  Write-Host "Selecione o dominio atlasone.app.br na tela do Cloudflare." -ForegroundColor Gray
   Start-Process $cf -ArgumentList "tunnel","login" -Wait
 }
 
@@ -100,7 +100,7 @@ credentials-file: /etc/cloudflared/$tunnelName.json
 ingress:
   - hostname: $domain
     service: http://host.docker.internal:80
-  - hostname: atlasone.com.br
+  - hostname: atlasone.app.br
     service: http://host.docker.internal:80
   - service: http_status:404
 "@ | Set-Content -Path $configPath -Encoding UTF8
