@@ -1,0 +1,6 @@
+services:
+  atlas-one-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: atlas_one_tunnel
+    restart: always
+    command: tunnel --no-autoupdate --protocol http2 --url http://host.docker.internal:80

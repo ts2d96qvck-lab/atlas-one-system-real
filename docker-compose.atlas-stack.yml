@@ -1,0 +1,99 @@
+# Atlas One - stack completo (sempre reinicia sozinho)
+services:
+  atlas-postgres:
+    image: postgres:16
+    container_name: atlas_one_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: atlas
+      POSTGRES_DB: atlas_one
+    ports:
+      - "5432:5432"
+    volumes:
+      - atlas_one_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlas -d atlas_one"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  atlas-redis:
+    image: redis:7
+    container_name: atlas_one_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  evolution-postgres:
+    image: postgres:16
+    container_name: atlas_evolution_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution_postgres:/var/lib/postgresql/data
+
+  evolution-redis:
+    image: redis:7
+    container_name: atlas_evolution_redis
+    restart: unless-stopped
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: atlas_evolution_api
+    restart: unless-stopped
+    depends_on:
+      - evolution-postgres
+      - evolution-redis
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-CHANGE_ME_EVOLUTION_KEY}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:evolution@evolution-postgres:5432/evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379
+      LOG_LEVEL: ERROR
+      DEL_INSTANCE: "false"
+      LANGUAGE: pt-BR
+    volumes:
+      - evolution_instances:/evolution/instances
+
+  atlas-proxy:
+    image: nginx:1.27-alpine
+    container_name: atlas_one_proxy
+    restart: unless-stopped
+    depends_on:
+      - atlas-postgres
+    ports:
+      - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./infra/nginx/atlas-local.conf:/etc/nginx/conf.d/default.conf:ro
+
+  atlas-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: atlas_one_tunnel
+    restart: unless-stopped
+    depends_on:
+      - atlas-proxy
+    command: tunnel --no-autoupdate --protocol http2 --url http://host.docker.internal:80
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./logs:/logs
+
+volumes:
+  atlas_one_postgres:
+  evolution_postgres:
+  evolution_instances:

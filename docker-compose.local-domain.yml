@@ -1,0 +1,10 @@
+services:
+  atlas-one-proxy:
+    image: nginx:1.27-alpine
+    container_name: atlas_one_proxy
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/atlas-local.conf:/etc/nginx/conf.d/default.conf:ro
+

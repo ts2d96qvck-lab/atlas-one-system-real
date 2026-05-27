@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment (never commit secrets; keep *.example templates)
+.env
+.env.local
+.env.production
+.env.*.local
+apps/server/.env
+apps/web/.env.local
+
+# Keys / credential artifacts
+*.pem
+*.key
+*.p12
+*.pfx
+*.dump
+
+# Build outputs
+dist/
+.next/
+out/
+.turbo/
+coverage/
+test-results/
+playwright-report/
+
+# Runtime data
+logs/
+backups/
+uploads/
+artifacts/
+.qa-tokens.json
+acesso-publico.url
+*.log
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# PM2
+.pm2/
+
+# Legacy local demo (optional)
+data/db.json
+data/*.backup*.json

@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: atlas
+      POSTGRES_DB: atlas_one
+    ports:
+      - "5432:5432"
+    volumes:
+      - atlas_postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://atlas:atlas@postgres:5432/atlas_one
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379
+      DEL_INSTANCE: "false"
+      LANGUAGE: pt-BR
+    volumes:
+      - evolution_instances:/evolution/instances
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    depends_on:
+      - postgres
+      - redis
+      - evolution-api
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      DATABASE_PROVIDER: postgresql
+      DATABASE_URL: postgresql://atlas:atlas@postgres:5432/atlas_one
+      REDIS_URL: redis://redis:6379
+      EVOLUTION_URL: http://evolution-api:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      - server
+    ports:
+      - "3001:3001"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+
+volumes:
+  atlas_postgres:
+  evolution_instances:
+

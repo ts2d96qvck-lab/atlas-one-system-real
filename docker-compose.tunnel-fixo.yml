@@ -1,0 +1,11 @@
+services:
+  atlas-one-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: atlas_one_tunnel
+    restart: always
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run atlas-one
+    volumes:
+      - ./infra/cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ./infra/cloudflared:/etc/cloudflared:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

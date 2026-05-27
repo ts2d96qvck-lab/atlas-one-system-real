@@ -1,0 +1,44 @@
+{
+  "name": "atlas-one-system-real",
+  "version": "1.0.0",
+  "description": "Atlas One - B2B SaaS WhatsApp, CRM e atendimento comercial",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "install:all": "pnpm install",
+    "build": "node scripts/build.js",
+    "build:packages": "corepack pnpm --filter @atlas-one/lib build && corepack pnpm --filter @atlas-one/ui build",
+    "build:server": "corepack pnpm --filter @atlas-one/server build",
+    "build:web": "corepack pnpm --filter @atlas-one/web build",
+    "redeploy:web": "node scripts/redeploy-web.js",
+    "start": "node scripts/start-production.js",
+    "start:server": "pnpm --filter @atlas-one/server start",
+    "start:web": "pnpm --filter @atlas-one/web start",
+    "dev": "pnpm run dev:enterprise",
+    "dev:enterprise": "pnpm --filter @atlas-one/server dev & pnpm --filter @atlas-one/web dev",
+    "lint": "node scripts/lint.js",
+    "typecheck": "node scripts/lint.js",
+    "db:generate": "pnpm --filter @atlas-one/server db:generate",
+    "db:push": "pnpm --filter @atlas-one/server db:push",
+    "db:seed": "pnpm --filter @atlas-one/server db:seed",
+    "test:smoke": "node scripts/run-qa-api-smoke.mjs",
+    "test:e2e": "playwright test",
+    "test:messaging": "pnpm --filter @atlas-one/server test && playwright test tests/e2e/messaging.spec.ts",
+    "test:qa": "node scripts/run-qa-api-smoke.mjs && playwright test",
+    "test:billing": "node scripts/run-billing-smoke.mjs",
+    "test:full": "node scripts/run-full-qa.mjs",
+    "validate:docker": "node scripts/validate-docker-compose.mjs",
+    "generate:env": "node scripts/generate-staging-env.mjs",
+    "postinstall": "playwright install chromium || true"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "esbuild": "^0.28.0",
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  }
+}

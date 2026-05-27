@@ -1,0 +1,34 @@
+services:
+  atlas-postgres:
+    image: postgres:16
+    container_name: atlas_one_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: atlas
+      POSTGRES_DB: atlas_one
+    ports:
+      - "5432:5432"
+    volumes:
+      - atlas_one_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlas -d atlas_one"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+  atlas-redis:
+    image: redis:7
+    container_name: atlas_one_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+volumes:
+  atlas_one_postgres:
+

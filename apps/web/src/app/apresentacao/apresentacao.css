@@ -1,0 +1,12 @@
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .apresentacao-doc {
+    max-width: 100%;
+    padding: 0;
+  }
+  body {
+    background: white !important;
+  }
+}

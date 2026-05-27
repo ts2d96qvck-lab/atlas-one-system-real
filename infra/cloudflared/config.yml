@@ -1,0 +1,9 @@
+tunnel: atlas-one
+credentials-file: /etc/cloudflared/atlas-one.json
+
+ingress:
+  - hostname: app.atlasone.com.br
+    service: http://host.docker.internal:80
+  - hostname: atlasone.com.br
+    service: http://host.docker.internal:80
+  - service: http_status:404

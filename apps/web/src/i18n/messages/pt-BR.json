@@ -1,0 +1,16 @@
+{
+  "product": {
+    "name": "Atlas One",
+    "subtitle": "WhatsApp, CRM e SDR"
+  },
+  "navigation": {
+    "inbox": "Inbox",
+    "leads": "Leads",
+    "customers": "Clientes",
+    "deals": "Negocios",
+    "automation": "Automacao",
+    "reports": "Relatorios",
+    "settings": "Configuracoes"
+  }
+}
+

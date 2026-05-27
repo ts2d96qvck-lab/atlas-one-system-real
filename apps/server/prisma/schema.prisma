@@ -1,0 +1,431 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("enterprise")
+  status    String   @default("active")
+  billingStatus String @default("active")
+  billingDueAt DateTime?
+  blockedAt DateTime?
+  settings Json @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users               User[]
+  instances           WhatsAppInstance[]
+  conversations       Conversation[]
+  leads               Lead[]
+  pipelines           Pipeline[]
+  automations         Automation[]
+  campaigns           Campaign[]
+  audits              AuditLog[]
+  paymentIntegrations PaymentIntegration[]
+  authChallenges      AuthChallenge[]
+  teams               Team[]
+  monthlyTargets      MonthlyTarget[]
+  userInvites         UserInvite[]
+  apiKeys             ApiKey[]
+  webhookEndpoints    WebhookEndpoint[]
+  webhookDeliveries   WebhookDelivery[]
+  externalIdentities  ExternalIdentity[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  teamId       String?
+  name         String
+  email        String
+  passwordHash String
+  role         String
+  status       String   @default("active")
+  phone        String?
+  twoFactorEnabled Boolean @default(false)
+  tokenVersion   Int      @default(0)
+  permissions  Json     @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  team          Team?          @relation("TeamMembers", fields: [teamId], references: [id])
+  managedTeams  Team[]         @relation("TeamManager")
+  assignedLeads Lead[]
+  conversations Conversation[]
+  authChallenges AuthChallenge[]
+  invites        UserInvite[]
+  externalIdentities ExternalIdentity[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role])
+}
+
+model AuthChallenge {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String
+  purpose    String
+  channel    String
+  target     String
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, purpose, createdAt])
+  @@index([userId, createdAt])
+}
+
+model UserInvite {
+  id          String    @id @default(cuid())
+  tenantId    String
+  userId      String
+  tokenHash   String    @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+}
+
+model ExternalIdentity {
+  id              String   @id @default(cuid())
+  tenantId        String
+  userId          String
+  provider        String
+  providerSubject String
+  email           String
+  metadata        Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, provider, providerSubject])
+  @@index([tenantId, userId])
+  @@index([tenantId, email])
+}
+
+model WhatsAppInstance {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  label        String
+  phone        String?
+  provider     String   @default("evolution")
+  status       String   @default("created")
+  ownerJid     String?
+  lastSyncAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  conversations Conversation[]
+  campaigns     Campaign[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+}
+
+model Conversation {
+  id              String   @id @default(cuid())
+  tenantId        String
+  teamId          String?
+  instanceId      String
+  assignedToId    String?
+  customerName    String
+  customerPhone   String
+  status          String   @default("open")
+  priority        String   @default("normal")
+  tags            Json     @default("[]")
+  lastMessageAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  team     Team?            @relation(fields: [teamId], references: [id])
+  instance WhatsAppInstance @relation(fields: [instanceId], references: [id])
+  assignedTo User?          @relation(fields: [assignedToId], references: [id])
+  messages Message[]
+  lead     Lead?
+
+  @@index([tenantId, customerPhone])
+  @@index([tenantId, status, lastMessageAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  direction      String
+  type           String   @default("text")
+  text           String?
+  mediaUrl       String?
+  providerId     String?
+  status         String   @default("queued")
+  raw            Json?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+model Lead {
+  id             String   @id @default(cuid())
+  tenantId       String
+  teamId         String?
+  conversationId String?  @unique
+  assignedToId   String?
+  company        String
+  contact        String
+  phone          String
+  email          String?
+  origin         String
+  status         String
+  value          Decimal  @default(0)
+  customFields   Json     @default("{}")
+  nextFollowUpAt DateTime?
+  expectedCloseDate DateTime?
+  closedAt       DateTime?
+  lostAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  team         Team?         @relation(fields: [teamId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+  assignedTo   User?         @relation(fields: [assignedToId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, phone])
+}
+
+model Team {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  managerId    String?
+  monthlyTarget Decimal @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  manager        User?          @relation("TeamManager", fields: [managerId], references: [id])
+  members        User[]         @relation("TeamMembers")
+  leads          Lead[]
+  conversations  Conversation[]
+  monthlyTargets MonthlyTarget[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, managerId])
+}
+
+model MonthlyTarget {
+  id          String   @id @default(cuid())
+  tenantId    String
+  teamId      String?
+  month       String
+  targetValue Decimal  @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  team   Team?  @relation(fields: [teamId], references: [id])
+
+  @@unique([tenantId, teamId, month])
+  @@index([tenantId, month])
+}
+
+model Pipeline {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  stages PipelineStage[]
+}
+
+model PipelineStage {
+  id         String @id @default(cuid())
+  pipelineId String
+  name       String
+  order      Int
+  color      String?
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id])
+
+  @@unique([pipelineId, order])
+}
+
+model Automation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  trigger   String
+  enabled   Boolean  @default(true)
+  config    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, enabled])
+}
+
+model Campaign {
+  id               String    @id @default(cuid())
+  tenantId         String
+  instanceId       String
+  name             String
+  status           String    @default("draft")
+  messageKind      String    @default("session")
+  message          String?
+  mediaUrl         String?
+  mediaType        String?
+  templateName     String?
+  templateLanguage String?   @default("pt_BR")
+  templateBody     Json      @default("[]")
+  config           Json      @default("{}")
+  scheduledAt      DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdById      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  instance   WhatsAppInstance    @relation(fields: [instanceId], references: [id])
+  recipients CampaignRecipient[]
+
+  @@index([tenantId, status])
+  @@index([status, scheduledAt])
+}
+
+model CampaignRecipient {
+  id             String    @id @default(cuid())
+  campaignId     String
+  tenantId       String
+  phone          String
+  name           String?
+  variables      Json      @default("{}")
+  status         String    @default("pending")
+  error          String?
+  providerId     String?
+  conversationId String?
+  messageId      String?
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, phone])
+  @@index([campaignId, status])
+  @@index([tenantId, phone])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  actorId    String?
+  entity     String
+  entityId   String?
+  action     String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+}
+
+model PaymentIntegration {
+  id        String   @id @default(cuid())
+  tenantId  String
+  provider  String
+  status    String   @default("active")
+  config    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, provider])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String
+  keyPrefix   String
+  keyHash     String    @unique
+  scopes      Json      @default("[\"read\",\"write\"]")
+  status      String    @default("active")
+  lastUsedAt  DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([keyHash])
+}
+
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String   @default("Webhook")
+  url       String
+  secret    String
+  events    Json     @default("[]")
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id])
+  deliveries WebhookDelivery[]
+
+  @@index([tenantId, status])
+}
+
+model WebhookDelivery {
+  id             String    @id @default(cuid())
+  tenantId       String
+  endpointId     String
+  event          String
+  payload        Json
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  nextRetryAt    DateTime?
+  lastError      String?
+  responseStatus Int?
+  createdAt      DateTime  @default(now())
+  deliveredAt    DateTime?
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([endpointId, status])
+  @@index([status, nextRetryAt])
+}
