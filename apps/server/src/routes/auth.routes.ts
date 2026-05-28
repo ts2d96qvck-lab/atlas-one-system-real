@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
+import { ZodError } from "zod";
 import {
   bootstrapOwnerAccount,
   confirmPasswordReset,
@@ -25,6 +26,9 @@ import {
 import { env } from "../config/env";
 import { assertSetupToken } from "../lib/security/validate-env";
 import { prisma } from "../lib/prisma";
+import { resolveClientIp } from "../lib/client-ip";
+import { AuthLoginError, formatZodIssues } from "../lib/auth-login-errors";
+import { appLog } from "../lib/app-log";
 
 export async function authRoutes(app: FastifyInstance) {
   await app.register(async (authApp) => {
@@ -34,15 +38,78 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     authApp.post("/login", async (request, reply) => {
+      const requestId = request.requestId;
+      const accessContext = {
+        ip: resolveClientIp(request),
+        userAgent: request.headers["user-agent"],
+        requestId,
+        host: typeof request.headers.host === "string" ? request.headers.host : undefined
+      };
+
+      appLog.info("auth_login_request", {
+        requestId,
+        host: accessContext.host,
+        clientIp: accessContext.ip,
+        origin: request.headers.origin ?? null,
+        userAgent: accessContext.userAgent ?? null
+      });
+
       try {
-        return reply.send(
-          await login(request.body, {
-            ip: request.ip,
-            userAgent: request.headers["user-agent"]
-          })
-        );
+        const result = await login(request.body, accessContext);
+        appLog.info("auth_login_response", {
+          requestId,
+          requires2fa: result.requires2fa,
+          role: result.requires2fa ? result.role : result.user.role
+        });
+        return reply.send(result);
       } catch (error) {
-        return sendError(reply, 401, "Falha no login", clientMessage(error, "Credenciais invalidas"));
+        if (error instanceof ZodError) {
+          const detail = formatZodIssues(error.issues);
+          appLog.warn("auth_login_schema_error", { requestId, detail });
+          return sendError(reply, 422, "Dados de login invalidos", detail, {
+            requestId,
+            exposeMessage: true
+          });
+        }
+
+        if (error instanceof AuthLoginError) {
+          appLog.warn("auth_login_rejected", {
+            requestId,
+            code: error.code,
+            message: error.message
+          });
+          if (error.code === "invalid_credentials") {
+            return sendError(reply, 401, "Falha no login", "Credenciais invalidas", {
+              requestId,
+              exposeMessage: true
+            });
+          }
+          if (error.code === "rate_limited") {
+            return sendError(reply, 429, "Muitas tentativas", error.message, {
+              requestId,
+              exposeMessage: true
+            });
+          }
+          if (error.code === "billing_blocked") {
+            return sendError(reply, 403, "Conta bloqueada", error.message, {
+              requestId,
+              exposeMessage: true
+            });
+          }
+          return sendError(reply, 422, "Verificacao adicional necessaria", error.message, {
+            requestId,
+            exposeMessage: true
+          });
+        }
+
+        appLog.error("auth_login_unexpected", {
+          requestId,
+          message: error instanceof Error ? error.message : String(error)
+        });
+        return sendError(reply, 500, "Erro interno no login", clientMessage(error, "Erro interno"), {
+          requestId,
+          exposeMessage: false
+        });
       }
     });
 

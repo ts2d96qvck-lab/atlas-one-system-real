@@ -10,6 +10,15 @@ function isPrivateHostname(hostname: string) {
   return false;
 }
 
+function matchesAppPublicHost(originUrl: URL) {
+  try {
+    const app = new URL(env.appPublicUrl);
+    return originUrl.hostname === app.hostname;
+  } catch {
+    return false;
+  }
+}
+
 export function resolveCorsOrigin(origin: string | undefined, callback: (err: Error | null, allow: boolean) => void) {
   if (!origin) {
     callback(null, true);
@@ -29,6 +38,11 @@ export function resolveCorsOrigin(origin: string | undefined, callback: (err: Er
   try {
     const url = new URL(origin);
     if (isPrivateHostname(url.hostname)) {
+      callback(null, true);
+      return;
+    }
+    // Allow http and https for the configured production app host (TLS may terminate at Cloudflare).
+    if (matchesAppPublicHost(url) && (url.protocol === "http:" || url.protocol === "https:")) {
       callback(null, true);
       return;
     }

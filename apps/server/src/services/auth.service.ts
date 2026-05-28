@@ -7,12 +7,31 @@ import { maskPhone, otpDeliversForReal, otpDeliveryLabel, sendSms } from "./sms.
 import { assertPassword } from "../lib/security/password-policy";
 import { BCRYPT_ROUNDS } from "../lib/security/bcrypt";
 import { readSessionToken, revokeUserSessions, signSessionToken } from "../lib/session";
+import { appLog } from "../lib/app-log";
+import { isPrivateOrLoopbackIp } from "../lib/client-ip";
+import { AuthLoginError } from "../lib/auth-login-errors";
 
-export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  tenantSlug: z.string().min(2).default("atlas-one")
-});
+export const loginSchema = z
+  .object({
+    email: z.string().email(),
+    password: z.string().min(8).optional(),
+    senha: z.string().min(8).optional(),
+    tenantSlug: z.string().min(2).default("atlas-one")
+  })
+  .superRefine((data, ctx) => {
+    if (!data.password && !data.senha) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["senha"],
+        message: "Senha obrigatoria"
+      });
+    }
+  })
+  .transform(({ senha, password, email, tenantSlug }) => ({
+    email: email.trim().toLowerCase(),
+    tenantSlug: tenantSlug.trim().toLowerCase(),
+    password: password ?? senha!
+  }));
 
 const verifyCodeSchema = z.object({
   challengeId: z.string().min(5),
@@ -60,6 +79,8 @@ export type SessionUser = {
 type AccessContext = {
   ip?: string;
   userAgent?: string;
+  requestId?: string;
+  host?: string;
 };
 
 export function publicUser(user: SessionUser) {
@@ -128,6 +149,10 @@ async function recordAuthAudit(
 
 async function isSuspiciousAccess(tenantId: string, userId: string, context?: AccessContext) {
   if (!context?.ip && !context?.userAgent) return false;
+  const currentIp = context.ip ?? "";
+  // Smoke tests via localhost/nginx and first access from public domain must not force 2FA.
+  if (isPrivateOrLoopbackIp(currentIp)) return false;
+
   const lastSuccess = await prisma.auditLog.findFirst({
     where: { tenantId, actorId: userId, action: "auth_login_success" },
     orderBy: { createdAt: "desc" }
@@ -136,7 +161,8 @@ async function isSuspiciousAccess(tenantId: string, userId: string, context?: Ac
   const metadata = asMetadataRecord(lastSuccess.metadata);
   const lastIp = typeof metadata.ip === "string" ? metadata.ip : "";
   const lastAgent = typeof metadata.userAgent === "string" ? metadata.userAgent : "";
-  const changedIp = Boolean(context.ip && lastIp && context.ip !== lastIp);
+  if (isPrivateOrLoopbackIp(lastIp)) return false;
+  const changedIp = Boolean(currentIp && lastIp && currentIp !== lastIp);
   const changedAgent = Boolean(context.userAgent && lastAgent && context.userAgent !== lastAgent);
   return changedIp || changedAgent;
 }
@@ -174,24 +200,51 @@ type LoginNeeds2fa = {
 export type LoginResult = LoginSuccess | LoginNeeds2fa;
 
 export async function login(input: unknown, context?: AccessContext): Promise<LoginResult> {
+  const log = (step: string, detail: Record<string, unknown> = {}) => {
+    appLog.info("auth_login", {
+      step,
+      requestId: context?.requestId,
+      host: context?.host,
+      clientIp: context?.ip,
+      ...detail
+    });
+  };
+
   const credentials = loginSchema.parse(input);
+  log("schema_ok", {
+    tenantSlug: credentials.tenantSlug,
+    email: credentials.email
+  });
+
   const tenant = await prisma.tenant.findUnique({
     where: { slug: credentials.tenantSlug },
     include: {
       instances: { where: { phone: { not: null } }, select: { phone: true }, take: 1 },
       users: {
-        where: { email: credentials.email.toLowerCase() },
+        where: { email: credentials.email },
         take: 1
       }
     }
   });
 
   const user = tenant?.users[0];
+  log("tenant_lookup", {
+    tenantFound: Boolean(tenant),
+    tenantSlug: credentials.tenantSlug,
+    userFound: Boolean(user),
+    userStatus: user?.status ?? null,
+    userRole: user?.role ?? null,
+    twoFactorEnabled: user?.twoFactorEnabled ?? null,
+    billingStatus: tenant?.billingStatus ?? null
+  });
+
   if (!tenant || !user || user.status !== "active") {
-    throw new Error("Login invalido");
+    log("invalid_credentials", { reason: "tenant_or_user_missing_or_inactive" });
+    throw new AuthLoginError("invalid_credentials", "Login invalido");
   }
 
   const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+  log("password_check", { bcryptPassed: isValid });
   if (!isValid) {
     await recordAuthAudit(tenant.id, user.id, "auth_login_failed", context, { reason: "invalid_password" });
     const since = new Date(Date.now() - 15 * 60 * 1000);
@@ -199,13 +252,18 @@ export async function login(input: unknown, context?: AccessContext): Promise<Lo
       where: { tenantId: tenant.id, actorId: user.id, action: "auth_login_failed", createdAt: { gte: since } }
     });
     if (failures >= 5) {
-      throw new Error("Conta temporariamente bloqueada por tentativas invalidas. Aguarde 15 minutos.");
+      log("rate_limited", { failures });
+      throw new AuthLoginError(
+        "rate_limited",
+        "Conta temporariamente bloqueada por tentativas invalidas. Aguarde 15 minutos."
+      );
     }
-    throw new Error("Login invalido");
+    throw new AuthLoginError("invalid_credentials", "Login invalido");
   }
 
   if (tenant.billingStatus === "blocked" || tenant.blockedAt) {
-    throw new Error("Conta bloqueada por pendencia de pagamento");
+    log("billing_blocked", { billingStatus: tenant.billingStatus, blockedAt: tenant.blockedAt });
+    throw new AuthLoginError("billing_blocked", "Conta bloqueada por pendencia de pagamento");
   }
 
   const sessionUser: SessionUser = {
@@ -222,6 +280,14 @@ export async function login(input: unknown, context?: AccessContext): Promise<Lo
   const smsDeliversForReal = otpDeliversForReal();
   const ownerMustUse2fa = user.role === "owner" && smsDeliversForReal;
   const mustUse2fa = ownerMustUse2fa || user.twoFactorEnabled || (suspicious && smsDeliversForReal);
+  log("twofa_decision", {
+    suspicious,
+    smsDeliversForReal,
+    ownerMustUse2fa,
+    twoFactorEnabled: user.twoFactorEnabled,
+    mustUse2fa,
+    qaBypass2fa: env.qaBypass2fa
+  });
   const otpChannel = otpDeliveryLabel();
   const hasPreviousSuccess = await prisma.auditLog.findFirst({
     where: { tenantId: tenant.id, actorId: user.id, action: "auth_login_success" },
@@ -231,7 +297,13 @@ export async function login(input: unknown, context?: AccessContext): Promise<Lo
 
   if (mustUse2fa && !env.qaBypass2fa) {
     const phone = normalizePhone(user.phone ?? tenant.instances[0]?.phone);
-    if (!phone) throw new Error(`Configure um telefone para receber verificacao por ${otpChannel}.`);
+    if (!phone) {
+      log("twofa_phone_missing", { otpChannel });
+      throw new AuthLoginError(
+        "twofa_phone_missing",
+        `Configure um telefone para receber verificacao por ${otpChannel}.`
+      );
+    }
     const { challenge, code } = await createChallenge({
       tenantId: tenant.id,
       userId: user.id,
@@ -242,20 +314,23 @@ export async function login(input: unknown, context?: AccessContext): Promise<Lo
       await sendSms(phone, `Seu codigo Atlas One: ${code}. Expira em 10 minutos.`, { tenantId: tenant.id });
     } catch (error) {
       await prisma.authChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+      const detail = error instanceof Error ? error.message : String(error);
+      log("twofa_sms_failed", { otpChannel, detail });
       if (env.isProduction && !env.allowLocalSms) {
-        const detail = error instanceof Error ? error.message : String(error);
-        throw new Error(`Nao foi possivel enviar codigo pelo ${otpChannel}: ${detail}`);
+        throw new AuthLoginError("twofa_sms", `Nao foi possivel enviar codigo pelo ${otpChannel}: ${detail}`);
       }
       const token = signSessionToken(sessionUser, user.tokenVersion);
       await recordAuthAudit(tenant.id, user.id, "auth_login_success", context, {
         mode: "2fa_skipped_delivery_failed",
-        reason: error instanceof Error ? error.message : String(error)
+        reason: detail
       });
+      log("login_success", { mode: "2fa_skipped_delivery_failed" });
       return { token, user: publicUser(sessionUser), requires2fa: false };
     }
     await recordAuthAudit(tenant.id, user.id, "auth_login_challenge", context, {
       reason: suspicious ? "suspicious_access" : ownerMustUse2fa ? "owner_policy" : "user_2fa_enabled"
     });
+    log("twofa_challenge", { challengeId: challenge.id, ownerFirstAccess });
     return {
       requires2fa: true,
       challengeId: challenge.id,
@@ -270,6 +345,7 @@ export async function login(input: unknown, context?: AccessContext): Promise<Lo
 
   const token = signSessionToken(sessionUser, user.tokenVersion);
   await recordAuthAudit(tenant.id, user.id, "auth_login_success", context, { mode: "password_only" });
+  log("login_success", { mode: "password_only", role: user.role });
   return { token, user: publicUser(sessionUser), requires2fa: false };
 }
 

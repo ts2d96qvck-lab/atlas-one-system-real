@@ -189,13 +189,19 @@ export async function login(email: string, password: string, tenantSlug = "atlas
   const response = await fetchWithTimeout(`${apiUrl()}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password, tenantSlug })
+    body: JSON.stringify({
+      tenantSlug: tenantSlug.trim().toLowerCase(),
+      email: email.trim().toLowerCase(),
+      password
+    })
   });
+  const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body?.message ?? body?.error ?? "Login invalido");
+    const detail = typeof body?.message === "string" ? body.message : undefined;
+    const base = body?.error ?? body?.message ?? "Login invalido";
+    throw new Error(detail && detail !== base ? `${base}: ${detail}` : base);
   }
-  return response.json() as Promise<LoginResponse>;
+  return body as LoginResponse;
 }
 
 export type AuthProviderInfo = {

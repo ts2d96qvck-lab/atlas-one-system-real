@@ -2,21 +2,47 @@ import type { FastifyReply } from "fastify";
 import { env } from "../config/env";
 import { appLog } from "../lib/app-log";
 
-export function sendError(reply: FastifyReply, statusCode: number, message: string, details?: unknown) {
+type SendErrorOptions = {
+  requestId?: string;
+  /** When true, include a safe `message` field even in production (login/validation). */
+  exposeMessage?: boolean;
+};
+
+export function sendError(
+  reply: FastifyReply,
+  statusCode: number,
+  message: string,
+  details?: unknown,
+  options?: SendErrorOptions
+) {
   if (statusCode >= 500) {
     appLog.error("api_error", {
+      requestId: options?.requestId,
       statusCode,
       message,
       details: details instanceof Error ? details.message : details
     });
   }
 
-  const exposeDetails = !env.isProduction && details !== undefined;
+  const detailText =
+    typeof details === "string"
+      ? details
+      : details instanceof Error
+        ? details.message
+        : undefined;
+
+  const exposeDetails = options?.exposeMessage || (!env.isProduction && details !== undefined);
+  const safeMessage = detailText && (options?.exposeMessage || !env.isProduction) ? detailText : undefined;
+
   return reply.status(statusCode).send({
     error: message,
-    ...(exposeDetails
-      ? { details: details instanceof Error ? details.message : details }
-      : {})
+    ...(safeMessage ? { message: safeMessage } : {}),
+    ...(options?.requestId ? { requestId: options.requestId } : {}),
+    ...(exposeDetails && detailText && !safeMessage
+      ? { details: detailText }
+      : exposeDetails && details !== undefined && !detailText
+        ? { details: details instanceof Error ? details.message : details }
+        : {})
   });
 }
 

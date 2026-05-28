@@ -53,11 +53,12 @@ export function maskPhone(phone: string) {
 }
 
 export function otpDeliversForReal() {
+  if (env.isProduction && env.smsProvider === "console") return false;
   return (
     env.smsProvider === "twilio" ||
     (env.smsProvider === "webhook" && Boolean(env.smsWebhookUrl)) ||
     env.smsProvider === "whatsapp" ||
-    env.smsProvider === "console"
+    (!env.isProduction && env.smsProvider === "console")
   );
 }
 
