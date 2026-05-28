@@ -46,6 +46,20 @@ export async function buildServer() {
 
   registerRequestContext(app);
 
+  // Accept POST/PATCH with Content-Type application/json and empty body (e.g. /campaigns/:id/start).
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
+    try {
+      if (body === "" || body === undefined || body === null) {
+        done(null, {});
+        return;
+      }
+      done(null, JSON.parse(body as string));
+    } catch (error) {
+      done(error as Error, undefined);
+    }
+  });
+
   await app.register(cors, corsOptions);
   await app.register(helmet, { crossOriginResourcePolicy: { policy: "cross-origin" } });
   await mkdir(uploadsRoot(), { recursive: true });
@@ -128,14 +142,36 @@ export async function buildServer() {
     });
 
     const evolutionWebhookHandler = async (
-      request: { body: unknown; headers: Record<string, unknown> },
+      request: { body: unknown; headers: Record<string, unknown>; requestId?: string },
       reply: { status: (code: number) => { send: (body: unknown) => unknown }; send: (body: unknown) => unknown },
       tenantSlug?: string
     ) => {
+      const event =
+        request.body && typeof request.body === "object"
+          ? String((request.body as Record<string, unknown>).event ?? "unknown")
+          : "unknown";
+      appLog.info("evolution_webhook_received", {
+        requestId: request.requestId,
+        tenantSlug: tenantSlug ?? null,
+        event
+      });
+
       if (!verifyEvolutionWebhook(request as never)) {
+        appLog.warn("evolution_webhook_rejected", {
+          requestId: request.requestId,
+          tenantSlug: tenantSlug ?? null,
+          event,
+          reason: "webhook_unauthorized"
+        });
         return reply.status(401).send({ ok: false, error: "webhook_unauthorized" });
       }
       const result = await handleEvolutionWebhook(request.body, tenantSlug);
+      appLog.info("evolution_webhook_processed", {
+        requestId: request.requestId,
+        tenantSlug: tenantSlug ?? null,
+        event,
+        result
+      });
       return reply.send(result);
     };
 

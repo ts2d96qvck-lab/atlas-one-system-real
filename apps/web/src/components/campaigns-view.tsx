@@ -47,7 +47,8 @@ export function CampaignsView({ token }: Props) {
     onlyBusinessHours: true
   });
 
-  const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  const headers = { authorization: `Bearer ${token}` };
+  const jsonHeaders = { ...headers, "content-type": "application/json" };
 
   async function load() {
     const [campaignRes, instanceRes] = await Promise.all([
@@ -90,7 +91,7 @@ export function CampaignsView({ token }: Props) {
     }
     const response = await fetch(`${apiUrl()}/campaigns`, {
       method: "POST",
-      headers,
+      headers: jsonHeaders,
       body: JSON.stringify({
         name: form.name,
         instanceId: form.instanceId,
@@ -131,7 +132,8 @@ export function CampaignsView({ token }: Props) {
     if (kind === "delete" && !window.confirm("Excluir esta campanha?")) return;
     const response = await fetch(`${apiUrl()}/campaigns/${id}${kind === "delete" ? "" : `/${kind}`}`, {
       method: kind === "delete" ? "DELETE" : "POST",
-      headers
+      headers: kind === "delete" ? headers : jsonHeaders,
+      ...(kind === "delete" ? {} : { body: "{}" })
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));

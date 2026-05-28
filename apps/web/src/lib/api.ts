@@ -855,7 +855,7 @@ export function syncWebhook(token: string, instanceName: string) {
   return request<{ ok: boolean; webhookUrl: string }>(
     `/whatsapp/instances/${instanceName}/webhook/sync`,
     token,
-    { method: "POST", headers: { "content-type": "application/json" } }
+    { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }
   );
 }
 

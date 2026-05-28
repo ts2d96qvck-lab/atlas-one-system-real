@@ -45,6 +45,8 @@ export const env = {
   metaWhatsAppWebhookVerifyToken: process.env.META_WHATSAPP_WEBHOOK_VERIFY_TOKEN ?? "",
   metaWhatsAppAppSecret: process.env.META_WHATSAPP_APP_SECRET ?? "",
   webhookPublicUrl: process.env.WEBHOOK_PUBLIC_URL ?? "http://app.atlasone.local.gd",
+  /** Internal base URL Evolution uses to POST webhooks (same Docker network). Falls back to webhookPublicUrl. */
+  evolutionWebhookBaseUrl: process.env.EVOLUTION_WEBHOOK_BASE_URL ?? "",
   appPublicUrl: process.env.APP_PUBLIC_URL ?? process.env.WEBHOOK_PUBLIC_URL ?? "http://127.0.0.1",
   databaseUrl: process.env.DATABASE_URL ?? "",
   smsProvider: process.env.SMS_PROVIDER ?? "console",

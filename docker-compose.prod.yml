@@ -88,6 +88,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-atlas}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-atlas_one}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       EVOLUTION_URL: http://evolution-api:8080
+      EVOLUTION_WEBHOOK_BASE_URL: http://nginx
     volumes:
       - atlas_uploads:/app/uploads
     healthcheck:

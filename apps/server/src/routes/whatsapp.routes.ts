@@ -31,7 +31,8 @@ const createInstanceSchema = z.object({
 });
 
 function webhookUrl(tenantSlug: string) {
-  return buildWebhookPublicUrl(env.webhookPublicUrl, tenantSlug);
+  const base = (env.evolutionWebhookBaseUrl || env.webhookPublicUrl).replace(/\/$/, "");
+  return buildWebhookPublicUrl(base, tenantSlug);
 }
 
 async function tenantSettingsFor(user: { tenantId: string }) {

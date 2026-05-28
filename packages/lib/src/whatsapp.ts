@@ -99,6 +99,7 @@ export type WhatsAppProvider = {
 export type EvolutionConfig = {
   baseUrl: string;
   apiKey: string;
+  webhookSecret?: string;
 };
 
 export class EvolutionWhatsAppProvider implements WhatsAppProvider {
@@ -513,6 +514,14 @@ export class EvolutionWhatsAppProvider implements WhatsAppProvider {
   }
 
   async setWebhook(instanceName: string, url: string) {
+    const headers: Record<string, string> = {};
+    if (this.config.apiKey) {
+      headers.apikey = this.config.apiKey;
+    }
+    if (this.config.webhookSecret) {
+      headers["x-atlas-webhook-secret"] = this.config.webhookSecret;
+    }
+
     return this.request(`/webhook/set/${instanceName}`, {
       method: "POST",
       body: JSON.stringify({
@@ -522,6 +531,7 @@ export class EvolutionWhatsAppProvider implements WhatsAppProvider {
           webhookByEvents: false,
           webhook_base64: true,
           webhookBase64: true,
+          ...(Object.keys(headers).length ? { headers } : {}),
           events: [
             "MESSAGES_UPSERT",
             "MESSAGES_UPDATE",

@@ -15,6 +15,10 @@ export function verifyEvolutionWebhook(request: FastifyRequest) {
   if (env.webhookSecret && secret === env.webhookSecret) return true;
 
   if (!env.enterpriseMode) return true;
+
+  // Allow same-network callbacks when no secret headers are configured yet (legacy instances).
+  if (!env.webhookSecret && !env.evolutionApiKey) return true;
+
   return false;
 }
 

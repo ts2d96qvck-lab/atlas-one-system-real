@@ -1,4 +1,4 @@
-import { parseEvolutionWebhook } from "@atlas-one/lib";
+import { parseEvolutionWebhook, normalizeEvolutionEvent } from "@atlas-one/lib";
 import { createEvolutionProvider } from "./whatsapp/providers/evolution.provider";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
@@ -613,7 +613,7 @@ async function ingestMetaStatusUpdate(parsed: { messageId: string; status: strin
 
 export async function handleEvolutionWebhook(body: unknown, tenantSlug?: string) {
   if (body && typeof body === "object") {
-    const event = String((body as Record<string, unknown>).event ?? "");
+    const event = normalizeEvolutionEvent((body as Record<string, unknown>).event);
     if (event === "messages.upsert" || event === "message.upsert") {
       const maybeReaction = await handleReactionEvent(body, tenantSlug);
       if ((maybeReaction as { skipped?: string }).skipped !== "no_reaction_payload") {

@@ -107,15 +107,26 @@ function readMessageContent(message: Record<string, unknown> | undefined) {
   return null;
 }
 
+export function normalizeEvolutionEvent(event: unknown) {
+  return String(event ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, ".");
+}
+
 export function parseEvolutionWebhook(body: unknown): ParsedEvolutionMessage | null {
   if (!body || typeof body !== "object") return null;
 
   const payload = body as Record<string, unknown>;
-  const event = String(payload.event ?? "");
-  const data = (payload.data ?? payload) as Record<string, unknown>;
+  const event = normalizeEvolutionEvent(payload.event);
+  let data = (payload.data ?? payload) as Record<string, unknown>;
 
   if (event === "messages.update" || event === "message.update") {
     return null;
+  }
+
+  if (Array.isArray(data) && data[0] && typeof data[0] === "object") {
+    data = data[0] as Record<string, unknown>;
   }
 
   const key = (data.key ?? {}) as Record<string, unknown>;
