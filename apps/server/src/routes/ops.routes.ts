@@ -3,6 +3,7 @@ import rateLimit from "@fastify/rate-limit";
 import { requireAuth, requireUser } from "../plugins/auth";
 import { requirePermission } from "../plugins/permissions";
 import { getSlaMetrics } from "../services/ops/sla.service";
+import { getTenantDiagnostics } from "../services/ops/diagnostics.service";
 import {
   exportConversationsCsv,
   exportLeadsCsv,
@@ -23,6 +24,11 @@ export async function opsRoutes(app: FastifyInstance) {
     const query = request.query as { days?: string };
     const days = Math.min(90, Math.max(7, Number(query.days ?? 30) || 30));
     return reply.send(await getSlaMetrics(user.tenantId, scopeFromUser(user), days));
+  });
+
+  app.get("/diagnostics", { preHandler: [requireAuth, requirePermission("admin:read")] }, async (request, reply) => {
+    const user = requireUser(request);
+    return reply.send(await getTenantDiagnostics(user.tenantId));
   });
 
   await app.register(async (exportApp) => {

@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { getSlaMetrics } from "./ops/sla.service";
+import { mapConnectionStatus } from "./ops/diagnostics.service";
 
 const DEFAULT_PIPELINE = [
   "Novos leads",
@@ -252,7 +253,10 @@ export async function getDashboard(
           ...row,
           conversionRate: row.leads ? Number(((row.closed / row.leads) * 100).toFixed(1)) : 0
         })),
-      instances,
+      instances: instances.map((item) => ({
+        ...item,
+        connectionStatus: mapConnectionStatus(item.status, item.phone)
+      })),
       sla
     };
   } catch {

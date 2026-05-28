@@ -117,7 +117,13 @@ export function DashboardView({ token }: Props) {
     weighted: number;
     conversionRate: number;
   }[];
-  const instances = (data.instances ?? []) as { label: string; name: string; status: string; phone?: string | null }[];
+  const instances = (data.instances ?? []) as {
+    label: string;
+    name: string;
+    status: string;
+    connectionStatus?: string;
+    phone?: string | null;
+  }[];
   const sla = (data.sla ?? {}) as {
     config?: { firstResponseMinutes?: number; resolutionHours?: number };
     avgFirstResponseMinutes?: number | null;
@@ -171,8 +177,8 @@ export function DashboardView({ token }: Props) {
   const teamRows = [...teamPerformance].sort((a, b) => Number(b.revenue ?? 0) - Number(a.revenue ?? 0));
   const teamMaxRevenue = Math.max(...teamRows.map((row) => Number(row.revenue ?? 0)), 1);
   const connectedInstances = instances.filter((item) => {
-    const state = String(item.status ?? "").toLowerCase();
-    return state === "open" || state === "connected";
+    const state = String(item.connectionStatus ?? item.status ?? "").toLowerCase();
+    return state === "connected" || state === "open";
   }).length;
 
   const projectionRows = [
@@ -553,13 +559,26 @@ export function DashboardView({ token }: Props) {
             </div>
             <div className="space-y-2">
               {instances.map((item) => {
-                const normalized = String(item.status ?? "").toLowerCase();
+                const label = item.connectionStatus ?? item.status;
+                const normalized = String(label ?? "").toLowerCase();
                 const tone =
-                  normalized === "open" || normalized === "connected"
+                  normalized === "connected" || normalized === "open"
                     ? "text-emerald-600 bg-emerald-50"
                     : normalized === "connecting"
                       ? "text-amber-600 bg-amber-50"
-                      : "text-rose-600 bg-rose-50";
+                      : normalized === "needs_setup"
+                        ? "text-slate-600 bg-slate-100"
+                        : "text-rose-600 bg-rose-50";
+                const display =
+                  normalized === "connected" || normalized === "open"
+                    ? "Conectado"
+                    : normalized === "connecting"
+                      ? "Conectando"
+                      : normalized === "disconnected" || normalized === "closed"
+                        ? "Desconectado"
+                        : normalized === "needs_setup"
+                          ? "Configurar"
+                          : label;
                 return (
                   <div key={item.name} className="flex items-center justify-between rounded-lg border border-white bg-white px-3 py-2">
                     <div>
@@ -567,7 +586,7 @@ export function DashboardView({ token }: Props) {
                       <p className="text-xs text-slate-500">{item.phone ?? item.name}</p>
                     </div>
                     <p className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${tone}`}>
-                      {item.status}
+                      {display}
                     </p>
                   </div>
                 );
