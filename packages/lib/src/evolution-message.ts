@@ -32,6 +32,11 @@ function mediaFromPayload(payload: Record<string, unknown> | undefined) {
 function readMessageContent(message: Record<string, unknown> | undefined) {
   if (!message || typeof message !== "object") return null;
 
+  const ephemeral = message.ephemeralMessage as { message?: Record<string, unknown> } | undefined;
+  if (ephemeral?.message) {
+    return readMessageContent(ephemeral.message);
+  }
+
   if (typeof message.conversation === "string") {
     return { type: "text" as const, text: message.conversation };
   }
@@ -130,14 +135,23 @@ export function parseEvolutionWebhook(body: unknown): ParsedEvolutionMessage | n
   }
 
   const key = (data.key ?? {}) as Record<string, unknown>;
-  const remoteJid = String(key.remoteJid ?? data.remoteJid ?? data.from ?? "");
+  let remoteJid = String(key.remoteJid ?? data.remoteJid ?? data.from ?? data.number ?? "");
+  if (!remoteJid && typeof data.senderPn === "string") {
+    remoteJid = `${data.senderPn.replace(/\D/g, "")}@s.whatsapp.net`;
+  }
   if (!remoteJid || remoteJid.endsWith("@g.us")) return null;
 
   const messagePayload =
     (data.message as Record<string, unknown> | undefined) ??
     (Array.isArray(data.messages) ? (data.messages[0] as Record<string, unknown>)?.message : undefined);
 
-  const content = readMessageContent(messagePayload as Record<string, unknown> | undefined);
+  let content = readMessageContent(messagePayload as Record<string, unknown> | undefined);
+  if (!content && typeof data.text === "string" && data.text.trim()) {
+    content = { type: "text" as const, text: data.text.trim() };
+  }
+  if (!content && typeof data.body === "string" && data.body.trim()) {
+    content = { type: "text" as const, text: data.body.trim() };
+  }
   if (!content) return null;
 
   const fromMe = key.fromMe === true || event === "send.message";

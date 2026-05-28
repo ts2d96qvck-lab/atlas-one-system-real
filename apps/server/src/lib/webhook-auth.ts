@@ -8,6 +8,10 @@ function headerValue(request: FastifyRequest, name: string) {
 }
 
 export function verifyEvolutionWebhook(request: FastifyRequest) {
+  const query = (request.query ?? {}) as Record<string, string | undefined>;
+  const queryToken = query.token ?? query.webhook_token;
+  if (env.webhookSecret && queryToken === env.webhookSecret) return true;
+
   const apiKey = headerValue(request, "apikey") || headerValue(request, "x-api-key");
   if (env.evolutionApiKey && apiKey === env.evolutionApiKey) return true;
 

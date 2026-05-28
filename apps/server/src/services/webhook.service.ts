@@ -70,17 +70,40 @@ function phoneCandidates(raw: string) {
 }
 
 async function resolveWhatsAppInstance(instanceName: string, tenantSlug?: string) {
+  const normalized = instanceName.trim();
+  const slugInstance = (name: string) =>
+    name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
   if (tenantSlug) {
     const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug.toLowerCase() } });
     if (!tenant) return null;
-    return prisma.whatsAppInstance.findFirst({
-      where: { tenantId: tenant.id, name: instanceName },
+    const instances = await prisma.whatsAppInstance.findMany({
+      where: { tenantId: tenant.id },
       include: { tenant: true }
     });
+    const exact = instances.find((item) => item.name === normalized);
+    if (exact) return exact;
+    const insensitive = instances.find((item) => item.name.toLowerCase() === normalized.toLowerCase());
+    if (insensitive) return insensitive;
+    const preferredSlug = slugInstance(normalized);
+    const slugMatch = instances.find((item) => slugInstance(item.name) === preferredSlug);
+    if (slugMatch) return slugMatch;
+    if (instances.length === 1) return instances[0]!;
+    return null;
   }
 
   const matches = await prisma.whatsAppInstance.findMany({
-    where: { name: instanceName },
+    where: {
+      OR: [
+        { name: normalized },
+        { name: { equals: normalized, mode: "insensitive" } }
+      ]
+    },
     include: { tenant: true }
   });
   if (matches.length === 1) return matches[0];
