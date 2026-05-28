@@ -12,6 +12,7 @@ import { mkdir } from "node:fs/promises";
 import { uploadsRoot } from "./lib/media-storage";
 import { handleEvolutionWebhook, handleMetaCloudWebhook, handleMetaCloudWebhookVerify } from "./services/webhook.service";
 import { verifyEvolutionWebhook } from "./lib/webhook-auth";
+import { recordEvolutionWebhook } from "./services/ops/webhook-diagnostics";
 import { prisma } from "./lib/prisma";
 import { validateProductionEnv } from "./lib/security/validate-env";
 import { appLog } from "./lib/app-log";
@@ -45,20 +46,6 @@ export async function buildServer() {
   });
 
   registerRequestContext(app);
-
-  // Accept POST/PATCH with Content-Type application/json and empty body (e.g. /campaigns/:id/start).
-  app.removeContentTypeParser("application/json");
-  app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
-    try {
-      if (body === "" || body === undefined || body === null) {
-        done(null, {});
-        return;
-      }
-      done(null, JSON.parse(body as string));
-    } catch (error) {
-      done(error as Error, undefined);
-    }
-  });
 
   await app.register(cors, corsOptions);
   await app.register(helmet, { crossOriginResourcePolicy: { policy: "cross-origin" } });
@@ -166,6 +153,8 @@ export async function buildServer() {
         return reply.status(401).send({ ok: false, error: "webhook_unauthorized" });
       }
       const result = await handleEvolutionWebhook(request.body, tenantSlug);
+      const ok = Boolean(result && typeof result === "object" && (result as { ok?: boolean }).ok !== false);
+      recordEvolutionWebhook(event, ok);
       appLog.info("evolution_webhook_processed", {
         requestId: request.requestId,
         tenantSlug: tenantSlug ?? null,

@@ -110,6 +110,31 @@ async function resolveWhatsAppInstance(instanceName: string, tenantSlug?: string
   return null;
 }
 
+async function handleConnectionUpdate(body: Record<string, unknown>, tenantSlug?: string) {
+  const payload = (body.data ?? body) as Record<string, unknown>;
+  const nested =
+    payload.instance && typeof payload.instance === "object"
+      ? (payload.instance as Record<string, unknown>)
+      : payload;
+  const stateRaw = String(nested.state ?? nested.status ?? nested.connectionStatus ?? payload.state ?? "");
+  const instanceName = String(body.instance ?? nested.instanceName ?? nested.name ?? "Atlas one");
+  const instance = await resolveWhatsAppInstance(instanceName, tenantSlug);
+  if (!instance) return { ok: true, skipped: "instance_not_registered", instance: instanceName };
+
+  const state = stateRaw.toLowerCase();
+  let status = instance.status;
+  if (state.includes("open") || state.includes("connected")) status = "open";
+  else if (state.includes("connect") || state.includes("qrcode") || state.includes("pairing")) status = "connecting";
+  else if (state.includes("close") || state.includes("logout") || state.includes("disconnect")) status = "closed";
+
+  await prisma.whatsAppInstance.update({
+    where: { id: instance.id },
+    data: { status, lastSyncAt: new Date() }
+  });
+
+  return { ok: true, updated: true, status, instance: instance.name };
+}
+
 function pickAvatarFromWebhook(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;
   const root = body as Record<string, unknown>;
@@ -637,6 +662,9 @@ async function ingestMetaStatusUpdate(parsed: { messageId: string; status: strin
 export async function handleEvolutionWebhook(body: unknown, tenantSlug?: string) {
   if (body && typeof body === "object") {
     const event = normalizeEvolutionEvent((body as Record<string, unknown>).event);
+    if (event === "connection.update") {
+      return handleConnectionUpdate(body as Record<string, unknown>, tenantSlug);
+    }
     if (event === "messages.upsert" || event === "message.upsert") {
       const maybeReaction = await handleReactionEvent(body, tenantSlug);
       if ((maybeReaction as { skipped?: string }).skipped !== "no_reaction_payload") {
@@ -875,7 +903,7 @@ export async function handleEvolutionWebhook(body: unknown, tenantSlug?: string)
     });
   }
 
-  return { ok: true, messageId: message.id, conversationId: conversation.id };
+  return { ok: true, messageId: message.id, conversationId: conversation.id, inbound: !parsed.fromMe };
 }
 
 export function handleMetaCloudWebhookVerify(query: Record<string, string | undefined>) {
