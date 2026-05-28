@@ -132,8 +132,8 @@ export function CampaignsView({ token }: Props) {
     if (kind === "delete" && !window.confirm("Excluir esta campanha?")) return;
     const response = await fetch(`${apiUrl()}/campaigns/${id}${kind === "delete" ? "" : `/${kind}`}`, {
       method: kind === "delete" ? "DELETE" : "POST",
-      headers: kind === "delete" ? headers : jsonHeaders,
-      ...(kind === "delete" ? {} : { body: "{}" })
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: kind === "delete" ? undefined : JSON.stringify({})
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
