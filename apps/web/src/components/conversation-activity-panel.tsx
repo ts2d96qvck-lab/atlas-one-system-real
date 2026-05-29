@@ -14,6 +14,7 @@ type ConversationActivityPanelProps = {
   token: string;
   conversationId: string | null;
   agents: UserRow[];
+  mode?: "all" | "notes" | "history";
 };
 
 function formatWhen(value: string) {
@@ -85,7 +86,12 @@ function ActivityCard({ item }: { item: ConversationActivityItem }) {
   );
 }
 
-export function ConversationActivityPanel({ token, conversationId, agents }: ConversationActivityPanelProps) {
+export function ConversationActivityPanel({
+  token,
+  conversationId,
+  agents,
+  mode = "all"
+}: ConversationActivityPanelProps) {
   const [items, setItems] = useState<ConversationActivityItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -159,15 +165,23 @@ export function ConversationActivityPanel({ token, conversationId, agents }: Con
     }
   }
 
+  const visibleItems = useMemo(() => {
+    if (mode === "notes") return items.filter((item) => item.type === "note" || item.type === "legacy_note");
+    return items;
+  }, [items, mode]);
+
+  const showComposer = mode === "all" || mode === "notes";
+
   if (!conversationId) {
-    return <p className="mt-3 text-xs text-atlas-muted">Selecione uma conversa para ver notas e transferencias.</p>;
+    return <p className="text-xs text-atlas-muted">Selecione uma conversa para ver notas e transferencias.</p>;
   }
 
   return (
-    <div className="mt-3 flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
+      {showComposer ? (
       <div className="space-y-2">
         <textarea
-          className="w-full rounded-2xl border border-white/70 bg-white/55 p-3 text-sm outline-none backdrop-blur-xl"
+          className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-blue-300"
           rows={4}
           value={draft}
           onChange={(e) => handleDraftChange(e.target.value)}
@@ -192,18 +206,21 @@ export function ConversationActivityPanel({ token, conversationId, agents }: Con
           {saving ? <Loader2 size={14} className="animate-spin" /> : "Adicionar nota"}
         </Button>
       </div>
+      ) : null}
 
-      <div className="atlas-scroll mt-4 min-h-0 flex-1 space-y-2 overflow-auto pr-1">
+      <div className={`atlas-scroll min-h-0 flex-1 space-y-2 overflow-auto pr-1 ${showComposer ? "mt-4" : ""}`}>
         {loading ? (
           <div className="flex justify-center py-6">
             <Loader2 className="animate-spin text-slate-400" size={18} />
           </div>
         ) : null}
-        {!loading && !items.length ? (
-          <p className="text-xs text-atlas-muted">Nenhuma atividade registrada ainda.</p>
+        {!loading && !visibleItems.length ? (
+          <p className="text-xs text-atlas-muted">
+            {mode === "notes" ? "Nenhuma nota registrada ainda." : "Nenhuma atividade registrada ainda."}
+          </p>
         ) : null}
-        {items.map((item) =>
-          item.type === "legacy_note" ? (
+        {visibleItems.map((item) =>
+          item.type === "legacy_note" && mode !== "history" ? (
             <div key={item.id}>
               <ActivityCard item={item} />
               <Button

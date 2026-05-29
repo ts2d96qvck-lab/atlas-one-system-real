@@ -3,31 +3,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  Bell,
-  Check,
   CheckCheck,
   ChevronDown,
   Clock3,
   CornerUpLeft,
   FileText,
+  Filter,
   Loader2,
   LogOut,
   MessageCircle,
   Mic,
   MoreVertical,
   Paperclip,
-  Pencil,
   Plus,
   Search,
   Send,
-  Shield,
   Square,
   Trash2,
-  UserPlus,
-  Users,
   X
 } from "lucide-react";
-import { Badge, Button, Card } from "@atlas-one/ui";
+import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
 import {
   createConversation,
   deleteConversation,
@@ -59,8 +54,8 @@ import {
 import { connectRealtime, joinTenant } from "../lib/socket";
 import { SecureMedia } from "./secure-media";
 import { QuickRepliesMenu } from "./quick-replies-menu";
-import { ConversationActivityPanel } from "./conversation-activity-panel";
-import { ConversationTagChips, ConversationTagEditor, TagFilterBar } from "./conversation-tags";
+import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
+import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { AppCombobox } from "./ui/app-select";
 import { apiUrl } from "../lib/config";
 import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
@@ -517,316 +512,144 @@ function MessageBubble({
   );
 }
 
-type TeamMemberDropdownProps = {
-  agents: UserRow[];
-  selectedAgentId: string | null;
-  selectedDepartment: string;
-  onSelectDepartment: (department: string) => void;
-  onSelect: (id: string) => void;
-  agentAvatarFor: (agentId: string) => string | null;
+type ConversationHeaderBarProps = {
+  active: Conversation;
+  customerAvatarUrl?: string | null;
   accessToken: string;
+  onSetStatus: (status: "open" | "waiting_customer" | "closed") => void;
+  onOpenDrawer: () => void;
 };
 
-function TeamMemberDropdown({
-  agents,
-  selectedAgentId,
-  selectedDepartment,
-  onSelectDepartment,
-  onSelect,
-  agentAvatarFor,
-  accessToken
-}: TeamMemberDropdownProps) {
-  const departments = Array.from(new Set(agents.map(agentDepartment))).sort((a, b) => a.localeCompare(b));
-  const visibleAgents =
-    selectedDepartment === "Todos" ? agents : agents.filter((agent) => agentDepartment(agent) === selectedDepartment);
+function statusDotClass(status: string) {
+  if (status === "closed") return "bg-slate-400";
+  if (status === "waiting_customer") return "bg-amber-400";
+  return "bg-emerald-500";
+}
+
+function ConversationHeaderBar({
+  active,
+  customerAvatarUrl,
+  accessToken,
+  onSetStatus,
+  onOpenDrawer
+}: ConversationHeaderBarProps) {
+  const assignee = active.assignedTo?.name ?? "Sem atendente";
 
   return (
-    <div className="mt-2 max-h-64 overflow-auto rounded-xl border border-white/70 bg-white/90 p-2 shadow-sm">
-      <div className="mb-2 flex flex-wrap gap-1">
-        <button
-          type="button"
-          className={`rounded-full border px-2 py-0.5 text-[10px] ${selectedDepartment === "Todos" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600"}`}
-          onClick={() => onSelectDepartment("Todos")}
-        >
-          Todos
-        </button>
-        {departments.map((department) => (
-          <button
-            key={department}
-            type="button"
-            className={`rounded-full border px-2 py-0.5 text-[10px] ${
-              selectedDepartment === department ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600"
-            }`}
-            onClick={() => onSelectDepartment(department)}
-          >
-            {department}
-          </button>
-        ))}
+    <div className="flex items-center gap-2 rounded-t-2xl border-b border-slate-200 bg-white px-3 py-2">
+      <CustomerAvatar
+        name={active.customerName}
+        phone={active.customerPhone}
+        avatarUrl={customerAvatarUrl}
+        accessToken={accessToken}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
+        <p className="truncate text-xs text-slate-500">+{active.customerPhone}</p>
       </div>
-      {visibleAgents.map((agent) => (
-        <button
-          key={agent.id}
-          type="button"
-          onClick={() => onSelect(agent.id)}
-          className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs ${
-            selectedAgentId === agent.id ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50"
-          }`}
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <CustomerAvatar
-              name={agent.name}
-              phone={agent.email}
-              size="sm"
-              avatarUrl={agentAvatarFor(agent.id) ?? agent.avatarUrl}
-              accessToken={accessToken}
-            />
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{agent.name}</p>
-              <p className="truncate text-[10px] text-slate-500">{agentDepartment(agent)}</p>
-            </div>
-          </div>
-          <span className="ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300">
-            {selectedAgentId === agent.id ? <Check size={11} /> : null}
-          </span>
-        </button>
-      ))}
-      {!visibleAgents.length ? <p className="px-2 py-1 text-[10px] text-slate-500">Nenhum atendente neste departamento.</p> : null}
-    </div>
-  );
-}
-
-type TransferConversationActionProps = {
-  disabled?: boolean;
-  loading?: boolean;
-  onTransfer: () => void;
-};
-
-function TransferConversationAction({ disabled, loading, onTransfer }: TransferConversationActionProps) {
-  return (
-    <Button className="mt-2 h-8 w-full justify-center text-xs" variant="glass" disabled={disabled || loading} onClick={onTransfer}>
-      {loading ? <Loader2 size={14} className="animate-spin" /> : null}
-      Transferir atendimento
-    </Button>
-  );
-}
-
-type AttendantSelectorProps = {
-  current: Conversation["assignedTo"];
-  agents: UserRow[];
-  transferring: boolean;
-  onTransfer: (agent: UserRow, note?: string) => void;
-  agentAvatarFor: (agentId: string) => string | null;
-  accessToken: string;
-};
-
-function AttendantSelector({ current, agents, transferring, onTransfer, agentAvatarFor, accessToken }: AttendantSelectorProps) {
-  const [open, setOpen] = useState(false);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(current?.id ?? null);
-  const [selectedDepartment, setSelectedDepartment] = useState("Todos");
-  const [transferNote, setTransferNote] = useState("");
-
-  useEffect(() => {
-    setSelectedAgentId(current?.id ?? null);
-  }, [current?.id]);
-
-  const currentName = current?.name ?? "Nao atribuido";
-  const currentAgent = current?.id ? agents.find((item) => item.id === current.id) : null;
-  const currentDepartment = currentAgent ? agentDepartment(currentAgent) : "Sem departamento";
-
-  return (
-    <div className="relative">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700"
+            title="Alterar status"
+          >
+            <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
+            {statusShortLabel(active.status)}
+            <ChevronDown size={12} className="text-slate-400" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+          {(["open", "waiting_customer", "closed"] as const).map((status) => (
+            <button
+              key={status}
+              type="button"
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs ${
+                active.status === status ? "bg-slate-100 font-medium" : "hover:bg-slate-50"
+              }`}
+              onClick={() => onSetStatus(status)}
+            >
+              <span className={`h-2 w-2 rounded-full ${statusDotClass(status)}`} />
+              {statusLabel(status)}
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <span className="hidden max-w-[96px] truncate text-[11px] text-slate-500 sm:inline" title={assignee}>
+        {assignee}
+      </span>
       <button
         type="button"
-        className="flex max-w-full items-center gap-2 rounded-full border border-white/70 bg-white/80 p-1 pr-2 text-left text-xs sm:max-w-[175px]"
-        onClick={() => setOpen((v) => !v)}
-        title="Atendente"
+        className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
+        onClick={onOpenDrawer}
+        aria-label="Detalhes da conversa"
       >
-        <CustomerAvatar
-          name={currentName}
-          phone={currentName}
-          size="sm"
-          avatarUrl={current?.id ? agentAvatarFor(current.id) ?? currentAgent?.avatarUrl : null}
-          accessToken={accessToken}
-        />
-        <div className="min-w-0">
-          <p className="max-w-[110px] truncate text-[11px] font-semibold leading-tight text-slate-700">{currentName}</p>
-          <p className="max-w-[110px] truncate text-[10px] leading-tight text-slate-500">{currentDepartment}</p>
-        </div>
-        <ChevronDown size={12} />
+        <MoreVertical size={16} />
       </button>
-      {open ? (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-64 rounded-xl border border-white/70 bg-white/95 p-2 shadow-lg backdrop-blur">
-          <p className="text-[11px] font-semibold text-slate-600">Atendente</p>
-          <TeamMemberDropdown
-            agents={agents}
-            selectedAgentId={selectedAgentId}
-            selectedDepartment={selectedDepartment}
-            onSelectDepartment={setSelectedDepartment}
-            agentAvatarFor={agentAvatarFor}
-            accessToken={accessToken}
-            onSelect={(id) => {
-              setSelectedAgentId(id);
-              const agent = agents.find((item) => item.id === id);
-              if (agent) setSelectedDepartment(agentDepartment(agent));
-            }}
-          />
-          <textarea
-            className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-blue-300"
-            rows={2}
-            placeholder="Nota da transferencia (opcional)"
-            value={transferNote}
-            onChange={(e) => setTransferNote(e.target.value)}
-          />
-          <TransferConversationAction
-            loading={transferring}
-            disabled={!selectedAgentId || selectedAgentId === current?.id}
-            onTransfer={() => {
-              if (!selectedAgentId) return;
-              const agent = agents.find((item) => item.id === selectedAgentId);
-              if (!agent) return;
-              onTransfer(agent, transferNote.trim() || undefined);
-              setTransferNote("");
-              setOpen(false);
-            }}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
 
-type CustomerHeaderProps = {
-  active: Conversation;
-  agents: UserRow[];
-  customerAvatarUrl?: string | null;
-  editingContact: boolean;
-  contactDraft: { customerName: string; customerPhone: string };
-  setContactDraft: (
-    updater:
-      | { customerName: string; customerPhone: string }
-      | ((prev: { customerName: string; customerPhone: string }) => { customerName: string; customerPhone: string })
-  ) => void;
-  setEditingContact: (value: boolean) => void;
-  onSaveContact: () => void;
-  onDelete: () => void;
-  onSetStatus: (status: "open" | "waiting_customer" | "closed") => void;
-  onTransfer: (agent: UserRow, note?: string) => void;
-  transferring: boolean;
-  agentAvatarFor: (agentId: string) => string | null;
-  accessToken: string;
-  tagCatalog: TagCatalogItem[];
-  tagsSaving: boolean;
-  onTagsChange: (tags: string[]) => void | Promise<void>;
+type NewContactModalProps = {
+  open: boolean;
+  onClose: () => void;
+  name: string;
+  phone: string;
+  onNameChange: (value: string) => void;
+  onPhoneChange: (value: string) => void;
+  onSubmit: () => void | Promise<void>;
+  disabled: boolean;
 };
 
-function CustomerHeader({
-  active,
-  agents,
-  customerAvatarUrl,
-  editingContact,
-  contactDraft,
-  setContactDraft,
-  setEditingContact,
-  onSaveContact,
-  onDelete,
-  onSetStatus,
-  onTransfer,
-  transferring,
-  agentAvatarFor,
-  accessToken,
-  tagCatalog,
-  tagsSaving,
-  onTagsChange
-}: CustomerHeaderProps) {
-  return (
-    <div className="rounded-t-2xl border-b border-slate-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
-          <CustomerAvatar
-            name={active.customerName}
-            phone={active.customerPhone}
-            avatarUrl={customerAvatarUrl}
-            accessToken={accessToken}
-          />
-          {editingContact ? (
-            <div className="flex min-w-[220px] flex-col gap-1">
-              <input
-                className="atlas-field rounded-md px-2 py-1 text-xs outline-none"
-                value={contactDraft.customerName}
-                onChange={(e) => setContactDraft((s) => ({ ...s, customerName: e.target.value }))}
-                placeholder="Nome do cliente"
-              />
-              <input
-                className="atlas-field rounded-md px-2 py-1 text-xs outline-none"
-                value={contactDraft.customerPhone}
-                onChange={(e) => setContactDraft((s) => ({ ...s, customerPhone: e.target.value }))}
-                placeholder="Telefone do cliente"
-              />
-            </div>
-          ) : (
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{active.customerName}</p>
-              <p className="truncate text-xs text-slate-500">+{active.customerPhone}</p>
-            </div>
-          )}
-        </div>
+function NewContactModal({
+  open,
+  onClose,
+  name,
+  phone,
+  onNameChange,
+  onPhoneChange,
+  onSubmit,
+  disabled
+}: NewContactModalProps) {
+  if (!open) return null;
 
-        <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
-          <AttendantSelector
-            current={active.assignedTo ?? null}
-            agents={agents}
-            transferring={transferring}
-            onTransfer={onTransfer}
-            agentAvatarFor={agentAvatarFor}
-            accessToken={accessToken}
-          />
-          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-            {(["open", "waiting_customer", "closed"] as const).map((status) => (
-              <button
-                key={status}
-                type="button"
-                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
-                  active.status === status
-                    ? status === "closed"
-                      ? "bg-slate-700 text-white shadow-sm"
-                      : status === "waiting_customer"
-                        ? "bg-amber-500 text-white shadow-sm"
-                        : "bg-emerald-600 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-white"
-                }`}
-                onClick={() => onSetStatus(status)}
-                title={statusLabel(status)}
-              >
-                {statusLabel(status)}
-              </button>
-            ))}
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/30 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-base font-semibold">Novo contato</p>
+            <p className="text-xs text-slate-500">Inicie uma conversa com um cliente</p>
           </div>
-          {editingContact ? (
-            <>
-              <Button variant="glass" size="sm" className="h-7 px-2 text-[11px]" onClick={onSaveContact} title="Salvar cliente">
-                Salvar
-              </Button>
-              <Button variant="glass" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditingContact(false)} title="Cancelar">
-                Cancelar
-              </Button>
-            </>
-          ) : (
-            <Button variant="glass" size="icon" className="h-7 w-7" onClick={() => setEditingContact(true)} title="Editar cliente">
-              <Pencil size={13} />
-            </Button>
-          )}
-          <Button variant="glass" size="icon" className="h-7 w-7" onClick={onDelete} title="Excluir contato">
-            <Trash2 size={13} />
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-1 text-slate-500 hover:bg-slate-50">
+            <X size={14} />
+          </button>
+        </div>
+        <div className="mt-4 space-y-3">
+          <input
+            className="atlas-field w-full rounded-lg px-3 py-2 text-sm outline-none"
+            placeholder="Nome do cliente"
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+          />
+          <input
+            className="atlas-field w-full rounded-lg px-3 py-2 text-sm outline-none"
+            placeholder="WhatsApp com DDD"
+            value={phone}
+            onChange={(e) => onPhoneChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !disabled) void onSubmit();
+            }}
+          />
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="glass" className="h-9 px-3 text-xs" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button className="h-9 px-3 text-xs" disabled={disabled} onClick={() => void onSubmit()}>
+            Criar conversa
           </Button>
         </div>
-      </div>
-      <div className="mt-2 border-t border-slate-100 pt-2">
-        <ConversationTagEditor
-          tags={active.tags}
-          catalog={tagCatalog}
-          saving={tagsSaving}
-          onChange={onTagsChange}
-        />
       </div>
     </div>
   );
@@ -960,9 +783,9 @@ export function AtlasApp({ token, user }: Props) {
   const [pendingUploadUrl, setPendingUploadUrl] = useState("");
   const [pendingUploadCaption, setPendingUploadCaption] = useState("");
   const [newContact, setNewContact] = useState({ name: "", phone: "" });
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<"client" | "activity">("client");
-  const [editingContact, setEditingContact] = useState(false);
+  const [newContactModalOpen, setNewContactModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<ConversationDrawerTab>("cliente");
   const [contactDraft, setContactDraft] = useState({ customerName: "", customerPhone: "" });
   const [cadenceDraft, setCadenceDraft] = useState("padrao");
   const [transferLoading, setTransferLoading] = useState(false);
@@ -1019,7 +842,6 @@ export function AtlasApp({ token, user }: Props) {
         });
         const cadence = (detail.lead?.customFields as { cadence?: string } | undefined)?.cadence;
         setCadenceDraft(typeof cadence === "string" && cadence ? cadence : "padrao");
-        setEditingContact(false);
         setReplyToMessage(null);
         setLastSeenByConversation((current) => ({ ...current, [id]: Date.now() }));
       } catch {
@@ -1531,10 +1353,6 @@ export function AtlasApp({ token, user }: Props) {
     return normalizeAvatarUrl(value);
   }
 
-  function openTeamManagement() {
-    window.dispatchEvent(new CustomEvent("atlas:navigate", { detail: { view: "admin" } }));
-  }
-
   async function handleCreateConversation() {
     if (!newContact.name.trim() || !newContact.phone.trim()) return;
     const normalizedPhone = normalizeWhatsAppNumber(newContact.phone.trim());
@@ -1552,7 +1370,7 @@ export function AtlasApp({ token, user }: Props) {
       setActiveId(created.id);
       setActiveConversation({ ...created, messages: created.messages ?? [] });
       setNewContact({ name: "", phone: "" });
-      setQuickAddOpen(false);
+      setNewContactModalOpen(false);
       await refreshConversations();
       await openConversation(created.id);
       setError("");
@@ -1599,7 +1417,6 @@ export function AtlasApp({ token, user }: Props) {
       await openConversation(activeId);
       setInfo("Nome/telefone do cliente atualizados.");
       setError("");
-      setEditingContact(false);
     } catch (err) {
       setInfo("");
       setError(err instanceof Error ? err.message : "Falha ao atualizar dados do cliente");
@@ -1608,9 +1425,6 @@ export function AtlasApp({ token, user }: Props) {
 
   const active = activeConversation;
   const activeCustomerAvatar = active ? getAvatarUrl(active.tags) : null;
-  const openCount = visibleConversations.filter((item) => item.status === "open").length;
-  const waitingCount = visibleConversations.filter((item) => item.status === "waiting_customer").length;
-  const closedCount = visibleConversations.filter((item) => item.status === "closed").length;
 
   async function setStatusQuick(status: "open" | "waiting_customer" | "closed") {
     if (!active) return;
@@ -1665,242 +1479,126 @@ export function AtlasApp({ token, user }: Props) {
 
   return (
     <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-2.5 lg:p-3">
-      <section className="grid h-full min-h-0 grid-cols-1 gap-2 overflow-hidden sm:gap-2.5 2xl:grid-cols-[minmax(0,176px)_minmax(0,1fr)_minmax(0,272px)]">
-        <aside className={`glass-panel hidden min-h-0 flex-col ${INBOX_PANEL_CLASS} p-2.5 2xl:flex`}>
-          <div className="flex items-center gap-2 rounded-xl border border-white/60 bg-white/50 px-2 py-1.5">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-blue-500 to-violet-400 text-white">
-              <Shield size={14} />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold">Atlas One</p>
-              <p className="truncate text-[10px] text-atlas-muted">Inbox</p>
-            </div>
-          </div>
+      <section className="flex h-full min-h-0 flex-col overflow-hidden">
+        <header className={`glass-panel flex min-h-12 shrink-0 flex-wrap items-center gap-2 ${INBOX_PANEL_CLASS} px-3 py-2 sm:gap-3 sm:px-4`}>
+          <Search className="text-slate-400" size={18} />
+          <input
+            className="flex-1 bg-transparent text-sm outline-none"
+            placeholder="Buscar conversas..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {roleIsManager && managerAlertCount > 0 ? (
+            <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
+              {managerAlertCount} aguardando +5m
+            </span>
+          ) : null}
+        </header>
 
-          <div className="mt-2 rounded-xl border border-white/60 bg-white/45 p-2 backdrop-blur-xl">
-            <div className="mb-1.5 flex items-center justify-between">
-              <p className="text-[10px] font-semibold text-slate-600">Resumo</p>
-              <span className="text-[10px] text-slate-500">Hoje</span>
-            </div>
-            <div className="grid grid-cols-3 gap-1 text-center">
-              <div className="rounded-lg bg-white/65 px-1 py-1.5">
-                <p className="text-sm font-semibold leading-none text-slate-700">{openCount}</p>
-                <p className="mt-0.5 text-[9px] text-slate-500">Abertos</p>
-              </div>
-              <div className="rounded-lg bg-white/65 px-1 py-1.5">
-                <p className="text-sm font-semibold leading-none text-slate-700">{waitingCount}</p>
-                <p className="mt-0.5 text-[9px] text-slate-500">Aguard.</p>
-              </div>
-              <div className="rounded-lg bg-white/65 px-1 py-1.5">
-                <p className="text-sm font-semibold leading-none text-slate-700">{closedCount}</p>
-                <p className="mt-0.5 text-[9px] text-slate-500">Fech.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-2 rounded-xl border border-white/60 bg-white/45 p-2 backdrop-blur-xl">
-            <div className="mb-1.5 flex items-center justify-between">
-              <p className="text-[10px] font-semibold text-slate-600">Equipe</p>
-              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                {agents.length}
-              </span>
-            </div>
-            <div className="space-y-1">
-              {agents.slice(0, 3).map((agent) => (
-                <div key={agent.id} className="flex items-center gap-1.5 rounded-lg bg-white/65 px-1.5 py-1 text-[11px]">
-                  <CustomerAvatar
-                    name={agent.name}
-                    phone={agent.email}
-                    size="sm"
-                    avatarUrl={agentAvatarFor(agent.id) ?? agent.avatarUrl}
-                    accessToken={token}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-slate-700">{agent.name}</p>
-                    <p className="truncate text-[10px] text-slate-500">{agentDepartment(agent)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Button variant="glass" className="mt-1.5 h-7 w-full justify-center text-[10px]" onClick={openTeamManagement}>
-              <Users size={12} />
-              Equipe
-            </Button>
-            <Button variant="glass" className="mt-1 h-7 w-full justify-center text-[10px]" onClick={openTeamManagement}>
-              <UserPlus size={12} />
-              Novo
-            </Button>
-          </div>
-          <button
-            type="button"
-            onDoubleClick={() => setProfileOpen(true)}
-            className="mt-auto rounded-xl border border-white/60 bg-white/55 p-2 text-left text-xs backdrop-blur-xl"
-            title="Duplo clique para abrir perfil"
-          >
-            <div className="flex items-center gap-2">
-              <CustomerAvatar
-                name={user.name}
-                phone={user.email}
-                size="sm"
-                avatarUrl={internalPhoto ?? agentAvatarFor(user.id) ?? selfUser?.avatarUrl}
-                accessToken={token}
-              />
-              <div>
-                <p className="font-semibold">{user.name}</p>
-                <p className="text-[11px] text-atlas-muted">{roleLabel(user.role)} · duplo clique no perfil</p>
-              </div>
-            </div>
-          </button>
-        </aside>
-
-        <section className="flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden sm:gap-2.5 lg:min-h-[420px]">
-          <header className={`glass-panel flex min-h-12 shrink-0 flex-wrap items-center gap-2 ${INBOX_PANEL_CLASS} px-3 py-2 sm:gap-3 sm:px-4`}>
-            <Search className="text-atlas-blue" size={18} />
-            <input
-              className="flex-1 bg-transparent text-sm outline-none"
-              placeholder="Buscar..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <Button variant="glass" size="icon">
-              <Bell size={18} />
-            </Button>
-            {roleIsManager && managerAlertCount > 0 ? (
-              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
-                {managerAlertCount} aguardando +5m
-              </span>
-            ) : null}
-          </header>
-
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
-            <Card className={`flex min-h-[220px] min-w-0 flex-col border border-slate-200 bg-white/95 p-2.5 shadow-sm sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
-              <div className="flex items-center justify-between gap-2">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
+          <Card className={`flex min-h-[220px] min-w-0 flex-col border border-slate-200 bg-white/95 p-2.5 shadow-sm sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
                 <h1 className="text-base font-semibold">Inbox</h1>
                 <Badge className="h-5 px-2 text-[10px]">{filtered.length}</Badge>
               </div>
-              <div className="mt-2 rounded-xl border border-white/70 bg-white/55 p-2 backdrop-blur">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-medium text-atlas-muted">Novo contato</p>
-                  <Button
-                    variant="glass"
-                    className="h-7 px-2 text-[10px]"
-                    onClick={() => setQuickAddOpen((v) => !v)}
-                    title="Adicionar contato"
-                  >
-                    <Plus size={12} />
-                    {quickAddOpen ? "Fechar" : "Add"}
-                  </Button>
-                </div>
-                {quickAddOpen ? (
-                  <div className="mt-1.5 grid grid-cols-1 gap-1.5">
-                    <input
-                      className="atlas-field rounded-lg px-2.5 py-1.5 text-xs outline-none"
-                      placeholder="Nome do cliente"
-                      value={newContact.name}
-                      onChange={(e) => setNewContact((s) => ({ ...s, name: e.target.value }))}
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        className="atlas-field min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-xs outline-none"
-                        placeholder="WhatsApp com DDD"
-                        value={newContact.phone}
-                        onChange={(e) => setNewContact((s) => ({ ...s, phone: e.target.value }))}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") void handleCreateConversation();
-                        }}
-                      />
-                      <Button
-                        variant="glass"
-                        className="h-8 px-2.5 text-[10px]"
-                        onClick={() => void handleCreateConversation()}
-                        disabled={!newContact.name.trim() || !newContact.phone.trim()}
-                      >
-                        Salvar
+              <div className="flex items-center gap-1">
+                {canMonitorByUser ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="glass" className="h-8 px-2.5 text-[11px]" title="Filtrar fila">
+                        <Filter size={13} />
+                        Fila
                       </Button>
-                    </div>
-                  </div>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-[min(100vw-2rem,320px)] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                      <p className="mb-2 text-[11px] font-semibold text-slate-600">Departamento</p>
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                            queueDepartmentId === "all" ? "border-slate-300 bg-slate-100" : "border-slate-200 bg-white"
+                          }`}
+                          onClick={() => {
+                            setQueueDepartmentId("all");
+                            setQueueOwnerId("all");
+                          }}
+                        >
+                          Todos
+                        </button>
+                        {departmentOptions.map((department) => (
+                          <button
+                            key={department.id}
+                            type="button"
+                            className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                              queueDepartmentId === department.id ? "border-slate-300 bg-slate-100" : "border-slate-200 bg-white"
+                            }`}
+                            onClick={() => {
+                              setQueueDepartmentId(department.id);
+                              setQueueOwnerId("all");
+                            }}
+                          >
+                            {department.name}
+                          </button>
+                        ))}
+                      </div>
+                      {queueDepartmentId !== "all" ? (
+                        <div className="mt-3">
+                          <p className="mb-1 text-[10px] font-semibold text-slate-500">Atendente</p>
+                          <AppCombobox
+                            value={queueOwnerId}
+                            onChange={setQueueOwnerId}
+                            searchable
+                            options={[
+                              { value: "all", label: "Todos deste departamento" },
+                              ...agentsByDepartment.map((agent) => ({
+                                value: agent.id,
+                                label: agent.name,
+                                description: agent.team?.name ?? agentDepartment(agent)
+                              }))
+                            ]}
+                          />
+                        </div>
+                      ) : null}
+                    </PopoverContent>
+                  </Popover>
                 ) : null}
+                <TagFilterPopover catalog={tagCatalog} selected={tagFilter} onChange={setTagFilter} />
+                <Button
+                  type="button"
+                  variant="glass"
+                  size="icon"
+                  className="h-8 w-8"
+                  title="Novo contato"
+                  onClick={() => setNewContactModalOpen(true)}
+                >
+                  <Plus size={16} />
+                </Button>
               </div>
-              {loading && !filtered.length ? (
-                <div className="mt-8 flex justify-center">
-                  <Loader2 className="animate-spin" />
-                </div>
-              ) : null}
-              {canMonitorByUser ? (
-                <div className="mt-2 rounded-xl border border-slate-200 bg-white/85 p-1.5">
-                  <p className="mb-1 text-[10px] font-semibold text-slate-500">Departamento</p>
-                  <div className="flex flex-wrap gap-1">
-                    <button
-                      type="button"
-                      className={`rounded-full border px-2 py-0.5 text-[10px] ${
-                        queueDepartmentId === "all"
-                          ? "border-blue-200 bg-blue-50 text-blue-700"
-                          : "border-slate-200 bg-white text-slate-600"
-                      }`}
-                      onClick={() => {
-                        setQueueDepartmentId("all");
-                        setQueueOwnerId("all");
-                      }}
-                    >
-                      Todos departamentos
-                    </button>
-                    {departmentOptions.map((department) => (
-                      <button
-                        key={department.id}
-                        type="button"
-                        className={`rounded-full border px-2 py-0.5 text-[10px] ${
-                          queueDepartmentId === department.id
-                            ? "border-blue-200 bg-blue-50 text-blue-700"
-                            : "border-slate-200 bg-white text-slate-600"
-                        }`}
-                        onClick={() => {
-                          setQueueDepartmentId(department.id);
-                          setQueueOwnerId("all");
-                        }}
-                      >
-                        {department.name}
-                      </button>
-                    ))}
-                  </div>
-                  {queueDepartmentId !== "all" ? (
-                    <div className="mt-2">
-                      <p className="mb-1 text-[10px] font-semibold text-slate-500">Selecionar atendente do departamento</p>
-                      <AppCombobox
-                        value={queueOwnerId}
-                        onChange={setQueueOwnerId}
-                        searchable
-                        options={[
-                          { value: "all", label: "Todos deste departamento" },
-                          ...agentsByDepartment.map((agent) => ({
-                            value: agent.id,
-                            label: agent.name,
-                            description: agent.team?.name ?? agentDepartment(agent)
-                          }))
-                        ]}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              <TagFilterBar catalog={tagCatalog} selected={tagFilter} onChange={setTagFilter} compact />
-              <div className="atlas-scroll mt-2 min-h-0 flex-1 space-y-1 overflow-auto pr-0.5">
+            </div>
+            {loading && !filtered.length ? (
+              <div className="mt-8 flex justify-center">
+                <Loader2 className="animate-spin" />
+              </div>
+            ) : null}
+              <div className="atlas-scroll mt-2 min-h-0 flex-1 space-y-0.5 overflow-auto pr-0.5">
                 {filtered.map((item) => {
                   const last = item.messages?.[0];
                   const selected = item.id === activeId;
                   const unread = isUnreadConversation(item);
                   const overdue = isOverdueConversation(item);
+                  const dotClass = overdue ? "bg-rose-500" : unread ? "bg-blue-500" : statusDotClass(item.status);
                   return (
                     <div
                       key={item.id}
                       className={`w-full rounded-xl border px-2 py-1.5 text-left transition ${
                         selected
-                          ? "border-blue-200/70 bg-blue-50/50"
-                          : "border-transparent bg-transparent hover:border-white/70 hover:bg-white/60"
+                          ? "border-slate-200 bg-slate-50"
+                          : "border-transparent bg-transparent hover:border-slate-200/80 hover:bg-white/70"
                       }`}
                     >
                       <button type="button" onClick={() => openConversation(item.id)} className="w-full">
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-center gap-2">
                           <div className="relative shrink-0">
                             <CustomerAvatar
                               name={item.customerName}
@@ -1909,26 +1607,14 @@ export function AtlasApp({ token, user }: Props) {
                               size="sm"
                               accessToken={token}
                             />
-                            {unread ? (
-                              <span className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${overdue ? "bg-rose-500" : "bg-blue-500"}`} />
-                            ) : null}
+                            <span
+                              className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white ${dotClass}`}
+                              title={overdue ? "Aguardando +5m" : unread ? "Nao lida" : statusLabel(item.status)}
+                            />
                           </div>
                           <div className="min-w-0 flex-1 text-left">
-                            <div className="flex items-start justify-between gap-1">
-                              <p className="truncate text-[13px] font-semibold leading-tight">{item.customerName}</p>
-                              <div className="flex shrink-0 items-center gap-0.5">
-                                {overdue ? (
-                                  <span className="rounded-full bg-rose-100 px-1 py-0.5 text-[9px] font-semibold text-rose-700">+5m</span>
-                                ) : null}
-                                <span
-                                  className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${statusToneClass(item.status)}`}
-                                  title={statusLabel(item.status)}
-                                >
-                                  {statusShortLabel(item.status)}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="truncate text-[11px] leading-tight text-atlas-muted">{last?.text ?? "—"}</p>
+                            <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{item.customerName}</p>
+                            <p className="truncate text-[11px] leading-tight text-slate-500">{last?.text ?? "—"}</p>
                             <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-0.5" />
                           </div>
                         </div>
@@ -1942,32 +1628,12 @@ export function AtlasApp({ token, user }: Props) {
             <Card className={`flex min-h-[320px] min-w-0 flex-col border border-slate-200 bg-white/95 p-0 shadow-sm md:min-h-0 ${INBOX_PANEL_CLASS}`}>
               {active ? (
                 <>
-                  <CustomerHeader
+                  <ConversationHeaderBar
                     active={active}
-                    agents={agents}
                     customerAvatarUrl={activeCustomerAvatar}
-                    editingContact={editingContact}
-                    contactDraft={contactDraft}
-                    setContactDraft={setContactDraft}
-                    setEditingContact={(value) => {
-                      if (!value) {
-                        setContactDraft({
-                          customerName: active.customerName ?? "",
-                          customerPhone: active.customerPhone ?? ""
-                        });
-                      }
-                      setEditingContact(value);
-                    }}
-                    onSaveContact={() => void saveContactIdentity()}
-                    onDelete={() => void handleDeleteActiveConversation()}
-                    onSetStatus={(status) => void setStatusQuick(status)}
-                    onTransfer={(agent, note) => void transferTo(agent, note)}
-                    transferring={transferLoading}
-                    agentAvatarFor={agentAvatarFor}
                     accessToken={token}
-                    tagCatalog={tagCatalog}
-                    tagsSaving={tagsSaving}
-                    onTagsChange={(tags) => updateActiveTags(tags)}
+                    onSetStatus={(status) => void setStatusQuick(status)}
+                    onOpenDrawer={() => setDrawerOpen(true)}
                   />
                   <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-[#f7faff] px-3 py-4 sm:px-5 sm:py-5">
                     {groupMessagesForThread(active.messages ?? []).map((group) => (
@@ -2167,105 +1833,40 @@ export function AtlasApp({ token, user }: Props) {
               )}
             </Card>
           </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {!error && info ? <p className="text-sm text-emerald-700">{info}</p> : null}
-        </section>
-
-        <aside className={`hidden min-h-0 flex-col gap-2 overflow-hidden 2xl:flex ${INBOX_PANEL_CLASS}`}>
-          <Card className={`flex min-h-0 flex-1 flex-col border border-white/70 bg-white/50 p-3 backdrop-blur-xl ${INBOX_PANEL_CLASS}`}>
-            <div className="mb-3 flex gap-2 border-b border-white/70 pb-2">
-              <button
-                type="button"
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                  sidebarTab === "client" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                }`}
-                onClick={() => setSidebarTab("client")}
-              >
-                Cliente
-              </button>
-              <button
-                type="button"
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                  sidebarTab === "activity" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                }`}
-                onClick={() => setSidebarTab("activity")}
-              >
-                Atividade
-              </button>
-            </div>
-            {sidebarTab === "activity" ? (
-              <ConversationActivityPanel token={token} conversationId={active?.id ?? null} agents={agents} />
-            ) : active ? (
-              <div className="atlas-scroll min-h-0 flex-1 space-y-3 overflow-auto pr-1">
-                <div className="flex items-center gap-3 rounded-xl border border-white/70 bg-white/70 p-3">
-                  <CustomerAvatar
-                    name={active.customerName}
-                    phone={active.customerPhone}
-                    avatarUrl={activeCustomerAvatar}
-                    accessToken={token}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
-                    <p className="truncate text-xs text-slate-500">+{active.customerPhone}</p>
-                    {active.assignedTo ? (
-                      <p className="truncate text-[11px] text-slate-500">
-                        Atendente: {active.assignedTo.name}
-                        {active.team?.name ? ` · ${active.team.name}` : ""}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] text-atlas-muted">Nome</p>
-                  <input
-                    className="mt-1 w-full rounded-xl border border-white/70 bg-white/75 px-3 py-2 text-sm outline-none"
-                    value={contactDraft.customerName}
-                    onChange={(e) => setContactDraft((s) => ({ ...s, customerName: e.target.value }))}
-                    placeholder="Nome do cliente"
-                  />
-                </div>
-                <div>
-                  <p className="text-[11px] text-atlas-muted">Telefone</p>
-                  <input
-                    className="mt-1 w-full rounded-xl border border-white/70 bg-white/75 px-3 py-2 text-sm outline-none"
-                    value={contactDraft.customerPhone}
-                    onChange={(e) => setContactDraft((s) => ({ ...s, customerPhone: e.target.value }))}
-                    placeholder="Telefone com DDD"
-                  />
-                </div>
-                <div>
-                  <p className="text-[11px] text-atlas-muted">Cadencia</p>
-                  <select
-                    className="mt-1 w-full rounded-xl border border-white/70 bg-white/75 px-3 py-2 text-sm outline-none"
-                    value={cadenceDraft}
-                    onChange={(e) => setCadenceDraft(e.target.value)}
-                  >
-                    <option value="padrao">Padrao</option>
-                    <option value="acelerada">Acelerada</option>
-                    <option value="consultiva">Consultiva</option>
-                    <option value="reativacao">Reativacao</option>
-                  </select>
-                </div>
-                {active.lead ? (
-                  <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2 text-xs text-atlas-muted">
-                    <p className="font-semibold text-slate-700">{active.lead.company}</p>
-                    <p>
-                      Etapa: {active.lead.status} · R$ {Number(active.lead.value).toLocaleString("pt-BR")}
-                    </p>
-                  </div>
-                ) : null}
-                <div className="mt-2 flex justify-end text-xs text-atlas-muted">
-                  <Button className="h-8 px-3 text-xs" variant="glass" onClick={saveContactIdentity}>
-                    Salvar painel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-atlas-muted">Selecione uma conversa para editar dados do cliente.</p>
-            )}
-          </Card>
-        </aside>
+          {error ? <p className="shrink-0 text-sm text-red-600">{error}</p> : null}
+          {!error && info ? <p className="shrink-0 text-sm text-emerald-700">{info}</p> : null}
       </section>
+      <ConversationDrawer
+        open={drawerOpen}
+        tab={drawerTab}
+        onTabChange={setDrawerTab}
+        onClose={() => setDrawerOpen(false)}
+        active={active}
+        token={token}
+        contactDraft={contactDraft}
+        setContactDraft={setContactDraft}
+        cadenceDraft={cadenceDraft}
+        setCadenceDraft={setCadenceDraft}
+        onSaveContact={() => void saveContactIdentity()}
+        onSaveCadence={() => void saveCadence()}
+        onDelete={() => void handleDeleteActiveConversation()}
+        onTransfer={(agent, note) => void transferTo(agent, note)}
+        transferring={transferLoading}
+        agents={agents}
+        tagCatalog={tagCatalog}
+        tagsSaving={tagsSaving}
+        onTagsChange={(tags) => updateActiveTags(tags)}
+      />
+      <NewContactModal
+        open={newContactModalOpen}
+        onClose={() => setNewContactModalOpen(false)}
+        name={newContact.name}
+        phone={newContact.phone}
+        onNameChange={(value) => setNewContact((s) => ({ ...s, name: value }))}
+        onPhoneChange={(value) => setNewContact((s) => ({ ...s, phone: value }))}
+        onSubmit={() => void handleCreateConversation()}
+        disabled={!newContact.name.trim() || !newContact.phone.trim()}
+      />
       <UserProfileModal
         open={profileOpen}
         onClose={() => setProfileOpen(false)}

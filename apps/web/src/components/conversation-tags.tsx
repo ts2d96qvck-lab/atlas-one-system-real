@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Filter, Plus, X } from "lucide-react";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
 import type { TagCatalogItem } from "../lib/api";
 import { conversationDisplayTags, tagChipStyle } from "../lib/inbox-tags";
@@ -15,7 +15,7 @@ type ConversationTagChipsProps = {
 
 export function ConversationTagChips({ tags, catalog, compact, className = "" }: ConversationTagChipsProps) {
   const visible = conversationDisplayTags(tags);
-  const shown = compact ? visible.slice(0, 2) : visible;
+  const shown = compact ? visible.slice(0, 1) : visible;
   const overflow = compact ? Math.max(0, visible.length - shown.length) : 0;
 
   if (!visible.length) return null;
@@ -188,5 +188,64 @@ export function TagFilterBar({ catalog, selected, onChange, compact = false }: T
         ) : null}
       </div>
     </div>
+  );
+}
+
+type TagFilterPopoverProps = {
+  catalog: TagCatalogItem[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+};
+
+export function TagFilterPopover({ catalog, selected, onChange }: TagFilterPopoverProps) {
+  if (!catalog.length) return null;
+
+  function toggle(name: string) {
+    const key = name.toLowerCase();
+    if (selected.some((tag) => tag.toLowerCase() === key)) {
+      onChange(selected.filter((tag) => tag.toLowerCase() !== key));
+      return;
+    }
+    onChange([...selected, name]);
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="glass" className="h-8 px-2.5 text-[11px]" title="Filtrar conversas">
+          <Filter size={13} />
+          Filtros
+          {selected.length ? (
+            <span className="ml-1 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px]">{selected.length}</span>
+          ) : null}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[min(100vw-2rem,300px)] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+        <p className="mb-2 text-[11px] font-semibold text-slate-600">Filtrar por tag</p>
+        <div className="flex flex-wrap gap-1">
+          {catalog.map((item) => {
+            const active = selected.some((tag) => tag.toLowerCase() === item.name.toLowerCase());
+            return (
+              <button
+                key={item.name}
+                type="button"
+                className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition ${
+                  active ? "ring-1 ring-blue-300" : "opacity-80 hover:opacity-100"
+                }`}
+                style={tagChipStyle(item.name, catalog)}
+                onClick={() => toggle(item.name)}
+              >
+                {item.name}
+              </button>
+            );
+          })}
+        </div>
+        {selected.length ? (
+          <button type="button" className="mt-2 text-[11px] text-slate-500 underline" onClick={() => onChange([])}>
+            Limpar filtros
+          </button>
+        ) : null}
+      </PopoverContent>
+    </Popover>
   );
 }
