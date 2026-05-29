@@ -21,6 +21,8 @@ import {
   publicConversationPayload
 } from "../services/integrations/integration-events.service";
 import { listShortcuts } from "../services/admin.service";
+import { listInboxTags, saveInboxTags } from "../services/inbox-tags.service";
+import { requireRole } from "../plugins/roles";
 
 function normalizeWhatsAppNumber(raw: string) {
   const digits = raw.replace(/\D/g, "");
@@ -43,6 +45,39 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = requireUser(request);
     return reply.send(await listShortcuts(user.tenantId));
   });
+
+  app.get("/tags", { preHandler: [requireAuth, requirePermission("conversation:read")] }, async (request, reply) => {
+    const user = requireUser(request);
+    return reply.send(await listInboxTags(user.tenantId));
+  });
+
+  app.put(
+    "/tags",
+    {
+      preHandler: [
+        requireAuth,
+        requirePermission("conversation:update"),
+        requireRole("admin", "owner", "supervisor")
+      ]
+    },
+    async (request, reply) => {
+      const user = requireUser(request);
+      try {
+        const saved = await saveInboxTags(user.tenantId, request.body);
+        await auditLog({
+          tenantId: user.tenantId,
+          actorId: user.id,
+          entity: "TenantSettings",
+          entityId: user.tenantId,
+          action: "tags_updated",
+          metadata: { count: saved.length }
+        });
+        return reply.send(saved);
+      } catch (error) {
+        return sendError(reply, 400, "Nao foi possivel salvar tags", error instanceof Error ? error.message : error);
+      }
+    }
+  );
 
   app.get("/conversations", { preHandler: [requireAuth, requirePermission("conversation:read")] }, async (request, reply) => {
     const user = requireUser(request);

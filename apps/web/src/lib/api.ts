@@ -415,6 +415,23 @@ export function listInboxShortcuts(token: string) {
   return request<ShortcutItem[]>(`/inbox/shortcuts`, token, { headers: { "content-type": "application/json" } });
 }
 
+export type TagCatalogItem = {
+  name: string;
+  color?: string;
+};
+
+export function listInboxTags(token: string) {
+  return request<TagCatalogItem[]>(`/inbox/tags`, token, { headers: { "content-type": "application/json" } });
+}
+
+export function saveInboxTags(token: string, tags: TagCatalogItem[]) {
+  return request<TagCatalogItem[]>(`/inbox/tags`, token, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tags })
+  });
+}
+
 export function upsertShortcut(token: string, payload: { tag: string; text: string }) {
   return request<ShortcutItem>(`/admin/shortcuts`, token, {
     method: "POST",
