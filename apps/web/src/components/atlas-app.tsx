@@ -36,7 +36,7 @@ import {
   getConversation,
   getCompanySettings,
   listConversations,
-  listShortcuts,
+  listInboxShortcuts,
   listTeams,
   listUsers,
   uploadUserAvatar,
@@ -56,6 +56,7 @@ import {
 } from "../lib/api";
 import { connectRealtime, joinTenant } from "../lib/socket";
 import { SecureMedia } from "./secure-media";
+import { QuickRepliesMenu } from "./quick-replies-menu";
 import { AppCombobox } from "./ui/app-select";
 import { apiUrl } from "../lib/config";
 import { mergeMessages, mediaSrc, messageDeliveryStatus } from "../lib/messages";
@@ -882,7 +883,7 @@ export function AtlasApp({ token, user }: Props) {
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [draft, setDraft] = useState("");
   const [shortcuts, setShortcuts] = useState<ShortcutItem[]>([]);
-  const [shortcutTag, setShortcutTag] = useState("");
+  const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [recording, setRecording] = useState(false);
   const [pendingAudioFile, setPendingAudioFile] = useState<File | null>(null);
@@ -998,7 +999,7 @@ export function AtlasApp({ token, user }: Props) {
           setAgents(users);
           setTeams(teamRows);
         }
-        void listShortcuts(token)
+        void listInboxShortcuts(token)
           .then((rows) => {
             if (!cancelled) setShortcuts(rows);
           })
@@ -1106,6 +1107,17 @@ export function AtlasApp({ token, user }: Props) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [activeConversation?.id, activeConversation?.messages?.length]);
+
+  useEffect(() => {
+    if (!activeId || !shortcuts.length) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "k") return;
+      e.preventDefault();
+      setShortcutMenuOpen(true);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeId, shortcuts.length]);
 
   useEffect(() => {
     if (!activeConversation?.lead?.id) return;
@@ -1246,21 +1258,13 @@ export function AtlasApp({ token, user }: Props) {
     }
   }
 
-  function applyShortcut(tagValue: string) {
-    const normalized = tagValue.trim().toLowerCase();
-    if (!normalized) return;
-    const shortcut = shortcuts.find((item) => item.tag.toLowerCase() === normalized);
-    if (!shortcut) {
-      setError(`Atalho ${tagValue} nao encontrado.`);
-      return;
-    }
+  function insertShortcut(shortcut: ShortcutItem) {
     setDraft((current) => {
       const trimmed = current.trim();
       if (!trimmed) return shortcut.text;
-      if (trimmed === normalized) return shortcut.text;
+      if (trimmed.toLowerCase() === shortcut.tag.toLowerCase()) return shortcut.text;
       return `${current}\n${shortcut.text}`;
     });
-    setShortcutTag(normalized);
     setError("");
   }
 
@@ -1897,29 +1901,6 @@ export function AtlasApp({ token, user }: Props) {
                       </div>
                     </div>
                   ) : null}
-                  {shortcuts.length ? (
-                    <div className="mx-4 mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-3 py-2 text-xs">
-                      <span className="font-semibold text-slate-600">Atalho</span>
-                      <div className="min-w-[180px] flex-1">
-                        <AppCombobox
-                          value={shortcutTag}
-                          onChange={setShortcutTag}
-                          searchable
-                          placeholder="Selecionar hashtag"
-                          options={shortcuts.map((item) => ({ value: item.tag, label: item.tag }))}
-                        />
-                      </div>
-                      <Button
-                        variant="glass"
-                        className="h-8 px-3 text-xs"
-                        type="button"
-                        onClick={() => applyShortcut(shortcutTag)}
-                        disabled={!shortcutTag}
-                      >
-                        Aplicar no texto
-                      </Button>
-                    </div>
-                  ) : null}
                   {buildSignaturePreview(draft, user, companySettings?.messaging) ? (
                     <div className="mx-4 mb-1 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-[11px] text-emerald-900">
                       <p className="mb-1 font-semibold">Preview enviado ao cliente (com assinatura):</p>
@@ -1944,6 +1925,13 @@ export function AtlasApp({ token, user }: Props) {
                     <Button type="button" variant="glass" size="icon" onClick={() => fileRef.current?.click()}>
                       <Paperclip size={18} />
                     </Button>
+                    <QuickRepliesMenu
+                      shortcuts={shortcuts}
+                      disabled={!activeId}
+                      open={shortcutMenuOpen}
+                      onOpenChange={setShortcutMenuOpen}
+                      onSelect={insertShortcut}
+                    />
                     <Button
                       type="button"
                       variant="glass"
@@ -1959,13 +1947,6 @@ export function AtlasApp({ token, user }: Props) {
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === " " || e.key === "Tab") {
-                          const candidate = draft.trim().toLowerCase();
-                          if (candidate.startsWith("#")) {
-                            const existing = shortcuts.find((item) => item.tag.toLowerCase() === candidate);
-                            if (existing) setShortcutTag(existing.tag);
-                          }
-                        }
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
                           if (draft.trim()) void sendCurrentDraft();

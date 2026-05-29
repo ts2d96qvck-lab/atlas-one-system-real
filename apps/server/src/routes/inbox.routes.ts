@@ -20,6 +20,7 @@ import {
   emitIntegrationEvent,
   publicConversationPayload
 } from "../services/integrations/integration-events.service";
+import { listShortcuts } from "../services/admin.service";
 
 function normalizeWhatsAppNumber(raw: string) {
   const digits = raw.replace(/\D/g, "");
@@ -37,6 +38,11 @@ export async function inboxRoutes(app: FastifyInstance) {
       user.permissions.includes("conversation:takeover")
     );
   }
+
+  app.get("/shortcuts", { preHandler: [requireAuth, requirePermission("conversation:read")] }, async (request, reply) => {
+    const user = requireUser(request);
+    return reply.send(await listShortcuts(user.tenantId));
+  });
 
   app.get("/conversations", { preHandler: [requireAuth, requirePermission("conversation:read")] }, async (request, reply) => {
     const user = requireUser(request);
