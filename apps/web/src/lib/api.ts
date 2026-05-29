@@ -117,6 +117,8 @@ export type Lead = {
   email?: string | null;
   updatedAt?: string;
   expectedCloseDate?: string | null;
+  assignedToId?: string | null;
+  assignedTo?: { id: string; name: string; role: string } | null;
 };
 
 export type TenantSummary = {
@@ -890,6 +892,7 @@ export function createLead(
     email?: string;
     status?: string;
     value?: number;
+    assignedToId?: string | null;
   }
 ) {
   return request<Lead>("/crm/leads", token, {
