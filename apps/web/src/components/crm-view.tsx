@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
-import { createLead, deleteLead, updateLead, type Lead } from "../lib/api";
+import { createLead, deleteLead, listUsers, updateLead, type Lead, type UserRow } from "../lib/api";
 
 type Props = { token: string };
 
@@ -39,8 +39,43 @@ function parseCurrencyBrInput(value: string) {
   return Number(digits) / 100;
 }
 
+function agentInitials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function AgentAssigneeSelect({
+  value,
+  agents,
+  onChange
+}: {
+  value: string;
+  agents: UserRow[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none sm:col-span-2"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">Sem responsavel</option>
+      {agents.map((agent) => (
+        <option key={agent.id} value={agent.id}>
+          {agent.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function CrmView({ token }: Props) {
   const [data, setData] = useState<PipelineData | null>(null);
+  const [agents, setAgents] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
@@ -54,7 +89,8 @@ export function CrmView({ token }: Props) {
     email: "",
     status: "",
     value: "",
-    expectedCloseDate: ""
+    expectedCloseDate: "",
+    assignedToId: ""
   });
   const [creatingLead, setCreatingLead] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -63,15 +99,20 @@ export function CrmView({ token }: Props) {
     phone: "",
     email: "",
     status: "Novos leads",
-    value: ""
+    value: "",
+    assignedToId: ""
   });
   const [savingCreate, setSavingCreate] = useState(false);
 
   async function load() {
-    const res = await fetch(`${apiUrl()}/crm/pipeline`, {
-      headers: { authorization: `Bearer ${token}` }
-    });
-    if (res.ok) setData(await res.json());
+    const [pipelineRes, usersRes] = await Promise.all([
+      fetch(`${apiUrl()}/crm/pipeline`, {
+        headers: { authorization: `Bearer ${token}` }
+      }),
+      listUsers(token).catch(() => [] as UserRow[])
+    ]);
+    if (pipelineRes.ok) setData(await pipelineRes.json());
+    setAgents(usersRes);
     setLoading(false);
   }
 
@@ -123,7 +164,8 @@ export function CrmView({ token }: Props) {
       email: lead.email ?? "",
       status: lead.status ?? "",
       value: formatCurrencyBrFromNumber(Number(lead.value ?? 0)),
-      expectedCloseDate: toDatetimeLocal(lead.expectedCloseDate)
+      expectedCloseDate: toDatetimeLocal(lead.expectedCloseDate),
+      assignedToId: lead.assignedToId ?? lead.assignedTo?.id ?? ""
     });
   }
 
@@ -142,7 +184,8 @@ export function CrmView({ token }: Props) {
         email: editForm.email.trim() || undefined,
         status: editForm.status.trim(),
         value: parseCurrencyBrInput(editForm.value),
-        expectedCloseDate: editForm.expectedCloseDate ? new Date(editForm.expectedCloseDate).toISOString() : ""
+        expectedCloseDate: editForm.expectedCloseDate ? new Date(editForm.expectedCloseDate).toISOString() : "",
+        assignedToId: editForm.assignedToId || null
       });
       setEditingLead(null);
       setFeedback({ type: "success", text: "Lead atualizado com sucesso." });
@@ -167,10 +210,19 @@ export function CrmView({ token }: Props) {
         phone: createForm.phone.trim(),
         email: createForm.email.trim() || undefined,
         status: createForm.status,
-        value: parseCurrencyBrInput(createForm.value)
+        value: parseCurrencyBrInput(createForm.value),
+        assignedToId: createForm.assignedToId || null
       });
       setCreatingLead(false);
-      setCreateForm({ company: "", contact: "", phone: "", email: "", status: "Novos leads", value: "" });
+      setCreateForm({
+        company: "",
+        contact: "",
+        phone: "",
+        email: "",
+        status: "Novos leads",
+        value: "",
+        assignedToId: ""
+      });
       setFeedback({ type: "success", text: "Lead criado com sucesso." });
       await load();
     } catch (err) {
@@ -275,6 +327,14 @@ export function CrmView({ token }: Props) {
                     >
                       <p className="font-medium">{lead.company}</p>
                       <p className="text-xs text-atlas-muted">{lead.contact || "Sem contato definido"}</p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700">
+                          {lead.assignedTo?.name ? agentInitials(lead.assignedTo.name) : "—"}
+                        </span>
+                        <p className="text-[11px] text-atlas-muted">
+                          {lead.assignedTo?.name ?? "Sem responsavel"}
+                        </p>
+                      </div>
                       <p className="text-[11px] text-atlas-muted">{lead.phone ? `Telefone: ${lead.phone}` : "Telefone nao informado"}</p>
                       <p className="text-[11px] text-atlas-muted">
                         Fechamento previsto: {lead.expectedCloseDate ? formatDate(lead.expectedCloseDate) : "Sem previsao"}
@@ -380,6 +440,11 @@ export function CrmView({ token }: Props) {
                 value={editForm.expectedCloseDate}
                 onChange={(e) => setEditForm((s) => ({ ...s, expectedCloseDate: e.target.value }))}
               />
+              <AgentAssigneeSelect
+                value={editForm.assignedToId}
+                agents={agents}
+                onChange={(assignedToId) => setEditForm((s) => ({ ...s, assignedToId }))}
+              />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="glass" className="h-8 px-3 text-xs" onClick={() => setEditingLead(null)} disabled={savingLead}>
@@ -420,6 +485,11 @@ export function CrmView({ token }: Props) {
                 ))}
               </select>
               <input className="atlas-field rounded-xl px-3 py-2 text-sm outline-none" placeholder="Valor (R$)" value={createForm.value} onChange={(e) => setCreateForm((s) => ({ ...s, value: formatCurrencyBrInput(e.target.value) }))} />
+              <AgentAssigneeSelect
+                value={createForm.assignedToId}
+                agents={agents}
+                onChange={(assignedToId) => setCreateForm((s) => ({ ...s, assignedToId }))}
+              />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="glass" className="h-8 px-3 text-xs" onClick={() => setCreatingLead(false)} disabled={savingCreate}>Cancelar</Button>
