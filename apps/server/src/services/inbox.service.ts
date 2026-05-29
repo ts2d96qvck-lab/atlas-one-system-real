@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
+import { normalizeInboxUpload } from "../lib/media-upload";
+import { appLog } from "../lib/app-log";
 import { env } from "../config/env";
 import { emitToTenant } from "../lib/realtime";
 import { prepareOutboundInstance } from "./whatsapp/whatsapp-instance.service";
@@ -450,20 +452,15 @@ export async function sendMessage(tenantId: string, conversationId: string, inpu
   return message;
 }
 
-function mediaTypeFromMime(mime: string): "image" | "video" | "audio" | "document" {
-  if (mime.startsWith("image/")) return "image";
-  if (mime.startsWith("video/")) return "video";
-  if (mime.startsWith("audio/")) return "audio";
-  return "document";
-}
-
 export async function sendMediaMessage(
   tenantId: string,
   conversationId: string,
-  file: { buffer: Buffer; mimetype: string; filename: string },
+  file: { buffer: Buffer; mimetype: string; filename?: string },
   caption?: string,
   actor?: MessageActor
 ) {
+  const normalized = normalizeInboxUpload(file);
+
   const conversation = await prisma.conversation.findFirst({
     where: { tenantId, id: conversationId },
     include: { instance: true }
@@ -476,8 +473,8 @@ export async function sendMediaMessage(
   const outbound = await prepareOutboundInstance(tenantId, conversationId, sendingInstance);
   const { provider, instance: evolutionInstance, sendName: evolutionName } = outbound;
 
-  const mediatype = mediaTypeFromMime(file.mimetype);
-  const base64 = file.buffer.toString("base64");
+  const { mediatype, mimetype, filename, buffer, sizeBytes } = normalized;
+  const base64 = buffer.toString("base64");
   const numberOptions = outboundNumberCandidates(conversation.customerPhone);
   let result: unknown;
   let lastSendError: unknown = null;
@@ -490,10 +487,10 @@ export async function sendMediaMessage(
         instancePhone: evolutionInstance.phone ?? undefined,
         number,
         mediatype,
-        mimetype: file.mimetype,
+        mimetype,
         media: base64,
         caption,
-        fileName: file.filename
+        fileName: filename
       });
       lastSendError = null;
       break;
@@ -503,11 +500,23 @@ export async function sendMediaMessage(
   }
   if (lastSendError) {
     const base = lastSendError instanceof Error ? lastSendError.message : String(lastSendError);
+    appLog.error("inbox_media_send_failed", {
+      tenantId,
+      conversationId,
+      mimetype,
+      filename,
+      mediatype,
+      sizeBytes,
+      attemptedNumbers,
+      error: base
+    });
     throw new Error(
       `Falha no envio de midia via ${evolutionName}. Numeros testados: ${attemptedNumbers.join(", ")}. Detalhe: ${base}`
     );
   }
   if (!result) throw new Error("Nao foi possivel enviar midia para este numero");
+
+  const providerId = extractProviderId(result);
 
   const message = await prisma.message.create({
     data: {
@@ -515,28 +524,38 @@ export async function sendMediaMessage(
       direction: "out",
       type: mediatype,
       text: caption?.trim() || null,
+      providerId,
       status: "sent",
       raw: {
         provider: (result ?? null) as Prisma.InputJsonValue,
         sentById: actor?.id ?? null,
         sentByName: actor?.name ?? null,
         sentByRole: actor?.role ?? null,
+        deliveryStatus: "sent",
+        remoteJid: whatsappJid(conversation.customerPhone),
         recipientName: conversation.customerName,
-        recipientPhone: conversation.customerPhone
+        recipientPhone: conversation.customerPhone,
+        fileName: filename,
+        mimeType: mimetype
       }
     }
   });
 
   const { saveMediaBase64 } = await import("../lib/media-storage");
-  const mediaUrl = await saveMediaBase64(tenantId, message.id, base64, file.mimetype);
+  const mediaUrl = await saveMediaBase64(tenantId, message.id, base64, mimetype);
   const stored = await prisma.message.update({
     where: { id: message.id },
     data: { mediaUrl }
   });
 
+  const nextTags = conversationTagsWithMenuDone(conversation.tags, actor);
   const updatedConversation = await prisma.conversation.update({
     where: { id: conversation.id },
-    data: { status: "waiting_customer", lastMessageAt: new Date() },
+    data: {
+      status: "waiting_customer",
+      lastMessageAt: new Date(),
+      ...(nextTags ? { tags: nextTags } : {})
+    },
     include: {
       assignedTo: { select: { id: true, name: true, role: true } },
       team: { select: { id: true, name: true } },

@@ -16,6 +16,7 @@ import { runConversationAutomations } from "../services/automation.service";
 import { auditLog } from "../services/audit.service";
 import { assertTeamInTenant, assertUserInTenant } from "../lib/tenant-guard";
 import { sendError } from "../utils/http";
+import { appLog } from "../lib/app-log";
 import {
   emitIntegrationEvent,
   publicConversationPayload
@@ -362,7 +363,21 @@ export async function inboxRoutes(app: FastifyInstance) {
       });
       return reply.status(201).send(message);
     } catch (error) {
-      return sendError(reply, 400, "Nao foi possivel enviar midia", error instanceof Error ? error.message : error);
+      appLog.error("inbox_media_route_failed", {
+        tenantId: user.tenantId,
+        conversationId: id,
+        filename: file.filename,
+        mimetype: file.mimetype,
+        sizeBytes: buffer.length,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return sendError(
+        reply,
+        400,
+        "Nao foi possivel enviar midia",
+        error instanceof Error ? error.message : error,
+        { exposeMessage: true }
+      );
     }
   });
 

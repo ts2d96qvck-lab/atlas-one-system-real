@@ -502,18 +502,33 @@ export function transcribeMessage(token: string, conversationId: string, message
   });
 }
 
+const MEDIA_UPLOAD_TIMEOUT_MS = 120_000;
+
 export async function sendMediaFile(token: string, conversationId: string, file: File, caption?: string) {
   const form = new FormData();
   form.append("file", file);
   if (caption) form.append("caption", caption);
-  const response = await fetchWithTimeout(`${apiUrl()}/inbox/conversations/${conversationId}/messages/media`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}` },
-    body: form
-  });
+  const response = await fetchWithTimeout(
+    `${apiUrl()}/inbox/conversations/${conversationId}/messages/media`,
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` },
+      body: form
+    },
+    MEDIA_UPLOAD_TIMEOUT_MS
+  );
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body?.error ?? body?.message ?? "Falha ao enviar midia");
+    const base = body?.message ?? body?.error ?? `Erro ${response.status}`;
+    const detail =
+      typeof body?.details === "string"
+        ? body.details
+        : typeof body?.details?.message === "string"
+          ? body.details.message
+          : typeof body?.message === "string" && body?.error && body.message !== body.error
+            ? body.message
+            : "";
+    throw new Error(detail ? `${base}: ${detail}` : base);
   }
   return response.json() as Promise<Message>;
 }

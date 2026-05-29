@@ -1325,6 +1325,9 @@ export function AtlasApp({ token, user }: Props) {
       setPendingUploadFile(null);
       setPendingUploadUrl("");
       setPendingUploadCaption("");
+      setError("");
+      await openConversation(activeId);
+      await refreshConversations();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao enviar arquivo");
     }
@@ -1368,11 +1371,18 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   async function sendPendingAudio() {
-    if (!pendingAudioFile) return;
-    await handleFile(pendingAudioFile);
-    if (pendingAudioUrl) URL.revokeObjectURL(pendingAudioUrl);
-    setPendingAudioFile(null);
-    setPendingAudioUrl("");
+    if (!activeId || !pendingAudioFile) return;
+    try {
+      await sendMediaFile(token, activeId, pendingAudioFile);
+      if (pendingAudioUrl) URL.revokeObjectURL(pendingAudioUrl);
+      setPendingAudioFile(null);
+      setPendingAudioUrl("");
+      setError("");
+      await openConversation(activeId);
+      await refreshConversations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao enviar audio");
+    }
   }
 
   function discardPendingAudio() {
