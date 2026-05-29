@@ -1,5 +1,7 @@
 import type { Message } from "./api";
 
+const MESSAGE_CLUSTER_WINDOW_MS = 5 * 60 * 1000;
+
 export function mediaSrc(url: string | null | undefined, apiUrl: string, accessToken?: string) {
   if (!url) return undefined;
   if (url.startsWith("http") || url.startsWith("data:")) return url;
@@ -49,4 +51,77 @@ export function messageDeliveryStatus(message: Message) {
   const status = String(fromRaw ?? message.status ?? "").toLowerCase();
   if (status === "deleted" || status === "edited") return fromRaw ?? "sent";
   return status;
+}
+
+function messageSenderId(message: Message) {
+  const raw = message.raw && typeof message.raw === "object" ? (message.raw as Record<string, unknown>) : {};
+  return typeof raw.sentById === "string" ? raw.sentById : null;
+}
+
+export function messagesClusterTogether(previous: Message, next: Message) {
+  if (previous.direction !== next.direction) return false;
+  const delta = Math.abs(new Date(next.createdAt).getTime() - new Date(previous.createdAt).getTime());
+  if (delta > MESSAGE_CLUSTER_WINDOW_MS) return false;
+  if (previous.direction === "out") {
+    const prevSender = messageSenderId(previous);
+    const nextSender = messageSenderId(next);
+    if (prevSender && nextSender && prevSender !== nextSender) return false;
+  }
+  return true;
+}
+
+export function formatMessageDateLabel(iso: string) {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  if (sameDay(date, today)) return "Hoje";
+  if (sameDay(date, yesterday)) return "Ontem";
+
+  return date.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    ...(date.getFullYear() !== today.getFullYear() ? { year: "numeric" as const } : {})
+  });
+}
+
+export type MessageThreadGroup = {
+  dateKey: string;
+  dateLabel: string;
+  clusters: Message[][];
+};
+
+export function groupMessagesForThread(messages: Message[]): MessageThreadGroup[] {
+  const sorted = [...messages].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+  const groups: MessageThreadGroup[] = [];
+
+  for (const message of sorted) {
+    const dateKey = new Date(message.createdAt).toISOString().slice(0, 10);
+    let group = groups.find((item) => item.dateKey === dateKey);
+    if (!group) {
+      group = {
+        dateKey,
+        dateLabel: formatMessageDateLabel(message.createdAt),
+        clusters: []
+      };
+      groups.push(group);
+    }
+
+    const lastCluster = group.clusters[group.clusters.length - 1];
+    const lastMessage = lastCluster?.[lastCluster.length - 1];
+    if (lastCluster && lastMessage && messagesClusterTogether(lastMessage, message)) {
+      lastCluster.push(message);
+    } else {
+      group.clusters.push([message]);
+    }
+  }
+
+  return groups;
 }

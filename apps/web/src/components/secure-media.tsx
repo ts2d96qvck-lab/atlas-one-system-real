@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { apiUrl } from "../lib/config";
 
 type Props = {
@@ -111,11 +111,14 @@ export function SecureMedia({ path, token, type, alt, fileName }: Props) {
 
   if (type === "video") {
     return (
-      <div className="rounded-xl border border-slate-200/70 bg-white/70 p-2">
-        <video controls src={src} className="max-h-56 rounded-lg" />
+      <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white/70">
+        <video controls src={src} className="max-h-56 w-full rounded-lg" />
       </div>
     );
   }
+
+  const label = fileName ?? "Documento";
+  const extension = label.includes(".") ? label.split(".").pop()?.toUpperCase() : "DOC";
 
   return (
     <a
@@ -123,9 +126,15 @@ export function SecureMedia({ path, token, type, alt, fileName }: Props) {
       target="_blank"
       rel="noreferrer"
       download={fileName}
-      className="flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white/70 px-3 py-2 text-xs text-slate-700"
+      className="flex min-w-[200px] max-w-sm items-center gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 text-xs text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white"
     >
-      <span className="truncate font-medium">{fileName ?? "Documento"}</span>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
+        <FileText size={18} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{label}</span>
+        <span className="text-[10px] uppercase tracking-wide text-slate-500">{extension ?? "Arquivo"} · Toque para abrir</span>
+      </span>
     </a>
   );
 }

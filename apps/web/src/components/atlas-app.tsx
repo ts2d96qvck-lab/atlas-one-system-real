@@ -64,7 +64,7 @@ import { ConversationTagChips, ConversationTagEditor, TagFilterBar } from "./con
 import { AppCombobox } from "./ui/app-select";
 import { apiUrl } from "../lib/config";
 import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
-import { mergeMessages, mediaSrc, messageDeliveryStatus } from "../lib/messages";
+import { mergeMessages, mediaSrc, messageDeliveryStatus, groupMessagesForThread } from "../lib/messages";
 import { hasPermission } from "../lib/session-user";
 
 type Props = { token: string; user: SessionUser };
@@ -247,7 +247,11 @@ function MediaMessageRenderer({ message, token }: { message: Message; token: str
   if (!message.mediaUrl) return null;
 
   if (message.type === "image") {
-    return <SecureMedia path={message.mediaUrl} token={token} type="image" alt="Imagem enviada" />;
+    return (
+      <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white/70">
+        <SecureMedia path={message.mediaUrl} token={token} type="image" alt="Imagem enviada" />
+      </div>
+    );
   }
 
   if (message.type === "audio") {
@@ -339,7 +343,10 @@ function MessageBubble({
   canManage,
   onDelete,
   onEdit,
-  onTranscribe
+  onTranscribe,
+  clustered,
+  clusterFirst,
+  clusterLast
 }: {
   message: Message;
   token: string;
@@ -348,6 +355,9 @@ function MessageBubble({
   onDelete?: (message: Message) => void;
   onEdit?: (message: Message) => void;
   onTranscribe?: (message: Message) => void;
+  clustered?: boolean;
+  clusterFirst?: boolean;
+  clusterLast?: boolean;
 }) {
   const outgoing = message.direction === "out";
   const raw = (message.raw && typeof message.raw === "object" ? message.raw : {}) as Record<string, unknown>;
@@ -388,15 +398,16 @@ function MessageBubble({
   }
 
   return (
-    <div className={`group flex ${outgoing ? "justify-end" : "justify-start"}`}>
+    <div className={`group flex ${outgoing ? "justify-end" : "justify-start"} ${clustered && !clusterFirst ? "-mt-1.5" : ""}`}>
       <div
         onDoubleClick={() => onReply(message)}
-        className={`relative z-10 max-w-[78%] overflow-hidden break-words rounded-2xl px-3 py-2.5 text-[13px] leading-5 shadow-sm sm:max-w-[72%] xl:max-w-[340px] ${
+        className={`relative z-10 max-w-[88%] overflow-hidden break-words rounded-2xl px-3 py-2.5 text-[13px] leading-5 shadow-sm sm:max-w-[78%] xl:max-w-[340px] ${
           outgoing
-            ? "rounded-br-md bg-[#d9fdd3] text-slate-900"
-            : "rounded-bl-md bg-white text-slate-800"
+            ? `bg-[#d9fdd3] text-slate-900 ${clusterLast === false ? "rounded-br-sm" : "rounded-br-md"} ${clustered && !clusterFirst ? "rounded-tr-sm" : ""}`
+            : `bg-white text-slate-800 ${clusterLast === false ? "rounded-bl-sm" : "rounded-bl-md"} ${clustered && !clusterFirst ? "rounded-tl-sm" : ""}`
         }`}
       >
+        {clustered && !clusterFirst ? null : (
         <div className="mb-1 flex items-center justify-between gap-2">
           <p className="text-[10px] font-semibold text-slate-500">{messageSenderLabel(raw, outgoing)}</p>
           {canManage && outgoing ? (
@@ -426,6 +437,7 @@ function MessageBubble({
             </div>
           ) : null}
         </div>
+        )}
         {replyTo ? (
           <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
             <p className="text-[10px] font-semibold text-slate-600">Resposta direcionada</p>
@@ -456,9 +468,13 @@ function MessageBubble({
         <div className="mt-1 flex flex-wrap items-center justify-end gap-1.5 text-[10px] text-slate-500">
           {edited ? <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">editada</span> : null}
           {outgoing ? (
-            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium ${statusView.badge}`} title={statusView.label}>
-              {statusView.icon}
-              {statusView.label}
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium ${statusView.badge}`}
+              title={statusView.label}
+              aria-label={`Status: ${statusView.label}`}
+            >
+              <span className={statusView.tone}>{statusView.icon}</span>
+              <span className="hidden sm:inline">{statusView.label}</span>
             </span>
           ) : null}
           <span>{formatTime(message.createdAt)}</span>
@@ -1883,18 +1899,36 @@ export function AtlasApp({ token, user }: Props) {
                     tagsSaving={tagsSaving}
                     onTagsChange={(tags) => updateActiveTags(tags)}
                   />
-                  <div className="atlas-scroll relative isolate flex-1 space-y-4 overflow-auto bg-[#f7faff] px-5 py-5">
-                    {(active.messages ?? []).map((m) => (
-                      <MessageBubble
-                        key={m.id}
-                        message={m}
-                        token={token}
-                        canManage
-                        onReply={(message) => setReplyToMessage(message)}
-                        onDelete={(message) => void handleDeleteMessage(message)}
-                        onEdit={(message) => void handleEditMessage(message)}
-                        onTranscribe={(message) => void handleTranscribeMessage(message)}
-                      />
+                  <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-[#f7faff] px-3 py-4 sm:px-5 sm:py-5">
+                    {groupMessagesForThread(active.messages ?? []).map((group) => (
+                      <section key={group.dateKey} className="mb-5 last:mb-0">
+                        <div className="sticky top-0 z-20 mb-3 flex justify-center">
+                          <span className="rounded-full border border-slate-200/80 bg-white/95 px-3 py-1 text-[11px] font-medium capitalize text-slate-600 shadow-sm backdrop-blur">
+                            {group.dateLabel}
+                          </span>
+                        </div>
+                        <div className="space-y-3">
+                          {group.clusters.map((cluster, clusterIndex) => (
+                            <div key={`${group.dateKey}-${clusterIndex}`} className="space-y-0">
+                              {cluster.map((m, messageIndex) => (
+                                <MessageBubble
+                                  key={m.id}
+                                  message={m}
+                                  token={token}
+                                  canManage
+                                  clustered={cluster.length > 1}
+                                  clusterFirst={messageIndex === 0}
+                                  clusterLast={messageIndex === cluster.length - 1}
+                                  onReply={(message) => setReplyToMessage(message)}
+                                  onDelete={(message) => void handleDeleteMessage(message)}
+                                  onEdit={(message) => void handleEditMessage(message)}
+                                  onTranscribe={(message) => void handleTranscribeMessage(message)}
+                                />
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </section>
                     ))}
                     <div ref={messagesEndRef} />
                   </div>
