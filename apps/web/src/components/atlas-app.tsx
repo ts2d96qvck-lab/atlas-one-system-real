@@ -37,6 +37,7 @@ import {
   getCompanySettings,
   listConversations,
   listInboxShortcuts,
+  listInboxTags,
   listTeams,
   listUsers,
   uploadUserAvatar,
@@ -51,14 +52,17 @@ import {
   type Message,
   type SessionUser,
   type ShortcutItem,
+  type TagCatalogItem,
   type TeamRow,
   type UserRow
 } from "../lib/api";
 import { connectRealtime, joinTenant } from "../lib/socket";
 import { SecureMedia } from "./secure-media";
 import { QuickRepliesMenu } from "./quick-replies-menu";
+import { ConversationTagChips, ConversationTagEditor, TagFilterBar } from "./conversation-tags";
 import { AppCombobox } from "./ui/app-select";
 import { apiUrl } from "../lib/config";
+import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
 import { mergeMessages, mediaSrc, messageDeliveryStatus } from "../lib/messages";
 import { hasPermission } from "../lib/session-user";
 
@@ -663,6 +667,9 @@ type CustomerHeaderProps = {
   transferring: boolean;
   agentAvatarFor: (agentId: string) => string | null;
   accessToken: string;
+  tagCatalog: TagCatalogItem[];
+  tagsSaving: boolean;
+  onTagsChange: (tags: string[]) => void | Promise<void>;
 };
 
 function CustomerHeader({
@@ -679,7 +686,10 @@ function CustomerHeader({
   onTransfer,
   transferring,
   agentAvatarFor,
-  accessToken
+  accessToken,
+  tagCatalog,
+  tagsSaving,
+  onTagsChange
 }: CustomerHeaderProps) {
   return (
     <div className="border-b border-slate-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
@@ -762,6 +772,14 @@ function CustomerHeader({
             <Trash2 size={13} />
           </Button>
         </div>
+      </div>
+      <div className="mt-2 border-t border-slate-100 pt-2">
+        <ConversationTagEditor
+          tags={active.tags}
+          catalog={tagCatalog}
+          saving={tagsSaving}
+          onChange={onTagsChange}
+        />
       </div>
     </div>
   );
@@ -884,6 +902,9 @@ export function AtlasApp({ token, user }: Props) {
   const [draft, setDraft] = useState("");
   const [shortcuts, setShortcuts] = useState<ShortcutItem[]>([]);
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false);
+  const [tagCatalog, setTagCatalog] = useState<TagCatalogItem[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagsSaving, setTagsSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [recording, setRecording] = useState(false);
   const [pendingAudioFile, setPendingAudioFile] = useState<File | null>(null);
@@ -1005,6 +1026,13 @@ export function AtlasApp({ token, user }: Props) {
           })
           .catch(() => {
             if (!cancelled) setShortcuts([]);
+          });
+        void listInboxTags(token)
+          .then((rows) => {
+            if (!cancelled) setTagCatalog(rows);
+          })
+          .catch(() => {
+            if (!cancelled) setTagCatalog([]);
           });
         void getCompanySettings(token)
           .then((settings) => {
@@ -1164,15 +1192,24 @@ export function AtlasApp({ token, user }: Props) {
   const managerAlertCount = visibleConversations.filter((item) => isOverdueConversation(item)).length;
 
   const filtered = useMemo(() => {
+    let rows = visibleConversations;
+    if (tagFilter.length) {
+      rows = rows.filter((conversation) => {
+        const tags = conversationDisplayTags(conversation.tags);
+        return tagFilter.every((selected) =>
+          tags.some((tag) => tag.toLowerCase() === selected.toLowerCase())
+        );
+      });
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return visibleConversations;
-    return visibleConversations.filter(
+    if (!q) return rows;
+    return rows.filter(
       (c) =>
         c.customerName.toLowerCase().includes(q) ||
         c.customerPhone.includes(q) ||
         c.lead?.company?.toLowerCase().includes(q)
     );
-  }, [visibleConversations, search]);
+  }, [visibleConversations, search, tagFilter]);
 
   async function sendCurrentDraft() {
     if (!activeId) {
@@ -1346,6 +1383,22 @@ export function AtlasApp({ token, user }: Props) {
     if (pendingAudioUrl) URL.revokeObjectURL(pendingAudioUrl);
     setPendingAudioFile(null);
     setPendingAudioUrl("");
+  }
+
+  async function updateActiveTags(displayTags: string[]) {
+    if (!activeId || !activeConversation) return;
+    setTagsSaving(true);
+    try {
+      const merged = mergeConversationTags(activeConversation.tags, displayTags);
+      await updateConversation(token, activeId, { tags: merged });
+      await openConversation(activeId);
+      await refreshConversations();
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nao foi possivel atualizar tags");
+    } finally {
+      setTagsSaving(false);
+    }
   }
 
   async function transferTo(agent: UserRow) {
@@ -1741,6 +1794,7 @@ export function AtlasApp({ token, user }: Props) {
                   ) : null}
                 </div>
               ) : null}
+              <TagFilterBar catalog={tagCatalog} selected={tagFilter} onChange={setTagFilter} />
               <div className="atlas-scroll mt-4 flex-1 space-y-2 overflow-auto pr-1">
                 {filtered.map((item) => {
                   const last = item.messages?.[0];
@@ -1773,6 +1827,7 @@ export function AtlasApp({ token, user }: Props) {
                           <div className="min-w-0 flex-1 text-left">
                             <p className="truncate text-sm font-semibold">{item.customerName}</p>
                             <p className="truncate text-xs text-atlas-muted">{last?.text ?? "—"}</p>
+                            <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-1" />
                             {item.team?.name ? (
                               <p className="truncate text-[10px] font-medium text-blue-700">{item.team.name}</p>
                             ) : null}
@@ -1817,6 +1872,9 @@ export function AtlasApp({ token, user }: Props) {
                     transferring={transferLoading}
                     agentAvatarFor={agentAvatarFor}
                     accessToken={token}
+                    tagCatalog={tagCatalog}
+                    tagsSaving={tagsSaving}
+                    onTagsChange={(tags) => updateActiveTags(tags)}
                   />
                   <div className="atlas-scroll relative isolate flex-1 space-y-4 overflow-auto bg-[#f7faff] px-5 py-5">
                     {(active.messages ?? []).map((m) => (
