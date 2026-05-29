@@ -98,6 +98,23 @@ function statusLabel(status: string) {
   return map[status] ?? status;
 }
 
+function statusShortLabel(status: string) {
+  const map: Record<string, string> = {
+    open: "Abr",
+    waiting_customer: "Ag.",
+    closed: "Fech."
+  };
+  return map[status] ?? status.slice(0, 4);
+}
+
+function statusToneClass(status: string) {
+  if (status === "closed") return "bg-slate-100 text-slate-600";
+  if (status === "waiting_customer") return "bg-amber-100 text-amber-800";
+  return "bg-emerald-100 text-emerald-800";
+}
+
+const INBOX_PANEL_CLASS = "overflow-hidden rounded-2xl";
+
 function avatarPalette(seed: string) {
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) hash = (hash << 5) - hash + seed.charCodeAt(i);
@@ -718,7 +735,7 @@ function CustomerHeader({
   onTagsChange
 }: CustomerHeaderProps) {
   return (
-    <div className="border-b border-slate-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+    <div className="rounded-t-2xl border-b border-slate-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
           <CustomerAvatar
@@ -1597,51 +1614,51 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   return (
-    <main className="mx-auto h-full max-w-[1500px] overflow-hidden p-2 sm:p-3 xl:p-4">
-      <section className="grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,210px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,210px)_minmax(0,1fr)_minmax(0,280px)]">
-        <aside className="glass-panel hidden min-h-0 flex-col overflow-hidden rounded-[26px] p-3 xl:flex">
-          <div className="flex items-center gap-2 rounded-2xl border border-white/60 bg-white/50 px-2.5 py-2">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-violet-400 text-white">
-              <Shield size={16} />
+    <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-2.5 lg:p-3">
+      <section className="grid h-full min-h-0 grid-cols-1 gap-2 overflow-hidden sm:gap-2.5 2xl:grid-cols-[minmax(0,176px)_minmax(0,1fr)_minmax(0,272px)]">
+        <aside className={`glass-panel hidden min-h-0 flex-col ${INBOX_PANEL_CLASS} p-2.5 2xl:flex`}>
+          <div className="flex items-center gap-2 rounded-xl border border-white/60 bg-white/50 px-2 py-1.5">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-blue-500 to-violet-400 text-white">
+              <Shield size={14} />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">Atlas One</p>
-              <p className="truncate text-[11px] text-atlas-muted">Inbox comercial</p>
+              <p className="truncate text-xs font-semibold">Atlas One</p>
+              <p className="truncate text-[10px] text-atlas-muted">Inbox</p>
             </div>
           </div>
 
-          <div className="mt-2.5 rounded-2xl border border-white/60 bg-white/45 p-2.5 backdrop-blur-xl">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[11px] font-semibold text-slate-600">Resumo do turno</p>
+          <div className="mt-2 rounded-xl border border-white/60 bg-white/45 p-2 backdrop-blur-xl">
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-slate-600">Resumo</p>
               <span className="text-[10px] text-slate-500">Hoje</span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5 text-center">
-              <div className="rounded-lg bg-white/65 px-1.5 py-2">
-                <p className="text-base font-semibold leading-none text-slate-700">{openCount}</p>
-                <p className="mt-1 text-[10px] text-slate-500">Abertos</p>
+            <div className="grid grid-cols-3 gap-1 text-center">
+              <div className="rounded-lg bg-white/65 px-1 py-1.5">
+                <p className="text-sm font-semibold leading-none text-slate-700">{openCount}</p>
+                <p className="mt-0.5 text-[9px] text-slate-500">Abertos</p>
               </div>
-              <div className="rounded-lg bg-white/65 px-1.5 py-2">
-                <p className="text-base font-semibold leading-none text-slate-700">{waitingCount}</p>
-                <p className="mt-1 text-[10px] text-slate-500">Aguard.</p>
+              <div className="rounded-lg bg-white/65 px-1 py-1.5">
+                <p className="text-sm font-semibold leading-none text-slate-700">{waitingCount}</p>
+                <p className="mt-0.5 text-[9px] text-slate-500">Aguard.</p>
               </div>
-              <div className="rounded-lg bg-white/65 px-1.5 py-2">
-                <p className="text-base font-semibold leading-none text-slate-700">{closedCount}</p>
-                <p className="mt-1 text-[10px] text-slate-500">Fechados</p>
+              <div className="rounded-lg bg-white/65 px-1 py-1.5">
+                <p className="text-sm font-semibold leading-none text-slate-700">{closedCount}</p>
+                <p className="mt-0.5 text-[9px] text-slate-500">Fech.</p>
               </div>
             </div>
           </div>
 
-          <div className="mt-2.5 rounded-2xl border border-white/60 bg-white/45 p-2.5 backdrop-blur-xl">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[11px] font-semibold text-slate-600">Equipe online</p>
+          <div className="mt-2 rounded-xl border border-white/60 bg-white/45 p-2 backdrop-blur-xl">
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-slate-600">Equipe</p>
               <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 {agents.length}
               </span>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {agents.slice(0, 3).map((agent) => (
-                <div key={agent.id} className="flex items-center gap-2 rounded-lg bg-white/65 px-2 py-1.5 text-xs">
+                <div key={agent.id} className="flex items-center gap-1.5 rounded-lg bg-white/65 px-1.5 py-1 text-[11px]">
                   <CustomerAvatar
                     name={agent.name}
                     phone={agent.email}
@@ -1656,19 +1673,19 @@ export function AtlasApp({ token, user }: Props) {
                 </div>
               ))}
             </div>
-            <Button variant="glass" className="mt-2 h-8 w-full justify-center text-[11px]" onClick={openTeamManagement}>
-              <Users size={13} />
-              Gerir equipe
+            <Button variant="glass" className="mt-1.5 h-7 w-full justify-center text-[10px]" onClick={openTeamManagement}>
+              <Users size={12} />
+              Equipe
             </Button>
-            <Button variant="glass" className="mt-1.5 h-8 w-full justify-center text-[11px]" onClick={openTeamManagement}>
-              <UserPlus size={13} />
-              Novo atendente
+            <Button variant="glass" className="mt-1 h-7 w-full justify-center text-[10px]" onClick={openTeamManagement}>
+              <UserPlus size={12} />
+              Novo
             </Button>
           </div>
           <button
             type="button"
             onDoubleClick={() => setProfileOpen(true)}
-            className="mt-auto rounded-2xl border border-white/60 bg-white/55 p-3 text-left text-sm backdrop-blur-xl"
+            className="mt-auto rounded-xl border border-white/60 bg-white/55 p-2 text-left text-xs backdrop-blur-xl"
             title="Duplo clique para abrir perfil"
           >
             <div className="flex items-center gap-2">
@@ -1687,8 +1704,8 @@ export function AtlasApp({ token, user }: Props) {
           </button>
         </aside>
 
-        <section className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden lg:min-h-[420px]">
-          <header className="glass-panel flex min-h-14 shrink-0 flex-wrap items-center gap-2 rounded-[26px] px-3 py-2 sm:gap-3 sm:px-5">
+        <section className="flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden sm:gap-2.5 lg:min-h-[420px]">
+          <header className={`glass-panel flex min-h-12 shrink-0 flex-wrap items-center gap-2 ${INBOX_PANEL_CLASS} px-3 py-2 sm:gap-3 sm:px-4`}>
             <Search className="text-atlas-blue" size={18} />
             <input
               className="flex-1 bg-transparent text-sm outline-none"
@@ -1706,36 +1723,36 @@ export function AtlasApp({ token, user }: Props) {
             ) : null}
           </header>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden md:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
-            <Card className="flex min-h-[220px] min-w-0 flex-col border border-slate-200 bg-white/95 p-3 shadow-sm sm:min-h-[280px] sm:p-3.5 md:min-h-0">
-              <div className="flex items-center justify-between">
-                <h1 className="text-lg font-semibold">Inbox</h1>
-                <Badge>{filtered.length}</Badge>
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
+            <Card className={`flex min-h-[220px] min-w-0 flex-col border border-slate-200 bg-white/95 p-2.5 shadow-sm sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+              <div className="flex items-center justify-between gap-2">
+                <h1 className="text-base font-semibold">Inbox</h1>
+                <Badge className="h-5 px-2 text-[10px]">{filtered.length}</Badge>
               </div>
-              <div className="mt-2.5 rounded-2xl border border-white/70 bg-white/55 p-2.5 backdrop-blur">
+              <div className="mt-2 rounded-xl border border-white/70 bg-white/55 p-2 backdrop-blur">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-atlas-muted">Novo contato</p>
+                  <p className="text-[11px] font-medium text-atlas-muted">Novo contato</p>
                   <Button
                     variant="glass"
-                    className="h-8 px-2.5 text-[11px]"
+                    className="h-7 px-2 text-[10px]"
                     onClick={() => setQuickAddOpen((v) => !v)}
                     title="Adicionar contato"
                   >
                     <Plus size={12} />
-                    {quickAddOpen ? "Fechar" : "Adicionar"}
+                    {quickAddOpen ? "Fechar" : "Add"}
                   </Button>
                 </div>
                 {quickAddOpen ? (
-                  <div className="mt-2 grid grid-cols-1 gap-2">
+                  <div className="mt-1.5 grid grid-cols-1 gap-1.5">
                     <input
-                      className="atlas-field rounded-xl px-3 py-2 text-sm outline-none"
+                      className="atlas-field rounded-lg px-2.5 py-1.5 text-xs outline-none"
                       placeholder="Nome do cliente"
                       value={newContact.name}
                       onChange={(e) => setNewContact((s) => ({ ...s, name: e.target.value }))}
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <input
-                        className="atlas-field min-w-0 flex-1 rounded-xl px-3 py-2 text-sm outline-none"
+                        className="atlas-field min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-xs outline-none"
                         placeholder="WhatsApp com DDD"
                         value={newContact.phone}
                         onChange={(e) => setNewContact((s) => ({ ...s, phone: e.target.value }))}
@@ -1745,14 +1762,13 @@ export function AtlasApp({ token, user }: Props) {
                       />
                       <Button
                         variant="glass"
-                        className="h-9 px-3 text-xs"
+                        className="h-8 px-2.5 text-[10px]"
                         onClick={() => void handleCreateConversation()}
                         disabled={!newContact.name.trim() || !newContact.phone.trim()}
                       >
                         Salvar
                       </Button>
                     </div>
-                    <p className="px-1 text-[10px] text-slate-500">Foto do cliente sincroniza automaticamente pelo WhatsApp.</p>
                   </div>
                 ) : null}
               </div>
@@ -1762,8 +1778,8 @@ export function AtlasApp({ token, user }: Props) {
                 </div>
               ) : null}
               {canMonitorByUser ? (
-                <div className="mt-3 rounded-xl border border-slate-200 bg-white/85 p-2">
-                  <p className="mb-1 text-[10px] font-semibold text-slate-500">Acompanhar por departamento</p>
+                <div className="mt-2 rounded-xl border border-slate-200 bg-white/85 p-1.5">
+                  <p className="mb-1 text-[10px] font-semibold text-slate-500">Departamento</p>
                   <div className="flex flex-wrap gap-1">
                     <button
                       type="button"
@@ -1817,8 +1833,8 @@ export function AtlasApp({ token, user }: Props) {
                   ) : null}
                 </div>
               ) : null}
-              <TagFilterBar catalog={tagCatalog} selected={tagFilter} onChange={setTagFilter} />
-              <div className="atlas-scroll mt-4 flex-1 space-y-2 overflow-auto pr-1">
+              <TagFilterBar catalog={tagCatalog} selected={tagFilter} onChange={setTagFilter} compact />
+              <div className="atlas-scroll mt-2 min-h-0 flex-1 space-y-1 overflow-auto pr-0.5">
                 {filtered.map((item) => {
                   const last = item.messages?.[0];
                   const selected = item.id === activeId;
@@ -1827,15 +1843,15 @@ export function AtlasApp({ token, user }: Props) {
                   return (
                     <div
                       key={item.id}
-                      className={`w-full rounded-2xl border p-2.5 text-left transition ${
+                      className={`w-full rounded-xl border px-2 py-1.5 text-left transition ${
                         selected
                           ? "border-blue-200/70 bg-blue-50/50"
                           : "border-transparent bg-transparent hover:border-white/70 hover:bg-white/60"
                       }`}
                     >
                       <button type="button" onClick={() => openConversation(item.id)} className="w-full">
-                        <div className="flex items-center gap-2.5">
-                          <div className="relative">
+                        <div className="flex items-start gap-2">
+                          <div className="relative shrink-0">
                             <CustomerAvatar
                               name={item.customerName}
                               phone={item.customerPhone}
@@ -1844,22 +1860,26 @@ export function AtlasApp({ token, user }: Props) {
                               accessToken={token}
                             />
                             {unread ? (
-                              <span className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full ${overdue ? "bg-rose-500" : "bg-blue-500"}`} />
+                              <span className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ${overdue ? "bg-rose-500" : "bg-blue-500"}`} />
                             ) : null}
                           </div>
                           <div className="min-w-0 flex-1 text-left">
-                            <p className="truncate text-sm font-semibold">{item.customerName}</p>
-                            <p className="truncate text-xs text-atlas-muted">{last?.text ?? "—"}</p>
-                            <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-1" />
-                            {item.team?.name ? (
-                              <p className="truncate text-[10px] font-medium text-blue-700">{item.team.name}</p>
-                            ) : null}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {overdue ? (
-                              <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">+5m</span>
-                            ) : null}
-                            <Badge className="h-6">{statusLabel(item.status)}</Badge>
+                            <div className="flex items-start justify-between gap-1">
+                              <p className="truncate text-[13px] font-semibold leading-tight">{item.customerName}</p>
+                              <div className="flex shrink-0 items-center gap-0.5">
+                                {overdue ? (
+                                  <span className="rounded-full bg-rose-100 px-1 py-0.5 text-[9px] font-semibold text-rose-700">+5m</span>
+                                ) : null}
+                                <span
+                                  className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${statusToneClass(item.status)}`}
+                                  title={statusLabel(item.status)}
+                                >
+                                  {statusShortLabel(item.status)}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="truncate text-[11px] leading-tight text-atlas-muted">{last?.text ?? "—"}</p>
+                            <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-0.5" />
                           </div>
                         </div>
                       </button>
@@ -1869,7 +1889,7 @@ export function AtlasApp({ token, user }: Props) {
               </div>
             </Card>
 
-            <Card className="flex min-h-[320px] min-w-0 flex-col border border-slate-200 bg-white/95 p-0 shadow-sm md:min-h-0">
+            <Card className={`flex min-h-[320px] min-w-0 flex-col border border-slate-200 bg-white/95 p-0 shadow-sm md:min-h-0 ${INBOX_PANEL_CLASS}`}>
               {active ? (
                 <>
                   <CustomerHeader
@@ -2008,7 +2028,7 @@ export function AtlasApp({ token, user }: Props) {
                   ) : null}
                   <form
                     onSubmit={handleSend}
-                    className="z-10 flex items-end gap-2 border-t border-slate-200 bg-white px-4 py-2.5"
+                    className="z-10 flex items-end gap-2 rounded-b-2xl border-t border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5"
                   >
                     <input
                       ref={fileRef}
@@ -2068,8 +2088,8 @@ export function AtlasApp({ token, user }: Props) {
           {!error && info ? <p className="text-sm text-emerald-700">{info}</p> : null}
         </section>
 
-        <aside className="hidden min-h-0 flex-col gap-4 overflow-hidden 2xl:flex">
-          <Card className="flex min-h-0 flex-1 flex-col border border-white/70 bg-white/50 p-4 backdrop-blur-xl">
+        <aside className={`hidden min-h-0 flex-col gap-2 overflow-hidden 2xl:flex ${INBOX_PANEL_CLASS}`}>
+          <Card className={`flex min-h-0 flex-1 flex-col border border-white/70 bg-white/50 p-3 backdrop-blur-xl ${INBOX_PANEL_CLASS}`}>
             <div className="mb-3 flex gap-2 border-b border-white/70 pb-2">
               <button
                 type="button"

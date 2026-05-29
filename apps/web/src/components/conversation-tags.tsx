@@ -143,9 +143,10 @@ type TagFilterBarProps = {
   catalog: TagCatalogItem[];
   selected: string[];
   onChange: (selected: string[]) => void;
+  compact?: boolean;
 };
 
-export function TagFilterBar({ catalog, selected, onChange }: TagFilterBarProps) {
+export function TagFilterBar({ catalog, selected, onChange, compact = false }: TagFilterBarProps) {
   if (!catalog.length) return null;
 
   function toggle(name: string) {
@@ -158,9 +159,12 @@ export function TagFilterBar({ catalog, selected, onChange }: TagFilterBarProps)
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-slate-200 bg-white/85 p-2">
-      <p className="mb-1 text-[10px] font-semibold text-slate-500">Filtrar por tag</p>
-      <div className="flex flex-wrap gap-1">
+    <div className={`${compact ? "mt-1.5 rounded-lg p-1.5" : "mt-2 rounded-xl p-2"} border border-slate-200 bg-white/85`}>
+      {!compact ? <p className="mb-1 text-[10px] font-semibold text-slate-500">Filtrar por tag</p> : null}
+      <div className="flex flex-wrap items-center gap-1">
+        {compact && !selected.length ? (
+          <span className="text-[10px] font-semibold text-slate-500">Tags</span>
+        ) : null}
         {catalog.map((item) => {
           const active = selected.some((tag) => tag.toLowerCase() === item.name.toLowerCase());
           return (
