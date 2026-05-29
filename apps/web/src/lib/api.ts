@@ -379,6 +379,7 @@ export function updateConversation(
     tags?: string[];
     customerName?: string;
     customerPhone?: string;
+    transferNote?: string;
   }
 ) {
   return request<Conversation>(`/inbox/conversations/${id}`, token, {
@@ -429,6 +430,28 @@ export function saveInboxTags(token: string, tags: TagCatalogItem[]) {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ tags })
+  });
+}
+
+export type ConversationActivityItem = {
+  id: string;
+  type: "note" | "transfer" | "update" | "legacy_note";
+  createdAt: string;
+  actor: { id: string; name: string; role: string } | null;
+  payload: Record<string, unknown>;
+};
+
+export function listConversationActivity(token: string, conversationId: string) {
+  return request<ConversationActivityItem[]>(`/inbox/conversations/${conversationId}/activity`, token, {
+    headers: { "content-type": "application/json" }
+  });
+}
+
+export function createConversationNote(token: string, conversationId: string, text: string) {
+  return request<ConversationActivityItem>(`/inbox/conversations/${conversationId}/notes`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text })
   });
 }
 

@@ -22,6 +22,11 @@ import {
 } from "../services/integrations/integration-events.service";
 import { listShortcuts } from "../services/admin.service";
 import { listInboxTags, saveInboxTags } from "../services/inbox-tags.service";
+import {
+  createInternalNote,
+  listConversationActivity,
+  recordConversationTransfer
+} from "../services/inbox-collaboration.service";
 import { requireRole } from "../plugins/roles";
 
 function normalizeWhatsAppNumber(raw: string) {
@@ -139,6 +144,7 @@ export async function inboxRoutes(app: FastifyInstance) {
       tags?: string[];
       customerName?: string;
       customerPhone?: string;
+      transferNote?: string;
     };
 
     const conversation = await prisma.conversation.findFirst({
@@ -181,21 +187,48 @@ export async function inboxRoutes(app: FastifyInstance) {
       }
     });
     if (!refreshed) return sendError(reply, 404, "Conversa nao encontrada");
-    await auditLog({
-      tenantId: user.tenantId,
-      actorId: user.id,
-      entity: "Conversation",
-      entityId: refreshed.id,
-      action: "updated",
-      metadata: {
-        assignedToId: body.assignedToId ?? null,
-        teamId: body.teamId ?? null,
-        status: body.status ?? null,
-        priority: body.priority ?? null,
-        customerName: body.customerName ?? null,
-        customerPhone: body.customerPhone ?? null
-      }
-    });
+
+    const isTransfer =
+      body.assignedToId !== undefined && body.assignedToId !== conversation.assignedToId;
+
+    if (isTransfer) {
+      await recordConversationTransfer({
+        tenantId: user.tenantId,
+        actorId: user.id,
+        conversationId: refreshed.id,
+        fromUserId: conversation.assignedToId,
+        toUserId: body.assignedToId ?? null,
+        teamId: body.teamId ?? refreshed.teamId ?? null,
+        note: body.transferNote
+      });
+    }
+
+    const onlyTransfer =
+      isTransfer &&
+      body.status === undefined &&
+      body.priority === undefined &&
+      body.tags === undefined &&
+      body.customerName === undefined &&
+      body.customerPhone === undefined;
+
+    if (!onlyTransfer) {
+      await auditLog({
+        tenantId: user.tenantId,
+        actorId: user.id,
+        entity: "Conversation",
+        entityId: refreshed.id,
+        action: "updated",
+        metadata: {
+          ...(isTransfer ? {} : { assignedToId: body.assignedToId ?? null }),
+          teamId: body.teamId ?? null,
+          status: body.status ?? null,
+          priority: body.priority ?? null,
+          tags: body.tags ?? null,
+          customerName: body.customerName ?? null,
+          customerPhone: body.customerPhone ?? null
+        }
+      });
+    }
 
     if (conversation.assignedToId && body.assignedToId === null) {
       await runConversationAutomations(user.tenantId, refreshed.id, "conversation.unassigned");
@@ -208,6 +241,53 @@ export async function inboxRoutes(app: FastifyInstance) {
 
     return reply.send(refreshed);
   });
+
+  app.get(
+    "/conversations/:id/activity",
+    { preHandler: [requireAuth, requirePermission("conversation:read")] },
+    async (request, reply) => {
+      const user = requireUser(request);
+      const { id } = request.params as { id: string };
+      if (!canViewAll(user)) {
+        const conversation = await prisma.conversation.findFirst({
+          where: { tenantId: user.tenantId, id },
+          select: { assignedToId: true }
+        });
+        if (!conversation) return sendError(reply, 404, "Conversa nao encontrada");
+        if (conversation.assignedToId !== user.id) {
+          return sendError(reply, 403, "Voce nao tem acesso a este atendimento");
+        }
+      }
+      try {
+        return reply.send(await listConversationActivity(user.tenantId, id));
+      } catch (error) {
+        return sendError(reply, 400, "Nao foi possivel carregar atividade", error instanceof Error ? error.message : error);
+      }
+    }
+  );
+
+  app.post(
+    "/conversations/:id/notes",
+    { preHandler: [requireAuth, requirePermission("conversation:update")] },
+    async (request, reply) => {
+      const user = requireUser(request);
+      const { id } = request.params as { id: string };
+      const body = request.body as { text?: string };
+      const conversation = await prisma.conversation.findFirst({
+        where: { tenantId: user.tenantId, id }
+      });
+      if (!conversation) return sendError(reply, 404, "Conversa nao encontrada");
+      if (!canViewAll(user) && conversation.assignedToId !== user.id) {
+        return sendError(reply, 403, "Voce nao tem acesso a este atendimento");
+      }
+      try {
+        const note = await createInternalNote(user.tenantId, user.id, id, body.text ?? "");
+        return reply.status(201).send(note);
+      } catch (error) {
+        return sendError(reply, 400, "Nao foi possivel salvar nota", error instanceof Error ? error.message : error);
+      }
+    }
+  );
 
   app.delete("/conversations/:id", { preHandler: [requireAuth, requirePermission("conversation:update")] }, async (request, reply) => {
     const user = requireUser(request);
