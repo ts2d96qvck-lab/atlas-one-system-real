@@ -115,6 +115,10 @@ function statusToneClass(status: string) {
 
 const INBOX_PANEL_CLASS = "overflow-hidden rounded-2xl";
 
+function mediaUploadKey(conversationId: string, file: File) {
+  return `${conversationId}:${file.name}:${file.size}:${file.lastModified}:${file.type}`;
+}
+
 function avatarPalette(seed: string) {
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) hash = (hash << 5) - hash + seed.charCodeAt(i);
@@ -974,6 +978,10 @@ export function AtlasApp({ token, user }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeIdRef = useRef<string | null>(null);
+  const sendingTextRef = useRef(false);
+  const sendingMediaRef = useRef<string | null>(null);
+  const [sendingText, setSendingText] = useState(false);
+  const [sendingMediaKey, setSendingMediaKey] = useState<string | null>(null);
 
   const selfUser = agents.find((agent) => agent.id === user.id) ?? null;
 
@@ -1201,6 +1209,18 @@ export function AtlasApp({ token, user }: Props) {
     return byDepartment.filter((item) => item.assignedToId === queueOwnerId);
   }, [canMonitorByUser, conversations, queueDepartmentId, queueOwnerId, roleIsAgent, user.id]);
 
+  const pendingUploadKey = useMemo(
+    () => (activeId && pendingUploadFile ? mediaUploadKey(activeId, pendingUploadFile) : null),
+    [activeId, pendingUploadFile]
+  );
+  const pendingUploadSending = pendingUploadKey !== null && sendingMediaKey === pendingUploadKey;
+  const pendingAudioKey = useMemo(
+    () => (activeId && pendingAudioFile ? mediaUploadKey(activeId, pendingAudioFile) : null),
+    [activeId, pendingAudioFile]
+  );
+  const pendingAudioSending = pendingAudioKey !== null && sendingMediaKey === pendingAudioKey;
+  const mediaSendLocked = Boolean(sendingMediaKey);
+
   function isUnreadConversation(item: Conversation) {
     const latest = item.messages?.[0];
     if (!latest || latest.direction !== "in") return false;
@@ -1241,11 +1261,15 @@ export function AtlasApp({ token, user }: Props) {
   }, [visibleConversations, search, tagFilter]);
 
   async function sendCurrentDraft() {
+    if (sendingTextRef.current) return;
     if (!activeId) {
       setError("Aguarde a conversa abrir para enviar a mensagem.");
       return;
     }
     if (!draft.trim()) return;
+
+    sendingTextRef.current = true;
+    setSendingText(true);
     const textRaw = draft;
     const shortcutMatch = shortcuts.find((item) => item.tag.toLowerCase() === draft.trim().toLowerCase());
     const text = shortcutMatch ? shortcutMatch.text : textRaw;
@@ -1257,6 +1281,9 @@ export function AtlasApp({ token, user }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao enviar");
       setDraft(textRaw);
+    } finally {
+      sendingTextRef.current = false;
+      setSendingText(false);
     }
   }
 
@@ -1336,11 +1363,12 @@ export function AtlasApp({ token, user }: Props) {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
+    if (sendingTextRef.current) return;
     await sendCurrentDraft();
   }
 
   async function handleFile(file: File) {
-    if (!activeId) return;
+    if (!activeId || sendingMediaRef.current) return;
     if (pendingUploadUrl) URL.revokeObjectURL(pendingUploadUrl);
     const kind = mediaPreviewKind(file);
     const previewUrl = kind === "image" || kind === "video" || kind === "audio" ? URL.createObjectURL(file) : "";
@@ -1352,6 +1380,11 @@ export function AtlasApp({ token, user }: Props) {
 
   async function sendPendingUpload() {
     if (!activeId || !pendingUploadFile) return;
+    const uploadKey = mediaUploadKey(activeId, pendingUploadFile);
+    if (sendingMediaRef.current === uploadKey) return;
+
+    sendingMediaRef.current = uploadKey;
+    setSendingMediaKey(uploadKey);
     try {
       await sendMediaFile(token, activeId, pendingUploadFile, pendingUploadCaption.trim() || undefined);
       if (pendingUploadUrl) URL.revokeObjectURL(pendingUploadUrl);
@@ -1363,10 +1396,16 @@ export function AtlasApp({ token, user }: Props) {
       await refreshConversations();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao enviar arquivo");
+    } finally {
+      if (sendingMediaRef.current === uploadKey) {
+        sendingMediaRef.current = null;
+        setSendingMediaKey(null);
+      }
     }
   }
 
   function discardPendingUpload() {
+    if (sendingMediaRef.current) return;
     if (pendingUploadUrl) URL.revokeObjectURL(pendingUploadUrl);
     setPendingUploadFile(null);
     setPendingUploadUrl("");
@@ -1405,6 +1444,11 @@ export function AtlasApp({ token, user }: Props) {
 
   async function sendPendingAudio() {
     if (!activeId || !pendingAudioFile) return;
+    const uploadKey = mediaUploadKey(activeId, pendingAudioFile);
+    if (sendingMediaRef.current === uploadKey) return;
+
+    sendingMediaRef.current = uploadKey;
+    setSendingMediaKey(uploadKey);
     try {
       await sendMediaFile(token, activeId, pendingAudioFile);
       if (pendingAudioUrl) URL.revokeObjectURL(pendingAudioUrl);
@@ -1415,10 +1459,16 @@ export function AtlasApp({ token, user }: Props) {
       await refreshConversations();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao enviar audio");
+    } finally {
+      if (sendingMediaRef.current === uploadKey) {
+        sendingMediaRef.current = null;
+        setSendingMediaKey(null);
+      }
     }
   }
 
   function discardPendingAudio() {
+    if (sendingMediaRef.current) return;
     if (pendingAudioUrl) URL.revokeObjectURL(pendingAudioUrl);
     setPendingAudioFile(null);
     setPendingAudioUrl("");
@@ -1954,13 +2004,22 @@ export function AtlasApp({ token, user }: Props) {
                   </div>
                   {pendingAudioFile ? (
                     <div className="mx-4 mb-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
-                      <p className="mb-2 text-xs font-semibold text-blue-700">Audio gravado (pre-escuta antes de enviar)</p>
+                      <p className="mb-2 text-xs font-semibold text-blue-700">
+                        {pendingAudioSending ? "Enviando audio..." : "Audio gravado (pre-escuta antes de enviar)"}
+                      </p>
                       <audio controls src={pendingAudioUrl} className="w-full" />
                       <div className="mt-2 flex gap-2">
-                        <Button size="sm" onClick={() => void sendPendingAudio()}>
-                          Enviar audio
+                        <Button size="sm" disabled={pendingAudioSending} onClick={() => void sendPendingAudio()}>
+                          {pendingAudioSending ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            "Enviar audio"
+                          )}
                         </Button>
-                        <Button size="sm" variant="glass" onClick={discardPendingAudio}>
+                        <Button size="sm" variant="glass" disabled={pendingAudioSending} onClick={discardPendingAudio}>
                           Descartar
                         </Button>
                       </div>
@@ -1968,7 +2027,9 @@ export function AtlasApp({ token, user }: Props) {
                   ) : null}
                   {pendingUploadFile ? (
                     <div className="mx-4 mb-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
-                      <p className="mb-2 text-xs font-semibold text-blue-700">Arquivo selecionado (confirme antes de enviar)</p>
+                      <p className="mb-2 text-xs font-semibold text-blue-700">
+                        {pendingUploadSending ? "Enviando arquivo..." : "Arquivo selecionado (confirme antes de enviar)"}
+                      </p>
                       {mediaPreviewKind(pendingUploadFile) === "image" && pendingUploadUrl ? (
                         <img src={pendingUploadUrl} alt="Preview da imagem" className="max-h-56 rounded-xl object-contain" />
                       ) : null}
@@ -1984,16 +2045,30 @@ export function AtlasApp({ token, user }: Props) {
                         </div>
                       ) : null}
                       <input
-                        className="mt-2 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-xs outline-none"
+                        className="mt-2 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-xs outline-none disabled:opacity-60"
                         placeholder="Legenda opcional (deixe vazio para enviar sem texto)"
                         value={pendingUploadCaption}
+                        disabled={pendingUploadSending}
                         onChange={(e) => setPendingUploadCaption(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            if (!pendingUploadSending) void sendPendingUpload();
+                          }
+                        }}
                       />
                       <div className="mt-2 flex gap-2">
-                        <Button size="sm" onClick={() => void sendPendingUpload()}>
-                          Enviar arquivo
+                        <Button size="sm" disabled={pendingUploadSending} onClick={() => void sendPendingUpload()}>
+                          {pendingUploadSending ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            "Enviar arquivo"
+                          )}
                         </Button>
-                        <Button size="sm" variant="glass" onClick={discardPendingUpload}>
+                        <Button size="sm" variant="glass" disabled={pendingUploadSending} onClick={discardPendingUpload}>
                           Cancelar
                         </Button>
                       </div>
@@ -2041,7 +2116,13 @@ export function AtlasApp({ token, user }: Props) {
                         e.target.value = "";
                       }}
                     />
-                    <Button type="button" variant="glass" size="icon" onClick={() => fileRef.current?.click()}>
+                    <Button
+                      type="button"
+                      variant="glass"
+                      size="icon"
+                      disabled={mediaSendLocked || sendingText}
+                      onClick={() => fileRef.current?.click()}
+                    >
                       <Paperclip size={18} />
                     </Button>
                     <QuickRepliesMenu
@@ -2055,25 +2136,27 @@ export function AtlasApp({ token, user }: Props) {
                       type="button"
                       variant="glass"
                       size="icon"
+                      disabled={mediaSendLocked || sendingText}
                       onClick={toggleRecord}
                       className={recording ? "ring-2 ring-red-400" : ""}
                     >
                       {recording ? <Square size={16} className="text-red-500" /> : <Mic size={18} />}
                     </Button>
                     <textarea
-                      className="atlas-field max-h-32 min-h-[40px] flex-1 resize-none rounded-[18px] px-4 py-2 text-sm outline-none focus:border-blue-300"
+                      className="atlas-field max-h-32 min-h-[40px] flex-1 resize-none rounded-[18px] px-4 py-2 text-sm outline-none focus:border-blue-300 disabled:opacity-60"
                       placeholder="Mensagem..."
                       value={draft}
+                      disabled={sendingText}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
-                          if (draft.trim()) void sendCurrentDraft();
+                          if (!sendingText && draft.trim()) void sendCurrentDraft();
                         }
                       }}
                     />
-                    <Button type="submit" size="icon" disabled={!draft.trim()}>
-                      <Send size={18} />
+                    <Button type="submit" size="icon" disabled={!draft.trim() || sendingText || mediaSendLocked}>
+                      {sendingText ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                     </Button>
                   </form>
                 </>
