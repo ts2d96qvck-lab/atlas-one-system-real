@@ -21,6 +21,8 @@ import {
   listAuditLogs,
   listInstances,
   listShortcuts,
+  listInboxTags,
+  saveInboxTags,
   listTeams,
   operationalReset,
   ownerTenantsOverview,
@@ -60,12 +62,16 @@ import {
   type WebhookEndpointRow,
   type SessionUser,
   type ShortcutItem,
+  type TagCatalogItem,
   type TenantSummary,
   type TeamRow,
   type WhatsAppInstance
 } from "../lib/api";
 import { EmptyState } from "./empty-state";
 import { OwnerClientsPanel } from "./owner-clients-panel";
+import { tagChipStyle } from "../lib/inbox-tags";
+
+const TAG_COLOR_OPTIONS = ["#6366f1", "#22c55e", "#0ea5e9", "#f59e0b", "#ef4444", "#a855f7", "#64748b"];
 
 type Props = { token: string; user?: SessionUser };
 
@@ -226,6 +232,7 @@ export function AdminView({ token, user }: Props) {
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [shortcuts, setShortcuts] = useState<ShortcutItem[]>([]);
+  const [tagCatalog, setTagCatalog] = useState<TagCatalogItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogRow[]>([]);
   const [selectedInstance, setSelectedInstance] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
@@ -258,6 +265,7 @@ export function AdminView({ token, user }: Props) {
   const [teamForm, setTeamForm] = useState({ name: "", managerId: "" });
   const [teamSaving, setTeamSaving] = useState(false);
   const [shortcutForm, setShortcutForm] = useState({ tag: "", text: "" });
+  const [tagForm, setTagForm] = useState({ name: "", color: TAG_COLOR_OPTIONS[0] });
   const [lastOnboarded, setLastOnboarded] = useState<{
     tenantName: string;
     tenantSlug: string;
@@ -455,6 +463,12 @@ export function AdminView({ token, user }: Props) {
       setShortcuts(shortcutRows);
     } catch {
       setShortcuts([]);
+    }
+    try {
+      const tagRows = await listInboxTags(token);
+      setTagCatalog(tagRows);
+    } catch {
+      setTagCatalog([]);
     }
     try {
       const settings = await getCompanySettings(token);
@@ -929,6 +943,41 @@ export function AdminView({ token, user }: Props) {
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao excluir atalho");
+    }
+  }
+
+  async function saveTagCatalogItem() {
+    const name = tagForm.name.trim();
+    if (!name) {
+      setMessage("Informe o nome da tag.");
+      return;
+    }
+    try {
+      const withoutDuplicate = tagCatalog.filter((item) => item.name.toLowerCase() !== name.toLowerCase());
+      const saved = await saveInboxTags(token, [
+        ...withoutDuplicate,
+        { name, color: tagForm.color || TAG_COLOR_OPTIONS[0] }
+      ]);
+      setTagCatalog(saved);
+      setTagForm({ name: "", color: TAG_COLOR_OPTIONS[0] });
+      setMessage("Tag salva no catalogo.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar tag");
+    }
+  }
+
+  async function removeTagCatalogItem(name: string) {
+    const ok = window.confirm(`Remover tag ${name} do catalogo?`);
+    if (!ok) return;
+    try {
+      const saved = await saveInboxTags(
+        token,
+        tagCatalog.filter((item) => item.name.toLowerCase() !== name.toLowerCase())
+      );
+      setTagCatalog(saved);
+      setMessage(`Tag ${name} removida do catalogo.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro ao remover tag");
     }
   }
 
@@ -1722,6 +1771,59 @@ export function AdminView({ token, user }: Props) {
               </div>
             ))}
             {!shortcuts.length ? <p className="text-xs text-atlas-muted">Nenhum atalho cadastrado.</p> : null}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-center gap-2">
+            <Hash size={15} className="text-atlas-blue" />
+            <p className="font-semibold">Catalogo de tags do inbox</p>
+          </div>
+          <p className="mt-1 text-xs text-atlas-muted">
+            Tags disponiveis para classificar conversas no inbox. Agentes aplicam tags; supervisores gerenciam o catalogo.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <input
+              className="rounded-xl bg-white/80 px-3 py-2 text-sm"
+              placeholder="Nome da tag"
+              value={tagForm.name}
+              onChange={(e) => setTagForm((s) => ({ ...s, name: e.target.value }))}
+            />
+            <select
+              className="rounded-xl bg-white/80 px-3 py-2 text-sm"
+              value={tagForm.color}
+              onChange={(e) => setTagForm((s) => ({ ...s, color: e.target.value }))}
+            >
+              {TAG_COLOR_OPTIONS.map((color) => (
+                <option key={color} value={color}>
+                  Cor {color}
+                </option>
+              ))}
+            </select>
+            <Button className="h-10" variant="glass" onClick={() => void saveTagCatalogItem()}>
+              <Plus size={16} /> Salvar tag
+            </Button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {tagCatalog.map((tag) => (
+              <div key={tag.name} className="flex items-center justify-between rounded-xl bg-white/70 px-3 py-2 text-xs">
+                <span
+                  className="inline-flex rounded-full border px-2 py-0.5 font-semibold"
+                  style={tagChipStyle(tag.name, tagCatalog)}
+                >
+                  {tag.name}
+                </span>
+                <Button
+                  variant="glass"
+                  className="h-7 px-2"
+                  onClick={() => void removeTagCatalogItem(tag.name)}
+                  aria-label={`Excluir tag ${tag.name}`}
+                >
+                  <Trash2 size={13} />
+                </Button>
+              </div>
+            ))}
+            {!tagCatalog.length ? <p className="text-xs text-atlas-muted">Nenhuma tag cadastrada.</p> : null}
           </div>
         </Card>
 
