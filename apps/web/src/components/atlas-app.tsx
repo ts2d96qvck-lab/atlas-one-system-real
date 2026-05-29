@@ -59,6 +59,7 @@ import {
 import { connectRealtime, joinTenant } from "../lib/socket";
 import { SecureMedia } from "./secure-media";
 import { QuickRepliesMenu } from "./quick-replies-menu";
+import { ConversationActivityPanel } from "./conversation-activity-panel";
 import { ConversationTagChips, ConversationTagEditor, TagFilterBar } from "./conversation-tags";
 import { AppCombobox } from "./ui/app-select";
 import { apiUrl } from "../lib/config";
@@ -576,7 +577,7 @@ type AttendantSelectorProps = {
   current: Conversation["assignedTo"];
   agents: UserRow[];
   transferring: boolean;
-  onTransfer: (agent: UserRow) => void;
+  onTransfer: (agent: UserRow, note?: string) => void;
   agentAvatarFor: (agentId: string) => string | null;
   accessToken: string;
 };
@@ -585,6 +586,7 @@ function AttendantSelector({ current, agents, transferring, onTransfer, agentAva
   const [open, setOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(current?.id ?? null);
   const [selectedDepartment, setSelectedDepartment] = useState("Todos");
+  const [transferNote, setTransferNote] = useState("");
 
   useEffect(() => {
     setSelectedAgentId(current?.id ?? null);
@@ -631,6 +633,13 @@ function AttendantSelector({ current, agents, transferring, onTransfer, agentAva
               if (agent) setSelectedDepartment(agentDepartment(agent));
             }}
           />
+          <textarea
+            className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-blue-300"
+            rows={2}
+            placeholder="Nota da transferencia (opcional)"
+            value={transferNote}
+            onChange={(e) => setTransferNote(e.target.value)}
+          />
           <TransferConversationAction
             loading={transferring}
             disabled={!selectedAgentId || selectedAgentId === current?.id}
@@ -638,7 +647,8 @@ function AttendantSelector({ current, agents, transferring, onTransfer, agentAva
               if (!selectedAgentId) return;
               const agent = agents.find((item) => item.id === selectedAgentId);
               if (!agent) return;
-              onTransfer(agent);
+              onTransfer(agent, transferNote.trim() || undefined);
+              setTransferNote("");
               setOpen(false);
             }}
           />
@@ -663,7 +673,7 @@ type CustomerHeaderProps = {
   onSaveContact: () => void;
   onDelete: () => void;
   onSetStatus: (status: "open" | "waiting_customer" | "closed") => void;
-  onTransfer: (agent: UserRow) => void;
+  onTransfer: (agent: UserRow, note?: string) => void;
   transferring: boolean;
   agentAvatarFor: (agentId: string) => string | null;
   accessToken: string;
@@ -912,11 +922,9 @@ export function AtlasApp({ token, user }: Props) {
   const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
   const [pendingUploadUrl, setPendingUploadUrl] = useState("");
   const [pendingUploadCaption, setPendingUploadCaption] = useState("");
-  const [internalNote, setInternalNote] = useState("");
   const [newContact, setNewContact] = useState({ name: "", phone: "" });
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [noteSaving, setNoteSaving] = useState(false);
-  const [noteSavedAt, setNoteSavedAt] = useState<string>("");
+  const [sidebarTab, setSidebarTab] = useState<"client" | "activity">("client");
   const [editingContact, setEditingContact] = useState(false);
   const [contactDraft, setContactDraft] = useState({ customerName: "", customerPhone: "" });
   const [cadenceDraft, setCadenceDraft] = useState("padrao");
@@ -973,8 +981,6 @@ export function AtlasApp({ token, user }: Props) {
         setEditingContact(false);
         setReplyToMessage(null);
         setLastSeenByConversation((current) => ({ ...current, [id]: Date.now() }));
-        const note = (detail.lead?.customFields as { internalNotes?: string } | undefined)?.internalNotes;
-        setInternalNote(note ?? "");
       } catch {
         setError("Nao foi possivel abrir a conversa agora.");
       }
@@ -982,19 +988,17 @@ export function AtlasApp({ token, user }: Props) {
     [token]
   );
 
-  const saveNote = useCallback(async () => {
+  const saveCadence = useCallback(async () => {
     if (!activeConversation?.lead?.id) return;
-    setNoteSaving(true);
     try {
       await updateLead(token, activeConversation.lead.id, {
-        customFields: { internalNotes: internalNote, cadence: cadenceDraft }
+        customFields: { cadence: cadenceDraft }
       });
-      setNoteSavedAt(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
       setError("");
-    } finally {
-      setNoteSaving(false);
+    } catch {
+      setError("Nao foi possivel salvar cadencia");
     }
-  }, [activeConversation?.lead?.id, cadenceDraft, internalNote, token]);
+  }, [activeConversation?.lead?.id, cadenceDraft, token]);
 
   useEffect(() => {
     const self = agents.find((item) => item.id === user.id);
@@ -1150,18 +1154,10 @@ export function AtlasApp({ token, user }: Props) {
   useEffect(() => {
     if (!activeConversation?.lead?.id) return;
     const timer = setTimeout(() => {
-      void saveNote();
+      void saveCadence();
     }, 700);
     return () => clearTimeout(timer);
-  }, [internalNote, activeConversation?.lead?.id, saveNote]);
-
-  useEffect(() => {
-    if (!activeConversation?.lead?.id) return;
-    const timer = setTimeout(() => {
-      void saveNote();
-    }, 700);
-    return () => clearTimeout(timer);
-  }, [cadenceDraft, activeConversation?.lead?.id, saveNote]);
+  }, [cadenceDraft, activeConversation?.lead?.id, saveCadence]);
 
   const visibleConversations = useMemo(() => {
     if (roleIsAgent) return conversations.filter((item) => item.assignedToId === user.id);
@@ -1401,13 +1397,14 @@ export function AtlasApp({ token, user }: Props) {
     }
   }
 
-  async function transferTo(agent: UserRow) {
+  async function transferTo(agent: UserRow, transferNote?: string) {
     if (!activeId) return;
     setTransferLoading(true);
     try {
       await updateConversation(token, activeId, {
         assignedToId: agent.id || null,
-        teamId: agent.teamId ?? null
+        teamId: agent.teamId ?? null,
+        transferNote
       });
       const items = await refreshConversations();
       const monitorId = roleIsAgent ? user.id : queueOwnerId;
@@ -1502,7 +1499,7 @@ export function AtlasApp({ token, user }: Props) {
       await updateConversation(token, activeId, { customerName: name, customerPhone: phone });
       if (activeConversation?.lead?.id) {
         await updateLead(token, activeConversation.lead.id, {
-          customFields: { internalNotes: internalNote, cadence: cadenceDraft }
+          customFields: { cadence: cadenceDraft }
         });
       }
       await refreshConversations();
@@ -1868,7 +1865,7 @@ export function AtlasApp({ token, user }: Props) {
                     onSaveContact={() => void saveContactIdentity()}
                     onDelete={() => void handleDeleteActiveConversation()}
                     onSetStatus={(status) => void setStatusQuick(status)}
-                    onTransfer={(agent) => void transferTo(agent)}
+                    onTransfer={(agent, note) => void transferTo(agent, note)}
                     transferring={transferLoading}
                     agentAvatarFor={agentAvatarFor}
                     accessToken={token}
@@ -2028,10 +2025,31 @@ export function AtlasApp({ token, user }: Props) {
         </section>
 
         <aside className="hidden min-h-0 flex-col gap-4 overflow-hidden 2xl:flex">
-          <Card className="flex-1 border border-white/70 bg-white/50 p-4 backdrop-blur-xl">
-            <p className="font-semibold">Painel do cliente</p>
-            {active ? (
-              <div className="mt-3 space-y-3">
+          <Card className="flex min-h-0 flex-1 flex-col border border-white/70 bg-white/50 p-4 backdrop-blur-xl">
+            <div className="mb-3 flex gap-2 border-b border-white/70 pb-2">
+              <button
+                type="button"
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                  sidebarTab === "client" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                }`}
+                onClick={() => setSidebarTab("client")}
+              >
+                Cliente
+              </button>
+              <button
+                type="button"
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                  sidebarTab === "activity" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                }`}
+                onClick={() => setSidebarTab("activity")}
+              >
+                Atividade
+              </button>
+            </div>
+            {sidebarTab === "activity" ? (
+              <ConversationActivityPanel token={token} conversationId={active?.id ?? null} agents={agents} />
+            ) : active ? (
+              <div className="atlas-scroll min-h-0 flex-1 space-y-3 overflow-auto pr-1">
                 <div className="flex items-center gap-3 rounded-xl border border-white/70 bg-white/70 p-3">
                   <CustomerAvatar
                     name={active.customerName}
@@ -2081,16 +2099,6 @@ export function AtlasApp({ token, user }: Props) {
                     <option value="reativacao">Reativacao</option>
                   </select>
                 </div>
-                <div>
-                  <p className="text-[11px] text-atlas-muted">Notas internas</p>
-                  <textarea
-                    className="mt-1 w-full rounded-2xl border border-white/70 bg-white/55 p-3 text-sm outline-none backdrop-blur-xl"
-                    rows={7}
-                    value={internalNote}
-                    onChange={(e) => setInternalNote(e.target.value)}
-                    placeholder="Visivel apenas para a equipe"
-                  />
-                </div>
                 {active.lead ? (
                   <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2 text-xs text-atlas-muted">
                     <p className="font-semibold text-slate-700">{active.lead.company}</p>
@@ -2099,15 +2107,14 @@ export function AtlasApp({ token, user }: Props) {
                     </p>
                   </div>
                 ) : null}
-                <div className="mt-2 flex items-center justify-between text-xs text-atlas-muted">
-                  <span>{noteSaving ? "Salvando..." : noteSavedAt ? `Salvo ${noteSavedAt}` : "Autosave ativo"}</span>
+                <div className="mt-2 flex justify-end text-xs text-atlas-muted">
                   <Button className="h-8 px-3 text-xs" variant="glass" onClick={saveContactIdentity}>
                     Salvar painel
                   </Button>
                 </div>
               </div>
             ) : (
-              <p className="mt-3 text-xs text-atlas-muted">Selecione uma conversa para editar nome, cadencia e notas.</p>
+              <p className="text-xs text-atlas-muted">Selecione uma conversa para editar dados do cliente.</p>
             )}
           </Card>
         </aside>
