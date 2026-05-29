@@ -130,10 +130,76 @@ function describeAuditLog(log: AuditLogRow) {
   return `${action} em ${entity}${actor}`;
 }
 
-function normalizeQrSrc(qrImage?: string | null) {
-  if (!qrImage) return null;
-  if (qrImage.startsWith("data:image")) return qrImage;
-  return `data:image/png;base64,${qrImage.replace(/^data:image\/[a-z]+;base64,/, "")}`;
+function stringOrEmpty(value: unknown) {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const nested = record.state ?? record.connectionState ?? record.status ?? record.connectionStatus;
+    if (typeof nested === "string") return nested.trim();
+  }
+  return "";
+}
+
+function normalizeInstanceStatus(value: unknown) {
+  return stringOrEmpty(value).toLowerCase();
+}
+
+function isInstanceConnected(status: unknown) {
+  const normalized = normalizeInstanceStatus(status);
+  return normalized === "open" || normalized === "connected";
+}
+
+function normalizeWhatsAppInstance(raw: unknown): WhatsAppInstance | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
+  const name = stringOrEmpty(record.name ?? record.instanceName);
+  if (!name) return null;
+  const label = stringOrEmpty(record.label) || name;
+  const id = stringOrEmpty(record.id) || name;
+  const status = normalizeInstanceStatus(
+    record.status ?? record.connectionState ?? record.connectionStatus ?? record.state
+  );
+  const phoneRaw = record.phone;
+  const phone =
+    typeof phoneRaw === "string" ? phoneRaw : phoneRaw == null ? null : stringOrEmpty(phoneRaw) || null;
+  const lastSyncRaw = record.lastSyncAt;
+  const lastSyncAt =
+    typeof lastSyncRaw === "string"
+      ? lastSyncRaw
+      : lastSyncRaw instanceof Date
+        ? lastSyncRaw.toISOString()
+        : null;
+  return { id, name, label, status, phone, lastSyncAt };
+}
+
+function normalizeWhatsAppInstances(rows: unknown) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map(normalizeWhatsAppInstance).filter((item): item is WhatsAppInstance => item !== null);
+}
+
+function instanceStatusLabel(status: unknown) {
+  const normalized = normalizeInstanceStatus(status);
+  if (isInstanceConnected(normalized)) return "Conectado";
+  if (normalized === "connecting" || normalized === "created" || normalized === "qrcode" || normalized === "pairing") {
+    return "Conectando";
+  }
+  if (!normalized) return "Sem status";
+  return "Desconectado";
+}
+
+function normalizeQrSrc(qrImage?: unknown) {
+  if (qrImage == null) return null;
+  const value =
+    typeof qrImage === "string"
+      ? qrImage
+      : typeof qrImage === "object" && qrImage !== null
+        ? stringOrEmpty((qrImage as Record<string, unknown>).base64 ?? (qrImage as Record<string, unknown>).qrCode)
+        : "";
+  if (!value) return null;
+  if (value.startsWith("data:image")) return value;
+  return `data:image/png;base64,${value.replace(/^data:image\/[a-z]+;base64,/, "")}`;
 }
 
 function formatDateTime(value?: string | null) {
@@ -251,36 +317,33 @@ export function AdminView({ token, user }: Props) {
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   const isOwner = user?.role === "owner";
   const activeInstance = instances.find((item) => item.name === selectedInstance) ?? null;
-  const activeStatus = (activeInstance?.status ?? "").toLowerCase();
-  const isConnected = activeStatus === "open" || activeStatus === "connected";
+  const activeStatus = normalizeInstanceStatus(activeInstance?.status);
+  const isConnected = isInstanceConnected(activeStatus);
   const statusTone = isConnected
     ? "bg-emerald-50/90 text-emerald-700 border-emerald-200/80"
-    : activeStatus === "connecting"
+    : activeStatus === "connecting" || activeStatus === "created" || activeStatus === "qrcode"
       ? "bg-amber-50/90 text-amber-700 border-amber-200/80"
       : "bg-slate-100/90 text-slate-600 border-slate-200/80";
-  const statusLabel =
-    activeStatus === "open" || activeStatus === "connected"
-      ? "Conectado"
-      : activeStatus === "connecting"
-        ? "Conectando"
-        : activeStatus
-          ? "Desconectado"
-          : "Sem status";
+  const statusLabel = instanceStatusLabel(activeInstance?.status);
   const recommendedAction = !activeInstance
     ? "Selecione um numero para iniciar."
     : isConnected
       ? "Tudo certo. Se quiser trocar aparelho, gere um novo QR."
-      : activeStatus === "connecting"
+      : activeStatus === "connecting" || activeStatus === "created" || activeStatus === "qrcode"
         ? "Aguardando leitura do QR no celular."
         : "Clique em Conectar QR e escaneie no WhatsApp.";
   const activeUsers = users.filter((user) => user.status === "active");
   const inactiveUsers = users.length - activeUsers.length;
   const departments = teams.map((team) => team.name);
-  const connectedInstances = instances.filter((instance) => instance.status === "open" || instance.status === "connected");
+  const connectedInstances = instances.filter((instance) => isInstanceConnected(instance.status));
   const disconnectedInstances = instances.length - connectedInstances.length;
   const tenantsCount = ownerSummary.tenants || tenants.length;
-  const tenantUsersTotal = ownerSummary.users || tenants.reduce((sum, tenant) => sum + tenant._count.users, 0);
-  const tenantInstancesTotal = ownerSummary.numbers || tenants.reduce((sum, tenant) => sum + tenant._count.instances, 0);
+  const tenantUsersTotal =
+    ownerSummary.users ||
+    tenants.reduce((sum, tenant) => sum + (tenant._count?.users ?? 0), 0);
+  const tenantInstancesTotal =
+    ownerSummary.numbers ||
+    tenants.reduce((sum, tenant) => sum + (tenant._count?.instances ?? 0), 0);
 
   const bootstrapAdminForms = useCallback(async () => {
     try {
@@ -307,14 +370,22 @@ export function AdminView({ token, user }: Props) {
       const bot = await getMenuBotSettings(token);
       setMenuBot(bot);
       setMenuBotForm({
-        enabled: bot.enabled,
-        greeting: bot.greeting,
-        invalidReply: bot.invalidReply,
-        options: bot.options.length
+        enabled: Boolean(bot.enabled),
+        greeting: bot.greeting ?? "",
+        invalidReply: bot.invalidReply ?? "",
+        options: bot.options?.length
           ? bot.options
           : [
-              { digit: "1", label: "Comercial", teamId: bot.teams.find((team) => team.name.toLowerCase().includes("comercial"))?.id },
-              { digit: "2", label: "Suporte", teamId: bot.teams.find((team) => team.name.toLowerCase().includes("suporte"))?.id }
+              {
+                digit: "1",
+                label: "Comercial",
+                teamId: bot.teams?.find((team) => team.name?.toLowerCase().includes("comercial"))?.id
+              },
+              {
+                digit: "2",
+                label: "Suporte",
+                teamId: bot.teams?.find((team) => team.name?.toLowerCase().includes("suporte"))?.id
+              }
             ]
       });
     } catch {
@@ -343,12 +414,17 @@ export function AdminView({ token, user }: Props) {
       setApiHealth("down");
     }
 
-    const rows = await listInstances(token);
-    setInstances(rows);
-    setSelectedInstance((current) => {
-      if (current && rows.some((item) => item.name === current)) return current;
-      return rows[0]?.name ?? "";
-    });
+    try {
+      const rows = normalizeWhatsAppInstances(await listInstances(token));
+      setInstances(rows);
+      setSelectedInstance((current) => {
+        if (current && rows.some((item) => item.name === current)) return current;
+        return rows[0]?.name ?? "";
+      });
+    } catch {
+      setInstances([]);
+      setSelectedInstance("");
+    }
 
     const usersRes = await fetch(`${apiUrl()}/admin/users`, { headers: { authorization: `Bearer ${token}` } });
     if (usersRes.ok) setUsers(await usersRes.json());
@@ -424,7 +500,7 @@ export function AdminView({ token, user }: Props) {
     }
     try {
       const catalog = await listWebhookEvents(token);
-      setWebhookEvents(catalog.events);
+      setWebhookEvents(Array.isArray(catalog.events) ? catalog.events : []);
     } catch {
       setWebhookEvents([]);
     }
@@ -477,15 +553,16 @@ export function AdminView({ token, user }: Props) {
     setConnecting(true);
     try {
       const body = await connectInstance(token, selectedInstance, force);
-      const img = normalizeQrSrc(body.qrImage);
+      const img = normalizeQrSrc(body.qrImage ?? (body as { qrCode?: unknown }).qrCode);
+      const connectionState = normalizeInstanceStatus(body.state);
       if (img) {
         setQrSrc(img);
         setMessage(`QR pronto para ${selectedInstance}. Escaneie no WhatsApp do celular.`);
-      } else if (body.state === "open" || body.state === "connected") {
+      } else if (isInstanceConnected(connectionState)) {
         setQrSrc(null);
         setMessage(`Numero ${selectedInstance} conectado com sucesso.`);
       } else {
-        setMessage(`Numero ${selectedInstance} em ${body.state ?? "connecting"}.`);
+        setMessage(`Numero ${selectedInstance} em ${connectionState || "connecting"}.`);
       }
       try {
         await syncWebhook(token, selectedInstance);
@@ -528,7 +605,7 @@ export function AdminView({ token, user }: Props) {
     setSyncing(true);
     try {
       const result = await syncWebhook(token, selectedInstance);
-      setMessage(`Webhook sincronizado: ${result.webhookUrl}`);
+      setMessage(`Webhook sincronizado: ${result.webhookUrl ?? "endpoint atualizado"}`);
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Falha ao sincronizar webhook");
@@ -1350,7 +1427,7 @@ export function AdminView({ token, user }: Props) {
                 {webhookDeliveries.map((delivery) => (
                   <div key={delivery.id} className="flex items-center justify-between rounded-lg bg-white/50 px-3 py-2 text-[11px]">
                     <span>
-                      {delivery.event} → {delivery.endpoint.name}
+                      {delivery.event} → {delivery.endpoint?.name ?? "webhook"}
                     </span>
                     <span className={delivery.status === "success" ? "text-emerald-700" : delivery.status === "failed" ? "text-rose-700" : "text-amber-700"}>
                       {delivery.status} ({delivery.attempts}x)
@@ -1746,7 +1823,7 @@ export function AdminView({ token, user }: Props) {
                     : "Crie ou selecione uma instancia"}
                 </p>
                 <span className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${statusTone}`}>
-                  <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : activeStatus === "connecting" ? "bg-amber-500" : "bg-slate-400"}`} />
+                  <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : activeStatus === "connecting" || activeStatus === "created" || activeStatus === "qrcode" ? "bg-amber-500" : "bg-slate-400"}`} />
                   {statusLabel}
                 </span>
               </div>
@@ -1759,8 +1836,8 @@ export function AdminView({ token, user }: Props) {
               >
                 <option value="">Selecionar numero</option>
                 {instances.map((instance) => (
-                  <option key={instance.id} value={instance.name}>
-                    {instance.label} ({instance.name})
+                  <option key={instance.id || instance.name} value={instance.name}>
+                    {instance.label || instance.name} ({instance.name})
                   </option>
                 ))}
               </select>
@@ -2187,14 +2264,19 @@ export function AdminView({ token, user }: Props) {
           <p className="font-semibold">Numeros salvos</p>
           <div className="mt-3 space-y-2">
             {instances.map((instance) => (
-              <div key={instance.id} className="flex items-center justify-between rounded-2xl bg-white/70 px-3 py-2 text-sm">
+              <div key={instance.id || instance.name} className="flex items-center justify-between rounded-2xl bg-white/70 px-3 py-2 text-sm">
                 <div>
-                  <p className="font-medium">{instance.label}</p>
-                  <p className="text-xs text-atlas-muted">{instance.name}</p>
+                  <p className="font-medium">{instance.label || instance.name || "WhatsApp"}</p>
+                  <p className="text-xs text-atlas-muted">{instance.name || "—"}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge>{instance.status}</Badge>
-                  <Button variant="glass" className="h-8 px-2" onClick={() => removeInstance(instance.name)}>
+                  <Badge>{instanceStatusLabel(instance.status)}</Badge>
+                  <Button
+                    variant="glass"
+                    className="h-8 px-2"
+                    onClick={() => instance.name && removeInstance(instance.name)}
+                    disabled={!instance.name}
+                  >
                     <Trash2 size={14} />
                   </Button>
                 </div>
@@ -2369,8 +2451,8 @@ export function AdminView({ token, user }: Props) {
                     <p className="text-xs text-atlas-muted">{t.slug}</p>
                   </div>
                   <div className="text-right text-xs text-atlas-muted">
-                    <p>{t._count.users} usuários</p>
-                    <p>{t._count.instances} números</p>
+                    <p>{t._count?.users ?? 0} usuários</p>
+                    <p>{t._count?.instances ?? 0} números</p>
                   </div>
                 </div>
               ))}

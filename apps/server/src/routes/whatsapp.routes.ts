@@ -1,21 +1,22 @@
 import type { FastifyInstance } from "fastify";
+import type { WhatsAppInstance } from "@prisma/client";
 import QRCode from "qrcode";
 import { z } from "zod";
-import { buildWebhookPublicUrl } from "@atlas-one/lib";
 import { requireAuth, requireUser } from "../plugins/auth";
 import { requireRole } from "../plugins/roles";
 import { prisma } from "../lib/prisma";
-import { env } from "../config/env";
 import { syncConversationAvatars } from "../services/webhook.service";
 import { assertInstanceInTenant } from "../lib/tenant-guard";
 import { sendError } from "../utils/http";
 import { assertCanAddInstance } from "../services/billing/billing.service";
 import {
+  alignEvolutionInstanceForOps,
   listWhatsAppProviderCatalog,
   normalizeProviderKind,
   providerForInstance
 } from "../services/whatsapp/whatsapp-instance.service";
 import { createEvolutionProvider } from "../services/whatsapp/providers/evolution.provider";
+import { buildEvolutionWebhookUrl } from "../lib/evolution-webhook-url";
 
 const sendTextSchema = z.object({
   instanceName: z.string().min(1),
@@ -30,22 +31,18 @@ const createInstanceSchema = z.object({
   provider: z.enum(["evolution", "meta_cloud"]).default("evolution")
 });
 
-function webhookUrl(tenantSlug: string) {
-  const base = (env.evolutionWebhookBaseUrl || env.webhookPublicUrl).replace(/\/$/, "");
-  let url = buildWebhookPublicUrl(base, tenantSlug);
-  if (env.webhookSecret) {
-    const separator = url.includes("?") ? "&" : "?";
-    url = `${url}${separator}token=${encodeURIComponent(env.webhookSecret)}`;
-  }
-  return url;
-}
-
 async function tenantSettingsFor(user: { tenantId: string }) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: user.tenantId },
     select: { settings: true }
   });
   return tenant?.settings;
+}
+
+async function prepareEvolutionInstance(user: { tenantId: string }, instance: WhatsAppInstance) {
+  const provider = createEvolutionProvider();
+  const aligned = await alignEvolutionInstanceForOps(user.tenantId, instance, provider);
+  return { provider, ...aligned };
 }
 
 export async function whatsappRoutes(app: FastifyInstance) {
@@ -110,21 +107,23 @@ export async function whatsappRoutes(app: FastifyInstance) {
     }
 
     try {
-      const p = createEvolutionProvider();
+      const { provider: p, evolutionName, instance: alignedInstance, renamed, dbName } =
+        await prepareEvolutionInstance(user, instance);
+
       if (body.force) {
         try {
-          await p.logout(instanceName);
+          await p.logout(evolutionName);
         } catch {
           /* ignore */
         }
-        await p.createInstanceIfMissing(instanceName, instance.phone ?? undefined);
+        await p.createInstanceIfMissing(evolutionName, alignedInstance.phone ?? undefined);
       } else {
-        await p.createInstanceIfMissing(instanceName, instance.phone ?? undefined);
+        await p.createInstanceIfMissing(evolutionName, alignedInstance.phone ?? undefined);
       }
 
-      const url = webhookUrl(user.tenantSlug);
-      await p.setWebhook(instanceName, url);
-      const result = await p.connect(instanceName);
+      const url = buildEvolutionWebhookUrl(user.tenantSlug);
+      await p.setWebhook(evolutionName, url);
+      const result = await p.connect(evolutionName);
 
       let qrImage = (result as { qrImage?: string | null }).qrImage ?? null;
       const qrCode = result.qrCode;
@@ -138,7 +137,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
       const status = String(result.state ?? (qrImage ? "connecting" : "connecting"));
       await prisma.whatsAppInstance.update({
-        where: { id: instance.id },
+        where: { id: alignedInstance.id },
         data: {
           status,
           lastSyncAt: new Date()
@@ -149,6 +148,9 @@ export async function whatsappRoutes(app: FastifyInstance) {
         ok: true,
         provider: kind,
         webhookUrl: url,
+        evolutionInstanceName: evolutionName,
+        dbInstanceRenamed: renamed,
+        previousDbName: renamed ? dbName : undefined,
         qrCode,
         qrImage,
         state: status,
@@ -170,10 +172,19 @@ export async function whatsappRoutes(app: FastifyInstance) {
     }
 
     try {
-      const url = webhookUrl(user.tenantSlug);
-      const settings = await tenantSettingsFor(user);
-      await providerForInstance(instance, settings).provider.setWebhook(instanceName, url);
-      return reply.send({ ok: true, provider: instance.provider, webhookUrl: url });
+      const url = buildEvolutionWebhookUrl(user.tenantSlug);
+      const { provider: p, evolutionName, instance: alignedInstance, renamed, dbName } =
+        await prepareEvolutionInstance(user, instance);
+      await p.setWebhook(evolutionName, url);
+      return reply.send({
+        ok: true,
+        provider: instance.provider,
+        webhookUrl: url,
+        evolutionInstanceName: evolutionName,
+        dbInstanceName: alignedInstance.name,
+        dbInstanceRenamed: renamed,
+        previousDbName: renamed ? dbName : undefined
+      });
     } catch (error) {
       return sendError(reply, 400, "Falha ao sincronizar webhook", error instanceof Error ? error.message : error);
     }
@@ -198,13 +209,18 @@ export async function whatsappRoutes(app: FastifyInstance) {
     });
     if (!instance) return sendError(reply, 404, "Instancia nao encontrada");
     try {
-      const settings = await tenantSettingsFor(user);
-      const state = await providerForInstance(instance, settings).provider.getState(instanceName);
+      const { provider, evolutionName, instance: alignedInstance } = await prepareEvolutionInstance(user, instance);
+      const state = await provider.getState(evolutionName);
       await prisma.whatsAppInstance.update({
-        where: { id: instance.id },
+        where: { id: alignedInstance.id },
         data: { status: state, lastSyncAt: new Date() }
       });
-      return reply.send({ instanceName, provider: instance.provider, state });
+      return reply.send({
+        instanceName: alignedInstance.name,
+        evolutionInstanceName: evolutionName,
+        provider: instance.provider,
+        state
+      });
     } catch (error) {
       return sendError(reply, 400, "Falha ao consultar estado da instancia", error instanceof Error ? error.message : error);
     }
@@ -219,16 +235,19 @@ export async function whatsappRoutes(app: FastifyInstance) {
     if (!instance) return sendError(reply, 404, "Instancia nao encontrada");
 
     try {
-      const settings = await tenantSettingsFor(user);
-      await providerForInstance(instance, settings).provider.logout(instanceName);
+      const { provider, evolutionName, instance: alignedInstance } = await prepareEvolutionInstance(user, instance);
+      await provider.logout(evolutionName);
+      await prisma.whatsAppInstance.update({
+        where: { id: alignedInstance.id },
+        data: { status: "closed", lastSyncAt: new Date() }
+      });
     } catch {
-      // Mesmo com erro do provedor, segue para marcar como desconectada localmente.
+      await prisma.whatsAppInstance.update({
+        where: { id: instance.id },
+        data: { status: "closed", lastSyncAt: new Date() }
+      });
     }
 
-    await prisma.whatsAppInstance.update({
-      where: { id: instance.id },
-      data: { status: "closed", lastSyncAt: new Date() }
-    });
     return reply.send({ ok: true, state: "closed" });
   });
 
@@ -240,8 +259,8 @@ export async function whatsappRoutes(app: FastifyInstance) {
     });
     if (!instance) return sendError(reply, 404, "Instancia nao encontrada");
     try {
-      const settings = await tenantSettingsFor(user);
-      await providerForInstance(instance, settings).provider.logout(instanceName);
+      const { provider, evolutionName } = await prepareEvolutionInstance(user, instance);
+      await provider.logout(evolutionName);
     } catch {
       // ignore provider failures on deletion path
     }

@@ -47,6 +47,8 @@ export const env = {
   webhookPublicUrl: process.env.WEBHOOK_PUBLIC_URL ?? "http://app.atlasone.local.gd",
   /** Internal base URL Evolution uses to POST webhooks (same Docker network). Falls back to webhookPublicUrl. */
   evolutionWebhookBaseUrl: process.env.EVOLUTION_WEBHOOK_BASE_URL ?? "",
+  /** When false (default), Evolution webhook registration uses HTTP even if WEBHOOK_PUBLIC_URL is HTTPS. */
+  webhookUseHttps: process.env.WEBHOOK_USE_HTTPS === "true",
   appPublicUrl: process.env.APP_PUBLIC_URL ?? process.env.WEBHOOK_PUBLIC_URL ?? "http://127.0.0.1",
   databaseUrl: process.env.DATABASE_URL ?? "",
   smsProvider: process.env.SMS_PROVIDER ?? "console",

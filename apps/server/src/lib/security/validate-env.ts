@@ -21,11 +21,16 @@ export function validateProductionEnv() {
   if (!env.corsOrigins.length) {
     errors.push("CORS_ORIGINS obrigatorio (ex: https://app.atlasone.app.br)");
   }
-  if (env.webhookPublicUrl.startsWith("http://") && !env.webhookPublicUrl.includes("localhost")) {
-    errors.push("WEBHOOK_PUBLIC_URL deve usar HTTPS em producao");
+  if (
+    env.webhookUseHttps &&
+    env.webhookPublicUrl.startsWith("http://") &&
+    !env.webhookPublicUrl.includes("localhost") &&
+    !env.evolutionWebhookBaseUrl.trim()
+  ) {
+    errors.push("WEBHOOK_PUBLIC_URL deve usar HTTPS em producao quando WEBHOOK_USE_HTTPS=true");
   }
-  if (env.appPublicUrl.startsWith("http://") && !env.appPublicUrl.includes("localhost")) {
-    errors.push("APP_PUBLIC_URL deve usar HTTPS em producao");
+  if (env.appPublicUrl.startsWith("http://") && !env.appPublicUrl.includes("localhost") && env.webhookUseHttps) {
+    errors.push("APP_PUBLIC_URL deve usar HTTPS em producao quando WEBHOOK_USE_HTTPS=true");
   }
   if (env.smsProvider === "console" && !env.allowLocalSms) {
     errors.push("SMS_PROVIDER=console nao e permitido (use twilio, webhook ou ATLAS_ALLOW_LOCAL_SMS=true apenas em ambiente controlado)");

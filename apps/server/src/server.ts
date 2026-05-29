@@ -4,6 +4,7 @@ import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import { buildWebhookPublicUrl } from "@atlas-one/lib";
+import { resolveEvolutionWebhookBase } from "./lib/evolution-webhook-url";
 import { registerRoutes } from "./routes";
 import { env } from "./config/env";
 import { initRealtime } from "./lib/realtime";
@@ -210,7 +211,8 @@ app.addHook("onReady", async () => {
   appLog.info("server_ready", {
     host: env.host,
     port: env.port,
-    webhook: buildWebhookPublicUrl(env.webhookPublicUrl)
+    webhookBase: resolveEvolutionWebhookBase(),
+    webhookPublic: buildWebhookPublicUrl(env.webhookPublicUrl)
   });
 
   webhookRetryTimer = setInterval(() => {

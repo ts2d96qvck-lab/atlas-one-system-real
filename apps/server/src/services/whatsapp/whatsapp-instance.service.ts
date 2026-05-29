@@ -73,6 +73,37 @@ export async function prepareOutboundInstance(
   };
 }
 
+export type AlignedEvolutionInstance = {
+  instance: WhatsAppInstance;
+  evolutionName: string;
+  dbName: string;
+  renamed: boolean;
+};
+
+export async function alignEvolutionInstanceForOps(
+  tenantId: string,
+  dbInstance: WhatsAppInstance,
+  provider: WhatsAppProvider
+): Promise<AlignedEvolutionInstance> {
+  const evolutionName = await provider.resolveInstanceName(dbInstance.name, dbInstance.phone ?? undefined);
+  if (evolutionName === dbInstance.name) {
+    return { instance: dbInstance, evolutionName, dbName: dbInstance.name, renamed: false };
+  }
+
+  const conflict = await prisma.whatsAppInstance.findFirst({
+    where: { tenantId, name: evolutionName, NOT: { id: dbInstance.id } }
+  });
+  if (conflict) {
+    return { instance: dbInstance, evolutionName, dbName: dbInstance.name, renamed: false };
+  }
+
+  const updated = await prisma.whatsAppInstance.update({
+    where: { id: dbInstance.id },
+    data: { name: evolutionName }
+  });
+  return { instance: updated, evolutionName, dbName: dbInstance.name, renamed: true };
+}
+
 export async function prepareInstanceForCampaign(
   tenantId: string,
   instanceId: string

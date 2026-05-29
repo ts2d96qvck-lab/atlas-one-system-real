@@ -156,6 +156,10 @@ export type WhatsAppInstance = {
   phone?: string | null;
   status: string;
   lastSyncAt?: string | null;
+  connectionState?: string | null;
+  connectionStatus?: string | null;
+  qrCode?: string | null;
+  webhookStatus?: string | null;
 };
 
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
@@ -785,7 +789,7 @@ export function listInstances(token: string) {
 }
 
 export function connectInstance(token: string, instanceName: string, force = false) {
-  return request<{ ok: boolean; qrImage?: string | null; state?: string; webhookUrl?: string }>(
+  return request<{ ok: boolean; qrImage?: string | null; qrCode?: string | null; state?: string; webhookUrl?: string }>(
     `/whatsapp/instances/${instanceName}/connect`,
     token,
     {

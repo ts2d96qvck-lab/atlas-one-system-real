@@ -28,7 +28,7 @@ export async function opsRoutes(app: FastifyInstance) {
 
   app.get("/diagnostics", { preHandler: [requireAuth, requirePermission("admin:read")] }, async (request, reply) => {
     const user = requireUser(request);
-    return reply.send(await getTenantDiagnostics(user.tenantId));
+    return reply.send(await getTenantDiagnostics(user.tenantId, user.tenantSlug));
   });
 
   await app.register(async (exportApp) => {
