@@ -74,6 +74,8 @@ export const env = {
   transcriptionModel: process.env.TRANSCRIPTION_MODEL ?? "whisper-1",
   redisUrl: process.env.REDIS_URL ?? "",
   qaBypassRateLimit: process.env.QA_BYPASS_RATE_LIMIT === "true",
-  qaBypass2fa: process.env.QA_BYPASS_2FA === "true" && process.env.NODE_ENV !== "production"
+  qaBypass2fa: process.env.QA_BYPASS_2FA === "true" && process.env.NODE_ENV !== "production",
+  /** When true (default), suspicious IP/UA changes never force login 2FA. Set false to re-enable. */
+  disableSuspicious2fa: process.env.DISABLE_SUSPICIOUS_2FA !== "false"
 };
 

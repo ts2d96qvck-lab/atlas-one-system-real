@@ -277,14 +277,23 @@ export async function login(input: unknown, context?: AccessContext): Promise<Lo
   };
 
   const suspicious = await isSuspiciousAccess(tenant.id, user.id, context);
+  if (suspicious) {
+    await recordAuthAudit(tenant.id, user.id, "auth_suspicious_access_detected", context, {
+      note: "audit_only_not_blocking_login"
+    });
+  }
+
   const smsDeliversForReal = otpDeliversForReal();
   const ownerMustUse2fa = user.role === "owner" && smsDeliversForReal;
-  const mustUse2fa = ownerMustUse2fa || user.twoFactorEnabled || (suspicious && smsDeliversForReal);
+  const suspiciousWouldForce2fa = suspicious && smsDeliversForReal && !env.disableSuspicious2fa;
+  const mustUse2fa = ownerMustUse2fa || user.twoFactorEnabled || suspiciousWouldForce2fa;
   log("twofa_decision", {
     suspicious,
+    disableSuspicious2fa: env.disableSuspicious2fa,
     smsDeliversForReal,
     ownerMustUse2fa,
     twoFactorEnabled: user.twoFactorEnabled,
+    suspiciousWouldForce2fa,
     mustUse2fa,
     qaBypass2fa: env.qaBypass2fa
   });
@@ -315,14 +324,20 @@ export async function login(input: unknown, context?: AccessContext): Promise<Lo
     } catch (error) {
       await prisma.authChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
       const detail = error instanceof Error ? error.message : String(error);
-      log("twofa_sms_failed", { otpChannel, detail });
-      if (env.isProduction && !env.allowLocalSms) {
-        throw new AuthLoginError("twofa_sms", `Nao foi possivel enviar codigo pelo ${otpChannel}: ${detail}`);
-      }
+      appLog.warn("twofa_sms_failed", {
+        requestId: context?.requestId,
+        tenantId: tenant.id,
+        userId: user.id,
+        otpChannel,
+        detail,
+        action: "login_continued_without_2fa"
+      });
+      log("twofa_sms_failed", { otpChannel, detail, action: "login_continued" });
       const token = signSessionToken(sessionUser, user.tokenVersion);
       await recordAuthAudit(tenant.id, user.id, "auth_login_success", context, {
         mode: "2fa_skipped_delivery_failed",
-        reason: detail
+        reason: detail,
+        suspicious
       });
       log("login_success", { mode: "2fa_skipped_delivery_failed" });
       return { token, user: publicUser(sessionUser), requires2fa: false };

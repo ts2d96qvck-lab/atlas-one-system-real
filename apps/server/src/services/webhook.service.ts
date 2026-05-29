@@ -18,6 +18,7 @@ import {
 import { assertWithinConversationQuota } from "./billing/billing.service";
 import { processMenuBot, MENU_DONE_TAG } from "./menu-bot.service";
 import { ensureInboundTeam, pickAssigneeForTeam } from "./teams.service";
+import { appLog } from "../lib/app-log";
 
 const conversationListInclude = {
   assignedTo: { select: { id: true, name: true, role: true } },
@@ -742,6 +743,15 @@ export async function handleEvolutionWebhook(body: unknown, tenantSlug?: string)
 
     emitIntegrationEvent(instance.tenantId, "conversation.created", publicConversationPayload(conversation));
     emitIntegrationEvent(instance.tenantId, "lead.created", publicLeadPayload(lead));
+
+    appLog.info("evolution_contact_created", {
+      tenantId: instance.tenantId,
+      instanceId: instance.id,
+      conversationId: conversation.id,
+      leadId: lead.id,
+      customerPhone,
+      customerName: parsed.customerName || customerPhone
+    });
   }
 
   if (!parsed.fromMe) {
@@ -826,6 +836,17 @@ export async function handleEvolutionWebhook(body: unknown, tenantSlug?: string)
         replyToProviderId
       } as Prisma.InputJsonValue
     }
+  });
+
+  appLog.info("evolution_message_created", {
+    tenantId: instance.tenantId,
+    instanceId: instance.id,
+    conversationId: conversation.id,
+    messageId: message.id,
+    direction: message.direction,
+    fromMe: parsed.fromMe,
+    type: parsed.type,
+    isNewConversation
   });
 
   if (replyToProviderId) {
