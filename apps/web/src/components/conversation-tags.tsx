@@ -195,10 +195,11 @@ type TagFilterPopoverProps = {
   catalog: TagCatalogItem[];
   selected: string[];
   onChange: (selected: string[]) => void;
+  embedded?: boolean;
 };
 
-export function TagFilterPopover({ catalog, selected, onChange }: TagFilterPopoverProps) {
-  if (!catalog.length) return null;
+function TagFilterContent({ catalog, selected, onChange }: Omit<TagFilterPopoverProps, "embedded">) {
+  if (!catalog.length) return <p className="text-[11px] text-slate-500">Nenhuma tag disponivel.</p>;
 
   function toggle(name: string) {
     const key = name.toLowerCase();
@@ -208,6 +209,43 @@ export function TagFilterPopover({ catalog, selected, onChange }: TagFilterPopov
     }
     onChange([...selected, name]);
   }
+
+  return (
+    <>
+      <p className="mb-2 text-[11px] font-medium text-slate-500">Tags</p>
+      <div className="flex flex-wrap gap-1">
+        {catalog.map((item) => {
+          const active = selected.some((tag) => tag.toLowerCase() === item.name.toLowerCase());
+          return (
+            <button
+              key={item.name}
+              type="button"
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition ${
+                active ? "bg-slate-100 ring-1 ring-slate-300" : "opacity-80 hover:opacity-100"
+              }`}
+              style={tagChipStyle(item.name, catalog)}
+              onClick={() => toggle(item.name)}
+            >
+              {item.name}
+            </button>
+          );
+        })}
+      </div>
+      {selected.length ? (
+        <button type="button" className="mt-2 text-[11px] text-slate-500 underline" onClick={() => onChange([])}>
+          Limpar tags
+        </button>
+      ) : null}
+    </>
+  );
+}
+
+export function TagFilterPopover({ catalog, selected, onChange, embedded }: TagFilterPopoverProps) {
+  if (embedded) {
+    return <TagFilterContent catalog={catalog} selected={selected} onChange={onChange} />;
+  }
+
+  if (!catalog.length) return null;
 
   return (
     <Popover>
@@ -221,30 +259,7 @@ export function TagFilterPopover({ catalog, selected, onChange }: TagFilterPopov
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(100vw-2rem,300px)] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-        <p className="mb-2 text-[11px] font-semibold text-slate-600">Filtrar por tag</p>
-        <div className="flex flex-wrap gap-1">
-          {catalog.map((item) => {
-            const active = selected.some((tag) => tag.toLowerCase() === item.name.toLowerCase());
-            return (
-              <button
-                key={item.name}
-                type="button"
-                className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition ${
-                  active ? "ring-1 ring-blue-300" : "opacity-80 hover:opacity-100"
-                }`}
-                style={tagChipStyle(item.name, catalog)}
-                onClick={() => toggle(item.name)}
-              >
-                {item.name}
-              </button>
-            );
-          })}
-        </div>
-        {selected.length ? (
-          <button type="button" className="mt-2 text-[11px] text-slate-500 underline" onClick={() => onChange([])}>
-            Limpar filtros
-          </button>
-        ) : null}
+        <TagFilterContent catalog={catalog} selected={selected} onChange={onChange} />
       </PopoverContent>
     </Popover>
   );

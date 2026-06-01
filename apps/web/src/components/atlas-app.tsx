@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCheck,
-  ChevronDown,
   Clock3,
   CornerUpLeft,
   FileText,
@@ -25,7 +24,7 @@ import {
   VolumeX,
   X
 } from "lucide-react";
-import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
+import { Button, Card, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
 import {
   createConversation,
   deleteConversation,
@@ -57,7 +56,7 @@ import {
 import { connectRealtime, joinTenant } from "../lib/socket";
 import { SecureMedia } from "./secure-media";
 import { QuickRepliesMenu } from "./quick-replies-menu";
-import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
+import { TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { AppCombobox } from "./ui/app-select";
 import { apiUrl } from "../lib/config";
@@ -105,23 +104,6 @@ function statusLabel(status: string) {
   };
   return map[status] ?? status;
 }
-
-function statusShortLabel(status: string) {
-  const map: Record<string, string> = {
-    open: "Abr",
-    waiting_customer: "Ag.",
-    closed: "Fech."
-  };
-  return map[status] ?? status.slice(0, 4);
-}
-
-function statusToneClass(status: string) {
-  if (status === "closed") return "bg-slate-100 text-slate-600";
-  if (status === "waiting_customer") return "bg-amber-100 text-amber-800";
-  return "bg-emerald-100 text-emerald-800";
-}
-
-const INBOX_PANEL_CLASS = "overflow-hidden rounded-2xl";
 
 function mediaUploadKey(conversationId: string, file: File) {
   return `${conversationId}:${file.name}:${file.size}:${file.lastModified}:${file.type}`;
@@ -318,41 +300,19 @@ function profilePhotoStorageKey(tenantId: string, userId: string) {
   return `atlas-one-internal-avatar:${tenantId}:${userId}`;
 }
 
-function messageSenderLabel(raw: Record<string, unknown>, outgoing: boolean) {
-  const sentByName = typeof raw.sentByName === "string" ? raw.sentByName : null;
-  const senderType = typeof raw.senderType === "string" ? raw.senderType : outgoing ? "agent" : "customer";
-  if (senderType === "bot") return sentByName ? `Robo · ${sentByName}` : "Robo";
-  if (senderType === "system") return sentByName ?? "Sistema";
-  if (outgoing) return sentByName ?? "Atendente";
-  return "Cliente";
-}
-
-function buildSignaturePreview(
-  draft: string,
-  user: SessionUser,
-  messaging?: CompanySettings["messaging"]
-) {
-  if (!draft || !messaging || messaging.signaturePlacement === "disabled" || !messaging.showAgentNameToCustomer) {
-    return null;
-  }
-  const signature = (messaging.agentSignatureFormat || "Atendente {{agentName}}:").replace(/\{\{agentName\}\}/g, user.name);
-  if (messaging.signaturePlacement === "before") return `${signature}\n${draft}`;
-  return `${draft}\n${signature}`;
-}
-
 function messageStatusView(status: string, edited: boolean) {
   const normalized = status.toLowerCase();
   if (normalized.includes("read")) {
-    return { icon: <CheckCheck size={12} />, label: "Lida", tone: "text-sky-600", badge: "bg-sky-100 text-sky-800" };
+    return { icon: <CheckCheck size={12} />, label: "Lida", tone: "text-slate-500", badge: "bg-slate-100 text-slate-600" };
   }
   if (normalized.includes("deliver")) {
-    return { icon: <CheckCheck size={12} />, label: "Entregue", tone: "text-slate-600", badge: "bg-slate-100 text-slate-700" };
+    return { icon: <CheckCheck size={12} />, label: "Entregue", tone: "text-slate-500", badge: "bg-slate-100 text-slate-600" };
   }
   if (normalized.includes("fail") || normalized.includes("error") || normalized.includes("undeliver")) {
-    return { icon: <AlertTriangle size={12} />, label: "Falhou", tone: "text-rose-600", badge: "bg-rose-100 text-rose-800" };
+    return { icon: <AlertTriangle size={12} />, label: "Falhou", tone: "text-slate-500", badge: "bg-slate-100 text-slate-600" };
   }
   if (normalized.includes("queue") || normalized.includes("pending") || normalized.includes("sending")) {
-    return { icon: <Clock3 size={12} />, label: "Enviando", tone: "text-amber-600", badge: "bg-amber-100 text-amber-900" };
+    return { icon: <Clock3 size={12} />, label: "Enviando", tone: "text-slate-400", badge: "bg-slate-100 text-slate-600" };
   }
   if (normalized.includes("received")) {
     return { icon: <MessageCircle size={12} />, label: "Recebida", tone: "text-slate-600", badge: "bg-slate-100 text-slate-700" };
@@ -430,20 +390,19 @@ function MessageBubble({
     <div className={`group flex ${outgoing ? "justify-end" : "justify-start"} ${clustered && !clusterFirst ? "-mt-1.5" : ""}`}>
       <div
         onDoubleClick={() => onReply(message)}
-        className={`relative z-10 max-w-[88%] overflow-hidden break-words rounded-2xl px-3 py-2.5 text-[13px] leading-5 shadow-sm sm:max-w-[78%] xl:max-w-[340px] ${
+        className={`relative z-10 max-w-[88%] overflow-hidden break-words rounded-2xl px-3 py-2 text-[13px] leading-5 sm:max-w-[78%] xl:max-w-[340px] ${
           outgoing
-            ? `bg-[#d9fdd3] text-slate-900 ${clusterLast === false ? "rounded-br-sm" : "rounded-br-md"} ${clustered && !clusterFirst ? "rounded-tr-sm" : ""}`
-            : `bg-white text-slate-800 ${clusterLast === false ? "rounded-bl-sm" : "rounded-bl-md"} ${clustered && !clusterFirst ? "rounded-tl-sm" : ""}`
+            ? `bg-slate-100 text-slate-900 ${clusterLast === false ? "rounded-br-sm" : "rounded-br-md"} ${clustered && !clusterFirst ? "rounded-tr-sm" : ""}`
+            : `bg-white text-slate-800 ring-1 ring-slate-100 ${clusterLast === false ? "rounded-bl-sm" : "rounded-bl-md"} ${clustered && !clusterFirst ? "rounded-tl-sm" : ""}`
         }`}
       >
-        {clustered && !clusterFirst ? null : (
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <p className="text-[10px] font-semibold text-slate-500">{messageSenderLabel(raw, outgoing)}</p>
-          {canManage && outgoing ? (
+        {clustered && !clusterFirst ? null : outgoing ? (
+        <div className="mb-1 flex items-center justify-end gap-2">
+          {canManage ? (
             <div className="relative">
               <button
                 type="button"
-                className="rounded-md p-0.5 text-slate-400 opacity-70 transition hover:bg-white/70 hover:text-slate-600 group-hover:opacity-100"
+                className="rounded-md p-0.5 text-slate-400 opacity-0 transition hover:bg-white/70 hover:text-slate-600 group-hover:opacity-100"
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label="Acoes da mensagem"
               >
@@ -457,7 +416,7 @@ function MessageBubble({
                     </button>
                   ) : null}
                   {onDelete ? (
-                    <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-rose-600 hover:bg-rose-50" onClick={() => { onDelete(message); setMenuOpen(false); }}>
+                    <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-600 hover:bg-slate-50" onClick={() => { onDelete(message); setMenuOpen(false); }}>
                       Apagar
                     </button>
                   ) : null}
@@ -466,7 +425,7 @@ function MessageBubble({
             </div>
           ) : null}
         </div>
-        )}
+        ) : null}
         {replyTo ? (
           <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
             <p className="text-[10px] font-semibold text-slate-600">Resposta direcionada</p>
@@ -488,22 +447,17 @@ function MessageBubble({
             ) : transcriptionError ? (
               <p className="text-[11px] text-rose-600">{transcriptionError}</p>
             ) : onTranscribe ? (
-              <button type="button" className="text-[11px] font-medium text-blue-700 hover:underline" onClick={() => onTranscribe(message)}>
+              <button type="button" className="text-[11px] font-medium text-slate-600 hover:underline" onClick={() => onTranscribe(message)}>
                 Transcrever audio
               </button>
             ) : null}
           </div>
         ) : null}
-        <div className="mt-1 flex flex-wrap items-center justify-end gap-1.5 text-[10px] text-slate-500">
-          {edited ? <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">editada</span> : null}
+        <div className="mt-1 flex items-center justify-end gap-1.5 text-[10px] text-slate-400">
+          {edited ? <span className="text-slate-400">editada</span> : null}
           {outgoing ? (
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium ${statusView.badge}`}
-              title={statusView.label}
-              aria-label={`Status: ${statusView.label}`}
-            >
-              <span className={statusView.tone}>{statusView.icon}</span>
-              <span className="hidden sm:inline">{statusView.label}</span>
+            <span className={`inline-flex items-center ${statusView.tone}`} title={statusView.label} aria-label={`Status: ${statusView.label}`}>
+              {statusView.icon}
             </span>
           ) : null}
           <span>{formatTime(message.createdAt)}</span>
@@ -527,77 +481,21 @@ function MessageBubble({
 
 type ConversationHeaderBarProps = {
   active: Conversation;
-  customerAvatarUrl?: string | null;
-  accessToken: string;
-  onSetStatus: (status: "open" | "waiting_customer" | "closed") => void;
   onOpenDrawer: () => void;
 };
 
-function statusDotClass(status: string) {
-  if (status === "closed") return "bg-slate-400";
-  if (status === "waiting_customer") return "bg-amber-400";
-  return "bg-emerald-500";
-}
-
-function ConversationHeaderBar({
-  active,
-  customerAvatarUrl,
-  accessToken,
-  onSetStatus,
-  onOpenDrawer
-}: ConversationHeaderBarProps) {
-  const assignee = active.assignedTo?.name ?? "Sem atendente";
-
+function ConversationHeaderBar({ active, onOpenDrawer }: ConversationHeaderBarProps) {
   return (
-    <div className="flex items-center gap-2 rounded-t-2xl border-b border-slate-200 bg-white px-3 py-2">
-      <CustomerAvatar
-        name={active.customerName}
-        phone={active.customerPhone}
-        avatarUrl={customerAvatarUrl}
-        accessToken={accessToken}
-      />
+    <div className="flex items-center gap-3 border-b border-slate-100 bg-white px-4 py-3">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
-        <p className="truncate text-xs text-slate-500">+{active.customerPhone}</p>
       </div>
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700"
-            title="Alterar status"
-          >
-            <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
-            {statusShortLabel(active.status)}
-            <ChevronDown size={12} className="text-slate-400" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-          {(["open", "waiting_customer", "closed"] as const).map((status) => (
-            <button
-              key={status}
-              type="button"
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs ${
-                active.status === status ? "bg-slate-100 font-medium" : "hover:bg-slate-50"
-              }`}
-              onClick={() => onSetStatus(status)}
-            >
-              <span className={`h-2 w-2 rounded-full ${statusDotClass(status)}`} />
-              {statusLabel(status)}
-            </button>
-          ))}
-        </PopoverContent>
-      </Popover>
-      <span className="hidden max-w-[96px] truncate text-[11px] text-slate-500 sm:inline" title={assignee}>
-        {assignee}
-      </span>
       <button
         type="button"
-        className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
+        className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
         onClick={onOpenDrawer}
-        aria-label="Detalhes da conversa"
       >
-        <MoreVertical size={16} />
+        Detalhes
       </button>
     </div>
   );
@@ -1554,7 +1452,6 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   const active = activeConversation;
-  const activeCustomerAvatar = active ? getAvatarUrl(active.tags) : null;
 
   async function setStatusQuick(status: "open" | "waiting_customer" | "closed") {
     if (!active) return;
@@ -1608,62 +1505,45 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   return (
-    <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-2.5 lg:p-3">
+    <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-2.5">
       <section className="flex h-full min-h-0 flex-col overflow-hidden">
-        <header className={`glass-panel flex min-h-12 shrink-0 flex-wrap items-center gap-2 ${INBOX_PANEL_CLASS} px-3 py-2 sm:gap-3 sm:px-4`}>
-          <Search className="text-slate-400" size={18} />
+        <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-slate-100 bg-white px-3 py-2 sm:px-4">
+          <Search className="shrink-0 text-slate-400" size={17} />
           <input
-            className="flex-1 bg-transparent text-sm outline-none"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
             placeholder="Buscar conversas..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {roleIsManager && managerAlertCount > 0 ? (
-            <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
-              {managerAlertCount} aguardando +5m
-            </span>
-          ) : null}
           <button
             type="button"
-            className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
-            title="Perfil e notificacoes"
+            className="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-slate-50"
+            title="Perfil"
             onClick={() => setProfileOpen(true)}
           >
             <User size={16} />
           </button>
         </header>
-        {notifyPermission === "default" ? (
-          <div className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-            <span>Ative notificacoes para receber alertas de novas mensagens do WhatsApp.</span>
-            <Button variant="glass" className="h-7 px-2.5 text-[11px]" onClick={() => void handleRequestNotificationPermission()}>
-              Ativar agora
-            </Button>
-          </div>
-        ) : null}
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
-          <Card className={`flex min-h-[220px] min-w-0 flex-col border border-slate-200 bg-white/95 p-2.5 shadow-sm sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold">Inbox</h1>
-                <Badge className="h-5 px-2 text-[10px]">{filtered.length}</Badge>
-              </div>
-              <div className="flex items-center gap-1">
-                {canMonitorByUser ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button type="button" variant="glass" className="h-8 px-2.5 text-[11px]" title="Filtrar fila">
-                        <Filter size={13} />
-                        Fila
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-[min(100vw-2rem,320px)] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                      <p className="mb-2 text-[11px] font-semibold text-slate-600">Departamento</p>
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-px overflow-hidden bg-slate-100 md:grid-cols-[minmax(200px,240px)_minmax(0,1fr)]">
+          <Card className="flex min-h-[220px] min-w-0 flex-col rounded-none border-0 bg-white p-0 shadow-none sm:min-h-[260px] md:min-h-0">
+            <div className="flex items-center justify-end gap-0.5 border-b border-slate-100 px-2 py-1.5">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="glass" size="icon" className="h-8 w-8 text-slate-500" title="Filtros">
+                    <Filter size={15} />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[min(100vw-2rem,300px)] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+                  <TagFilterPopover catalog={tagCatalog} selected={tagFilter} onChange={setTagFilter} embedded />
+                  {canMonitorByUser ? (
+                    <div className="mt-3 border-t border-slate-100 pt-3">
+                      <p className="mb-2 text-[11px] font-medium text-slate-500">Fila</p>
                       <div className="flex flex-wrap gap-1">
                         <button
                           type="button"
-                          className={`rounded-full border px-2 py-0.5 text-[10px] ${
-                            queueDepartmentId === "all" ? "border-slate-300 bg-slate-100" : "border-slate-200 bg-white"
+                          className={`rounded-md px-2 py-1 text-[11px] ${
+                            queueDepartmentId === "all" ? "bg-slate-100 text-slate-800" : "text-slate-600 hover:bg-slate-50"
                           }`}
                           onClick={() => {
                             setQueueDepartmentId("all");
@@ -1676,8 +1556,8 @@ export function AtlasApp({ token, user }: Props) {
                           <button
                             key={department.id}
                             type="button"
-                            className={`rounded-full border px-2 py-0.5 text-[10px] ${
-                              queueDepartmentId === department.id ? "border-slate-300 bg-slate-100" : "border-slate-200 bg-white"
+                            className={`rounded-md px-2 py-1 text-[11px] ${
+                              queueDepartmentId === department.id ? "bg-slate-100 text-slate-800" : "text-slate-600 hover:bg-slate-50"
                             }`}
                             onClick={() => {
                               setQueueDepartmentId(department.id);
@@ -1689,8 +1569,7 @@ export function AtlasApp({ token, user }: Props) {
                         ))}
                       </div>
                       {queueDepartmentId !== "all" ? (
-                        <div className="mt-3">
-                          <p className="mb-1 text-[10px] font-semibold text-slate-500">Atendente</p>
+                        <div className="mt-2">
                           <AppCombobox
                             value={queueOwnerId}
                             onChange={setQueueOwnerId}
@@ -1706,64 +1585,53 @@ export function AtlasApp({ token, user }: Props) {
                           />
                         </div>
                       ) : null}
-                    </PopoverContent>
-                  </Popover>
-                ) : null}
-                <TagFilterPopover catalog={tagCatalog} selected={tagFilter} onChange={setTagFilter} />
-                <Button
-                  type="button"
-                  variant="glass"
-                  size="icon"
-                  className="h-8 w-8"
-                  title="Novo contato"
-                  onClick={() => setNewContactModalOpen(true)}
-                >
-                  <Plus size={16} />
-                </Button>
-              </div>
+                      {roleIsManager && managerAlertCount > 0 ? (
+                        <p className="mt-2 text-[11px] text-slate-500">{managerAlertCount} aguardando resposta</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </PopoverContent>
+              </Popover>
+              <Button
+                type="button"
+                variant="glass"
+                size="icon"
+                className="h-8 w-8 text-slate-500"
+                title="Novo contato"
+                onClick={() => setNewContactModalOpen(true)}
+              >
+                <Plus size={15} />
+              </Button>
             </div>
             {loading && !filtered.length ? (
               <div className="mt-8 flex justify-center">
-                <Loader2 className="animate-spin" />
+                <Loader2 className="animate-spin text-slate-400" />
               </div>
             ) : null}
-              <div className="atlas-scroll mt-2 min-h-0 flex-1 space-y-0.5 overflow-auto pr-0.5">
+              <div className="atlas-scroll min-h-0 flex-1 overflow-auto">
                 {filtered.map((item) => {
                   const last = item.messages?.[0];
                   const selected = item.id === activeId;
                   const unread = isUnreadConversation(item);
-                  const overdue = isOverdueConversation(item);
-                  const dotClass = overdue ? "bg-rose-500" : unread ? "bg-blue-500" : statusDotClass(item.status);
+                  const showDot = unread || isOverdueConversation(item);
                   return (
-                    <div
-                      key={item.id}
-                      className={`w-full rounded-xl border px-2 py-1.5 text-left transition ${
-                        selected
-                          ? "border-slate-200 bg-slate-50"
-                          : "border-transparent bg-transparent hover:border-slate-200/80 hover:bg-white/70"
-                      }`}
-                    >
-                      <button type="button" onClick={() => openConversation(item.id)} className="w-full">
-                        <div className="flex items-center gap-2">
-                          <div className="relative shrink-0">
-                            <CustomerAvatar
-                              name={item.customerName}
-                              phone={item.customerPhone}
-                              avatarUrl={getAvatarUrl(item.tags)}
-                              size="sm"
-                              accessToken={token}
-                            />
-                            <span
-                              className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white ${dotClass}`}
-                              title={overdue ? "Aguardando +5m" : unread ? "Nao lida" : statusLabel(item.status)}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1 text-left">
-                            <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{item.customerName}</p>
-                            <p className="truncate text-[11px] leading-tight text-slate-500">{last?.text ?? "—"}</p>
-                            <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-0.5" />
-                          </div>
+                    <div key={item.id} className={`border-b border-slate-50 ${selected ? "bg-slate-50" : "bg-white"}`}>
+                      <button
+                        type="button"
+                        onClick={() => openConversation(item.id)}
+                        className="flex w-full items-start gap-2.5 px-3 py-3.5 text-left hover:bg-slate-50/80"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-[13px] leading-snug ${unread ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>
+                            {item.customerName}
+                          </p>
+                          <p className={`mt-1 truncate text-[12px] leading-snug ${unread ? "text-slate-500" : "text-slate-400"}`}>
+                            {last?.text ?? "—"}
+                          </p>
                         </div>
+                        {showDot ? (
+                          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-slate-900" aria-label={unread ? "Nao lida" : "Aguardando resposta"} />
+                        ) : null}
                       </button>
                     </div>
                   );
@@ -1771,21 +1639,15 @@ export function AtlasApp({ token, user }: Props) {
               </div>
             </Card>
 
-            <Card className={`flex min-h-[320px] min-w-0 flex-col border border-slate-200 bg-white/95 p-0 shadow-sm md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+            <Card className="flex min-h-[320px] min-w-0 flex-col rounded-none border-0 bg-white p-0 shadow-none md:min-h-0">
               {active ? (
                 <>
-                  <ConversationHeaderBar
-                    active={active}
-                    customerAvatarUrl={activeCustomerAvatar}
-                    accessToken={token}
-                    onSetStatus={(status) => void setStatusQuick(status)}
-                    onOpenDrawer={() => setDrawerOpen(true)}
-                  />
-                  <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-[#f7faff] px-3 py-4 sm:px-5 sm:py-5">
+                  <ConversationHeaderBar active={active} onOpenDrawer={() => setDrawerOpen(true)} />
+                  <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-slate-50/50 px-3 py-4 sm:px-5 sm:py-5">
                     {activeThreadFlash ? (
                       <div className="sticky top-0 z-30 mb-3 flex justify-center">
-                        <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-800 shadow-sm">
-                          Nova mensagem recebida
+                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+                          Nova mensagem
                         </span>
                       </div>
                     ) : null}
@@ -1822,9 +1684,9 @@ export function AtlasApp({ token, user }: Props) {
                     <div ref={messagesEndRef} />
                   </div>
                   {pendingAudioFile ? (
-                    <div className="mx-4 mb-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
-                      <p className="mb-2 text-xs font-semibold text-blue-700">
-                        {pendingAudioSending ? "Enviando audio..." : "Audio gravado (pre-escuta antes de enviar)"}
+                    <div className="mx-4 mb-2 rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="mb-2 text-xs font-medium text-slate-600">
+                        {pendingAudioSending ? "Enviando audio..." : "Audio gravado"}
                       </p>
                       <audio controls src={pendingAudioUrl} className="w-full" />
                       <div className="mt-2 flex gap-2">
@@ -1845,9 +1707,9 @@ export function AtlasApp({ token, user }: Props) {
                     </div>
                   ) : null}
                   {pendingUploadFile ? (
-                    <div className="mx-4 mb-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
-                      <p className="mb-2 text-xs font-semibold text-blue-700">
-                        {pendingUploadSending ? "Enviando arquivo..." : "Arquivo selecionado (confirme antes de enviar)"}
+                    <div className="mx-4 mb-2 rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="mb-2 text-xs font-medium text-slate-600">
+                        {pendingUploadSending ? "Enviando arquivo..." : "Arquivo selecionado"}
                       </p>
                       {mediaPreviewKind(pendingUploadFile) === "image" && pendingUploadUrl ? (
                         <img src={pendingUploadUrl} alt="Preview da imagem" className="max-h-56 rounded-xl object-contain" />
@@ -1894,12 +1756,12 @@ export function AtlasApp({ token, user }: Props) {
                     </div>
                   ) : null}
                   {replyToMessage ? (
-                    <div className="mx-4 mb-2 rounded-2xl border border-slate-200 bg-white/75 px-3 py-2 text-xs backdrop-blur">
+                    <div className="mx-4 mb-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="inline-flex items-center gap-1 font-semibold text-slate-700">
+                          <p className="inline-flex items-center gap-1 font-medium text-slate-600">
                             <CornerUpLeft size={12} />
-                            Respondendo mensagem especifica
+                            Respondendo
                           </p>
                           <p className="truncate text-slate-500">{replyToMessage.text ?? `[${replyToMessage.type}]`}</p>
                         </div>
@@ -1914,15 +1776,9 @@ export function AtlasApp({ token, user }: Props) {
                       </div>
                     </div>
                   ) : null}
-                  {buildSignaturePreview(draft, user, companySettings?.messaging) ? (
-                    <div className="mx-4 mb-1 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-[11px] text-emerald-900">
-                      <p className="mb-1 font-semibold">Preview enviado ao cliente (com assinatura):</p>
-                      <p className="whitespace-pre-wrap">{buildSignaturePreview(draft, user, companySettings?.messaging)}</p>
-                    </div>
-                  ) : null}
                   <form
                     onSubmit={handleSend}
-                    className="z-10 flex items-end gap-2 rounded-b-2xl border-t border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5"
+                    className="z-10 flex items-end gap-2 border-t border-slate-100 bg-white px-3 py-2.5 sm:px-4"
                   >
                     <input
                       ref={fileRef}
@@ -1957,9 +1813,9 @@ export function AtlasApp({ token, user }: Props) {
                       size="icon"
                       disabled={mediaSendLocked || sendingText}
                       onClick={toggleRecord}
-                      className={recording ? "ring-2 ring-red-400" : ""}
+                      className={recording ? "ring-2 ring-slate-300" : ""}
                     >
-                      {recording ? <Square size={16} className="text-red-500" /> : <Mic size={18} />}
+                      {recording ? <Square size={16} className="text-slate-600" /> : <Mic size={18} />}
                     </Button>
                     <textarea
                       className="atlas-field max-h-32 min-h-[40px] flex-1 resize-none rounded-[18px] px-4 py-2 text-sm outline-none focus:border-blue-300 disabled:opacity-60"
@@ -1986,8 +1842,8 @@ export function AtlasApp({ token, user }: Props) {
               )}
             </Card>
           </div>
-          {error ? <p className="shrink-0 text-sm text-red-600">{error}</p> : null}
-          {!error && info ? <p className="shrink-0 text-sm text-emerald-700">{info}</p> : null}
+          {error ? <p className="shrink-0 px-3 py-1.5 text-xs text-slate-700">{error}</p> : null}
+          {!error && info ? <p className="shrink-0 px-3 py-1.5 text-xs text-slate-500">{info}</p> : null}
       </section>
       <ConversationDrawer
         open={drawerOpen}
@@ -2009,6 +1865,7 @@ export function AtlasApp({ token, user }: Props) {
         tagCatalog={tagCatalog}
         tagsSaving={tagsSaving}
         onTagsChange={(tags) => updateActiveTags(tags)}
+        onSetStatus={(status) => void setStatusQuick(status)}
       />
       <NewContactModal
         open={newContactModalOpen}
