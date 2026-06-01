@@ -79,29 +79,44 @@ export function ConversationDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" className="absolute inset-0 bg-slate-950/30" aria-label="Fechar painel" onClick={onClose} />
-      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Detalhes da conversa</p>
-            <p className="text-xs text-slate-500">{active?.customerName ?? "Selecione uma conversa"}</p>
+      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">Detalhes da conversa</p>
+              <p className="truncate text-sm text-slate-800">{active?.customerName ?? "Selecione uma conversa"}</p>
+              {active ? (
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+                  <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">+{active.customerPhone}</span>
+                  {active.assignedTo?.name ? (
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">{active.assignedTo.name}</span>
+                  ) : null}
+                  {active.team?.name ? (
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">{active.team.name}</span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"
+              onClick={onClose}
+              aria-label="Fechar"
+            >
+              <X size={16} />
+            </button>
           </div>
-          <button
-            type="button"
-            className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"
-            onClick={onClose}
-            aria-label="Fechar"
-          >
-            <X size={16} />
-          </button>
         </div>
 
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-3 py-2">
+        <div className="flex gap-1 overflow-x-auto border-b border-slate-100 bg-slate-50/60 px-3 py-2">
           {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
               className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-                tab === item.id ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50"
+                tab === item.id
+                  ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:bg-white/80 hover:text-slate-700"
               }`}
               onClick={() => onTabChange(item.id)}
             >

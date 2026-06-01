@@ -77,7 +77,7 @@ export function ConversationTagEditor({ tags, catalog, disabled, saving, onChang
             <Plus size={12} className="ml-1" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[min(100vw-2rem,280px)] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+        <PopoverContent align="start" className="w-[min(100vw-2rem,280px)] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
           <p className="mb-2 text-xs font-semibold text-slate-700">Tags da conversa</p>
           <div className="mb-2 flex flex-wrap gap-1">
             {current.length ? (

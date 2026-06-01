@@ -167,6 +167,14 @@ async function compressImageFile(file: File, maxSide = 512) {
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
+function formatPhoneDisplay(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return `+${digits}`;
+  if (digits.length === 12) return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 8)}-${digits.slice(8)}`;
+  if (digits.length === 13) return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  return `+${digits}`;
+}
+
 function normalizeWhatsAppNumber(raw: string) {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return "";
@@ -538,58 +546,85 @@ function ConversationHeaderBar({
   onOpenDrawer
 }: ConversationHeaderBarProps) {
   const assignee = active.assignedTo?.name ?? "Sem atendente";
+  const teamName = active.team?.name ?? "Sem departamento";
+  const instanceLabel = active.instance?.label || active.instance?.name || "Número WhatsApp";
+  const instanceState = String(active.instance?.status ?? "").toLowerCase();
+  const instanceConnected = instanceState === "connected" || instanceState === "open";
 
   return (
-    <div className="flex items-center gap-2 rounded-t-2xl border-b border-slate-200 bg-white px-3 py-2">
-      <CustomerAvatar
-        name={active.customerName}
-        phone={active.customerPhone}
-        avatarUrl={customerAvatarUrl}
-        accessToken={accessToken}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
-        <p className="truncate text-xs text-slate-500">+{active.customerPhone}</p>
-      </div>
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700"
-            title="Alterar status"
-          >
-            <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
-            {statusShortLabel(active.status)}
-            <ChevronDown size={12} className="text-slate-400" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-          {(["open", "waiting_customer", "closed"] as const).map((status) => (
+    <div className="flex flex-col gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
+      <div className="flex items-center gap-2.5">
+        <CustomerAvatar
+          name={active.customerName}
+          phone={active.customerPhone}
+          avatarUrl={customerAvatarUrl}
+          accessToken={accessToken}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusToneClass(active.status)}`}>
+              {statusLabel(active.status)}
+            </span>
+          </div>
+          <p className="truncate text-xs text-slate-500">{formatPhoneDisplay(active.customerPhone)}</p>
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
             <button
-              key={status}
               type="button"
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs ${
-                active.status === status ? "bg-slate-100 font-medium" : "hover:bg-slate-50"
-              }`}
-              onClick={() => onSetStatus(status)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+              title="Alterar status"
             >
-              <span className={`h-2 w-2 rounded-full ${statusDotClass(status)}`} />
-              {statusLabel(status)}
+              <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
+              Status
+              <ChevronDown size={12} className="text-slate-400" />
             </button>
-          ))}
-        </PopoverContent>
-      </Popover>
-      <span className="hidden max-w-[96px] truncate text-[11px] text-slate-500 sm:inline" title={assignee}>
-        {assignee}
-      </span>
-      <button
-        type="button"
-        className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
-        onClick={onOpenDrawer}
-        aria-label="Detalhes da conversa"
-      >
-        <MoreVertical size={16} />
-      </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+            {(["open", "waiting_customer", "closed"] as const).map((status) => (
+              <button
+                key={status}
+                type="button"
+                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs ${
+                  active.status === status ? "bg-slate-100 font-medium text-slate-900" : "text-slate-600 hover:bg-slate-50"
+                }`}
+                onClick={() => onSetStatus(status)}
+              >
+                <span className={`h-2 w-2 rounded-full ${statusDotClass(status)}`} />
+                {statusLabel(status)}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+        <button
+          type="button"
+          className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
+          onClick={onOpenDrawer}
+          aria-label="Detalhes da conversa"
+          title="Detalhes, CRM e transferência"
+        >
+          <MoreVertical size={16} />
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">
+        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">
+          <User size={11} className="text-slate-400" />
+          {assignee}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">
+          {teamName}
+        </span>
+        <span
+          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 ${
+            instanceConnected ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}
+          title={instanceConnected ? "WhatsApp conectado" : "WhatsApp desconectado ou instável"}
+        >
+          <MessageCircle size={11} />
+          {instanceLabel}
+        </span>
+      </div>
     </div>
   );
 }
@@ -1203,6 +1238,22 @@ export function AtlasApp({ token, user }: Props) {
     );
   }, [visibleConversations, search, tagFilter]);
 
+  const whatsappOperationalStatus = useMemo(() => {
+    const instances = new Map<string, { label: string; connected: boolean }>();
+    for (const row of visibleConversations) {
+      const inst = row.instance;
+      if (!inst?.id) continue;
+      const state = String(inst.status ?? "").toLowerCase();
+      instances.set(inst.id, {
+        label: inst.label || inst.name || "WhatsApp",
+        connected: state === "connected" || state === "open"
+      });
+    }
+    const rows = [...instances.values()];
+    const connected = rows.filter((item) => item.connected).length;
+    return { total: rows.length, connected, rows };
+  }, [visibleConversations]);
+
   async function sendCurrentDraft() {
     if (sendingTextRef.current) return;
     if (!activeId) {
@@ -1602,22 +1653,35 @@ export function AtlasApp({ token, user }: Props) {
     <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-2.5 lg:p-3">
       <section className="flex h-full min-h-0 flex-col overflow-hidden">
         <header className={`glass-panel flex min-h-12 shrink-0 flex-wrap items-center gap-2 ${INBOX_PANEL_CLASS} px-3 py-2 sm:gap-3 sm:px-4`}>
-          <Search className="text-slate-400" size={18} />
+          <Search className="shrink-0 text-slate-400" size={18} />
           <input
-            className="flex-1 bg-transparent text-sm outline-none"
-            placeholder="Buscar conversas..."
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+            placeholder="Buscar por nome, telefone ou empresa..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {whatsappOperationalStatus.total ? (
+            <span
+              className={`hidden items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-medium sm:inline-flex ${
+                whatsappOperationalStatus.connected === whatsappOperationalStatus.total
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+              title="Status dos números WhatsApp visíveis na fila"
+            >
+              <MessageCircle size={12} />
+              WhatsApp {whatsappOperationalStatus.connected}/{whatsappOperationalStatus.total}
+            </span>
+          ) : null}
           {roleIsManager && managerAlertCount > 0 ? (
-            <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
+            <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
               {managerAlertCount} aguardando +5m
             </span>
           ) : null}
           <button
             type="button"
             className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
-            title="Perfil e notificacoes"
+            title="Perfil e notificações"
             onClick={() => setProfileOpen(true)}
           >
             <User size={16} />
@@ -1625,7 +1689,7 @@ export function AtlasApp({ token, user }: Props) {
         </header>
         {notifyPermission === "default" ? (
           <div className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-            <span>Ative notificacoes para receber alertas de novas mensagens do WhatsApp.</span>
+            <span>Ative notificações para receber alertas de novas mensagens do WhatsApp.</span>
             <Button variant="glass" className="h-7 px-2.5 text-[11px]" onClick={() => void handleRequestNotificationPermission()}>
               Ativar agora
             </Button>
@@ -1636,7 +1700,7 @@ export function AtlasApp({ token, user }: Props) {
           <Card className={`flex min-h-[220px] min-w-0 flex-col border border-slate-200 bg-white/95 p-2.5 shadow-sm sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold">Inbox</h1>
+                <h1 className="text-sm font-semibold text-slate-900">Caixa de entrada</h1>
                 <Badge className="h-5 px-2 text-[10px]">{filtered.length}</Badge>
               </div>
               <div className="flex items-center gap-1">
@@ -1725,17 +1789,20 @@ export function AtlasApp({ token, user }: Props) {
                   const unread = isUnreadConversation(item);
                   const overdue = isOverdueConversation(item);
                   const dotClass = overdue ? "bg-rose-500" : unread ? "bg-blue-500" : statusDotClass(item.status);
+                  const assigneeName = item.assignedTo?.name ?? "Sem atendente";
+                  const teamName = item.team?.name ?? "—";
+                  const instanceLabel = item.instance?.label || item.instance?.name || "WhatsApp";
                   return (
                     <div
                       key={item.id}
-                      className={`w-full rounded-xl border px-2 py-1.5 text-left transition ${
+                      className={`w-full rounded-xl border px-2.5 py-2 text-left transition ${
                         selected
-                          ? "border-slate-200 bg-slate-50"
-                          : "border-transparent bg-transparent hover:border-slate-200/80 hover:bg-white/70"
+                          ? "border-slate-300 bg-slate-50 shadow-sm"
+                          : "border-transparent hover:border-slate-200 hover:bg-white"
                       }`}
                     >
-                      <button type="button" onClick={() => openConversation(item.id)} className="w-full">
-                        <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => openConversation(item.id)} className="w-full text-left">
+                        <div className="flex items-start gap-2">
                           <div className="relative shrink-0">
                             <CustomerAvatar
                               name={item.customerName}
@@ -1749,10 +1816,30 @@ export function AtlasApp({ token, user }: Props) {
                               title={overdue ? "Aguardando +5m" : unread ? "Não lida" : statusLabel(item.status)}
                             />
                           </div>
-                          <div className="min-w-0 flex-1 text-left">
-                            <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{item.customerName}</p>
-                            <p className="truncate text-[11px] leading-tight text-slate-500">{last?.text ?? "—"}</p>
-                            <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{item.customerName}</p>
+                              <span className="shrink-0 text-[10px] text-slate-400">{formatTime(item.lastMessageAt ?? last?.createdAt)}</span>
+                            </div>
+                            <p className="truncate text-[11px] leading-tight text-slate-500">{formatPhoneDisplay(item.customerPhone)}</p>
+                            <p className="mt-0.5 truncate text-[11px] leading-tight text-slate-600">{last?.text ?? "Sem mensagens"}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusToneClass(item.status)}`}>
+                                {statusShortLabel(item.status)}
+                              </span>
+                              <span className="truncate text-[10px] text-slate-500" title={assigneeName}>
+                                {assigneeName}
+                              </span>
+                              <span className="text-[10px] text-slate-300">·</span>
+                              <span className="truncate text-[10px] text-slate-500" title={teamName}>
+                                {teamName}
+                              </span>
+                              <span className="text-[10px] text-slate-300">·</span>
+                              <span className="truncate text-[10px] text-slate-500" title={instanceLabel}>
+                                {instanceLabel}
+                              </span>
+                            </div>
+                            <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-1" />
                           </div>
                         </div>
                       </button>
@@ -1913,7 +2000,7 @@ export function AtlasApp({ token, user }: Props) {
                   ) : null}
                   <form
                     onSubmit={handleSend}
-                    className="z-10 flex items-end gap-2 rounded-b-2xl border-t border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5"
+                    className="z-10 flex items-end gap-2 rounded-b-2xl border-t border-slate-200 bg-white px-3 py-2.5 sm:px-4"
                   >
                     <input
                       ref={fileRef}
@@ -1932,6 +2019,7 @@ export function AtlasApp({ token, user }: Props) {
                       size="icon"
                       disabled={mediaSendLocked || sendingText}
                       onClick={() => fileRef.current?.click()}
+                      title="Anexar arquivo"
                     >
                       <Paperclip size={18} />
                     </Button>
