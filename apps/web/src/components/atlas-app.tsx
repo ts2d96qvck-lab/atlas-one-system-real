@@ -57,6 +57,7 @@ import {
 import { connectRealtime, joinTenant } from "../lib/socket";
 import { SecureMedia } from "./secure-media";
 import { QuickRepliesMenu } from "./quick-replies-menu";
+import { conversationStatusLabel, CONVERSATION_STATUS_SHORT, roleLabel as productRoleLabel } from "../lib/product-copy";
 import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { AppCombobox } from "./ui/app-select";
@@ -78,8 +79,8 @@ import {
 type Props = { token: string; user: SessionUser };
 const ROLE_TO_DEPARTMENT: Record<string, string> = {
   owner: "Diretoria",
-  admin: "Administrativo",
-  supervisor: "Supervisao",
+  admin: "Gestão",
+  supervisor: "Supervisão",
   agent: "Atendimento"
 };
 
@@ -98,21 +99,11 @@ function initials(name: string) {
 }
 
 function statusLabel(status: string) {
-  const map: Record<string, string> = {
-    open: "Aberto",
-    waiting_customer: "Aguardando",
-    closed: "Fechado"
-  };
-  return map[status] ?? status;
+  return conversationStatusLabel(status);
 }
 
 function statusShortLabel(status: string) {
-  const map: Record<string, string> = {
-    open: "Abr",
-    waiting_customer: "Ag.",
-    closed: "Fech."
-  };
-  return map[status] ?? status.slice(0, 4);
+  return CONVERSATION_STATUS_SHORT[status] ?? status.slice(0, 8);
 }
 
 function statusToneClass(status: string) {
@@ -226,7 +217,7 @@ function CustomerAvatar({
 
 function roleLabel(role?: string) {
   if (!role) return "Atendimento";
-  return ROLE_TO_DEPARTMENT[role] ?? role;
+  return ROLE_TO_DEPARTMENT[role] ?? productRoleLabel(role);
 }
 
 function agentDepartment(agent: UserRow) {
@@ -246,8 +237,8 @@ function genericMediaText(text?: string | null) {
   if (!text) return false;
   const normalized = normalizeMediaLabel(text);
   return (
-    ["audio", "image", "video", "document", "midia", "media", "arquivo", "figurinha", "sticker"].includes(normalized) ||
-    /^(audio|video|imagem|documento|midia)\s*$/i.test(text.trim())
+    ["audio", "image", "video", "document", "mídia", "media", "arquivo", "figurinha", "sticker"].includes(normalized) ||
+    /^(audio|video|imagem|documento|mídia)\s*$/i.test(text.trim())
   );
 }
 
@@ -737,7 +728,7 @@ function UserProfileModal({
           </div>
           <div className="rounded-lg border border-slate-200 px-3 py-2">
             <p className="text-slate-500">Telefone de cadastro</p>
-            <p className="font-semibold text-slate-800">{userPhone ? `+${userPhone}` : "Nao informado"}</p>
+            <p className="font-semibold text-slate-800">{userPhone ? `+${userPhone}` : "Não informado"}</p>
           </div>
           <div className="rounded-lg border border-slate-200 px-3 py-2">
             <p className="text-slate-500">Departamento atual</p>
@@ -750,7 +741,7 @@ function UserProfileModal({
         </div>
 
         <label className="mt-3 block cursor-pointer rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
-          {uploading ? "Enviando foto interna..." : "Enviar foto interna (somente validacao da equipe)"}
+          {uploading ? "Enviando foto interna..." : "Enviar foto interna (somente validação da equipe)"}
           <input
             type="file"
             accept="image/*"
@@ -773,7 +764,7 @@ function UserProfileModal({
           <p className="text-xs font-semibold text-slate-800">Notificacoes do Inbox</p>
           <p className="mt-1 text-[11px] text-slate-500">Alertas locais para novas mensagens recebidas.</p>
           {notifyPermission === "unsupported" ? (
-            <p className="mt-2 text-[11px] text-amber-700">Este navegador nao suporta notificacoes.</p>
+            <p className="mt-2 text-[11px] text-amber-700">Este navegador não suporta notificacoes.</p>
           ) : notifyPermission === "denied" ? (
             <p className="mt-2 text-[11px] text-amber-700">
               Notificacoes bloqueadas no navegador. Libere nas configuracoes do site.
@@ -904,7 +895,7 @@ export function AtlasApp({ token, user }: Props) {
       return items;
     } catch {
       setConversations([]);
-      setError("Inbox temporariamente indisponivel. Tentando reconectar...");
+      setError("Caixa de entrada temporariamente indisponível. Tentando reconectar...");
       return [];
     }
   }, [token]);
@@ -924,7 +915,7 @@ export function AtlasApp({ token, user }: Props) {
         setReplyToMessage(null);
         setLastSeenByConversation((current) => ({ ...current, [id]: Date.now() }));
       } catch {
-        setError("Nao foi possivel abrir a conversa agora.");
+        setError("Não foi possível abrir a conversa agora.");
       }
     },
     [token]
@@ -938,7 +929,7 @@ export function AtlasApp({ token, user }: Props) {
       });
       setError("");
     } catch {
-      setError("Nao foi possivel salvar cadencia");
+      setError("Não foi possível salvar cadencia");
     }
   }, [activeConversation?.lead?.id, cadenceDraft, token]);
 
@@ -1260,11 +1251,11 @@ export function AtlasApp({ token, user }: Props) {
       if (sync?.synced === true) {
         setInfo("Mensagem apagada no Atlas One e no WhatsApp do cliente.");
       } else {
-        setInfo("Mensagem apagada no Atlas One. WhatsApp nao sincronizado (sem ID do provedor).");
+        setInfo("Mensagem apagada no Atlas One. WhatsApp não sincronizado (sem ID do provedor).");
       }
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel apagar a mensagem");
+      setError(err instanceof Error ? err.message : "Não foi possível apagar a mensagem");
     }
   }
 
@@ -1282,11 +1273,11 @@ export function AtlasApp({ token, user }: Props) {
       if (sync?.synced === true) {
         setInfo("Mensagem editada no Atlas One e no WhatsApp do cliente.");
       } else {
-        setInfo("Mensagem editada no Atlas One. WhatsApp nao sincronizado (sem ID do provedor).");
+        setInfo("Mensagem editada no Atlas One. WhatsApp não sincronizado (sem ID do provedor).");
       }
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel editar a mensagem");
+      setError(err instanceof Error ? err.message : "Não foi possível editar a mensagem");
     }
   }
 
@@ -1299,7 +1290,7 @@ export function AtlasApp({ token, user }: Props) {
       setInfo("Audio transcrito.");
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Transcricao indisponivel. Configure OPENAI_API_KEY no servidor.");
+      setError(err instanceof Error ? err.message : "Transcrição indisponível. Configure OPENAI_API_KEY no servidor.");
     }
   }
 
@@ -1436,7 +1427,7 @@ export function AtlasApp({ token, user }: Props) {
       await refreshConversations();
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel atualizar tags");
+      setError(err instanceof Error ? err.message : "Não foi possível atualizar tags");
     } finally {
       setTagsSaving(false);
     }
@@ -1511,7 +1502,7 @@ export function AtlasApp({ token, user }: Props) {
 
   async function handleDeleteActiveConversation() {
     if (!active) return;
-    const ok = window.confirm(`Excluir contato ${active.customerName}? Essa acao remove conversa e mensagens.`);
+    const ok = window.confirm(`Excluir contato ${active.customerName}? Essa ação remove conversa e mensagens.`);
     if (!ok) return;
     try {
       await deleteConversation(token, active.id);
@@ -1520,7 +1511,7 @@ export function AtlasApp({ token, user }: Props) {
       const items = await refreshConversations();
       if (items[0]) await openConversation(items[0].id);
       setError("");
-      setInfo(`Contato ${active.customerName} excluido com sucesso.`);
+      setInfo(`Contato ${active.customerName} excluído com sucesso.`);
     } catch (err) {
       setInfo("");
       setError(err instanceof Error ? err.message : "Falha ao excluir contato");
@@ -1580,7 +1571,7 @@ export function AtlasApp({ token, user }: Props) {
       setInfo(`Status atualizado: ${statusLabel(status)}.`);
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel alterar o status");
+      setError(err instanceof Error ? err.message : "Não foi possível alterar o status");
     }
   }
 
@@ -1595,7 +1586,7 @@ export function AtlasApp({ token, user }: Props) {
       setInfo("Foto do atendente salva e visivel para a equipe.");
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel salvar a foto");
+      setError(err instanceof Error ? err.message : "Não foi possível salvar a foto");
     }
   }
 
@@ -1755,7 +1746,7 @@ export function AtlasApp({ token, user }: Props) {
                             />
                             <span
                               className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white ${dotClass}`}
-                              title={overdue ? "Aguardando +5m" : unread ? "Nao lida" : statusLabel(item.status)}
+                              title={overdue ? "Aguardando +5m" : unread ? "Não lida" : statusLabel(item.status)}
                             />
                           </div>
                           <div className="min-w-0 flex-1 text-left">
@@ -1824,7 +1815,7 @@ export function AtlasApp({ token, user }: Props) {
                   {pendingAudioFile ? (
                     <div className="mx-4 mb-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
                       <p className="mb-2 text-xs font-semibold text-blue-700">
-                        {pendingAudioSending ? "Enviando audio..." : "Audio gravado (pre-escuta antes de enviar)"}
+                        {pendingAudioSending ? "Enviando audio..." : "Audio gravado (pré-escuta antes de enviar)"}
                       </p>
                       <audio controls src={pendingAudioUrl} className="w-full" />
                       <div className="mt-2 flex gap-2">

@@ -90,7 +90,7 @@ export function SecureMedia({ path, token, type, alt, fileName }: Props) {
   }, [path, token, type, directAudioSrc]);
 
   if (!path) return null;
-  if (error) return <p className="text-xs text-rose-600">Midia indisponivel</p>;
+  if (error) return <p className="text-xs text-rose-600">Mídia indisponível</p>;
   if (!src) return <Loader2 size={16} className="animate-spin text-atlas-muted" />;
 
   if (type === "image") {
@@ -104,7 +104,7 @@ export function SecureMedia({ path, token, type, alt, fileName }: Props) {
   if (type === "audio") {
     return (
       <audio controls preload="metadata" src={src} className="w-full min-w-[220px] max-w-sm">
-        Seu navegador nao suporta reproducao de audio.
+        Seu navegador não suporta reproducao de audio.
       </audio>
     );
   }

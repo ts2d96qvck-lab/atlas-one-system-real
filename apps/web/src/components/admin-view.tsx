@@ -87,8 +87,8 @@ type UserRow = {
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Diretoria",
-  admin: "Administracao",
-  supervisor: "Supervisao",
+  admin: "Administração",
+  supervisor: "Supervisão",
   agent: "Atendimento"
 };
 
@@ -99,20 +99,20 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const AUDIT_ACTION_LABEL: Record<string, string> = {
-  created: "Criacao",
-  updated: "Atualizacao",
+  created: "Criação",
+  updated: "Atualização",
   deleted: "Exclusao",
   sent_text: "Mensagem de texto enviada",
-  sent_media: "Midia enviada",
+  sent_media: "Mídia enviada",
   auth_login_success: "Login bem-sucedido",
   auth_login_failed: "Tentativa de login falhou",
   auth_login_challenge: "Desafio 2FA enviado",
   auth_logout: "Logout",
-  password_reset_requested: "Recuperacao de senha solicitada",
+  password_reset_requested: "Recuperação de senha solicitada",
   password_reset_confirmed: "Senha redefinida",
   password_changed: "Senha alterada",
   permissions_updated: "Permissoes alteradas",
-  data_export: "Exportacao de dados",
+  data_export: "Exportação de dados",
   api_key_created: "Chave API criada",
   api_key_revoked: "Chave API revogada",
   webhook_created: "Webhook criado",
@@ -130,9 +130,9 @@ function describeAuditLog(log: AuditLogRow) {
       : log.entity === "Message"
         ? "Mensagem"
         : log.entity === "Auth"
-          ? "Autenticacao"
+          ? "Autenticação"
           : log.entity === "Export"
-            ? "Exportacao"
+            ? "Exportação"
             : log.entity;
   const actor = log.actor?.name ? ` · ${log.actor.name}` : "";
   return `${action} em ${entity}${actor}`;
@@ -211,7 +211,7 @@ function normalizeQrSrc(qrImage?: unknown) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "Ainda nao sincronizado";
+  if (!value) return "Ainda não sincronizado";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Data invalida";
   return parsed.toLocaleString("pt-BR");
@@ -294,8 +294,8 @@ export function AdminView({ token, user }: Props) {
   const [menuBot, setMenuBot] = useState<MenuBotSettings | null>(null);
   const [menuBotForm, setMenuBotForm] = useState({
     enabled: false,
-    greeting: "Ola! Escolha uma opcao:",
-    invalidReply: "Opcao invalida. Responda apenas com o numero da opcao desejada.",
+    greeting: "Ola! Escolha uma opção:",
+    invalidReply: "Opção invalida. Responda apenas com o número da opção desejada.",
     options: [] as MenuBotOption[]
   });
   const [menuBotSaving, setMenuBotSaving] = useState(false);
@@ -308,7 +308,7 @@ export function AdminView({ token, user }: Props) {
   const [webhookDeliveries, setWebhookDeliveries] = useState<WebhookDeliveryRow[]>([]);
   const [webhookEvents, setWebhookEvents] = useState<string[]>([]);
   const [apiKeyForm, setApiKeyForm] = useState({ name: "" });
-  const [webhookForm, setWebhookForm] = useState({ name: "Integracao", url: "", events: [] as string[] });
+  const [webhookForm, setWebhookForm] = useState({ name: "Integração", url: "", events: [] as string[] });
   const [lastCreatedApiKey, setLastCreatedApiKey] = useState("");
   const [lastWebhookSecret, setLastWebhookSecret] = useState("");
   const [integrationsBusy, setIntegrationsBusy] = useState(false);
@@ -338,7 +338,7 @@ export function AdminView({ token, user }: Props) {
       : "bg-slate-100/90 text-slate-600 border-slate-200/80";
   const statusLabel = instanceStatusLabel(activeInstance?.status);
   const recommendedAction = !activeInstance
-    ? "Selecione um numero para iniciar."
+    ? "Selecione um número para iniciar."
     : isConnected
       ? "Tudo certo. Se quiser trocar aparelho, gere um novo QR."
       : activeStatus === "connecting" || activeStatus === "created" || activeStatus === "qrcode"
@@ -567,7 +567,7 @@ export function AdminView({ token, user }: Props) {
 
   async function connectWhatsApp(force = false) {
     if (!selectedInstance) {
-      setMessage("Selecione primeiro um numero para conectar.");
+      setMessage("Selecione primeiro um número para conectar.");
       return;
     }
     setConnecting(true);
@@ -601,7 +601,7 @@ export function AdminView({ token, user }: Props) {
 
   async function disconnectWhatsApp() {
     if (!selectedInstance) {
-      setMessage("Selecione primeiro um numero para desconectar.");
+      setMessage("Selecione primeiro um número para desconectar.");
       return;
     }
     setDisconnecting(true);
@@ -619,7 +619,7 @@ export function AdminView({ token, user }: Props) {
 
   async function syncSelectedWebhook() {
     if (!selectedInstance) {
-      setMessage("Selecione primeiro um numero para sincronizar webhook.");
+      setMessage("Selecione primeiro um número para sincronizar webhook.");
       return;
     }
     setSyncing(true);
@@ -637,7 +637,7 @@ export function AdminView({ token, user }: Props) {
   async function createUser() {
     const requiresDepartment = form.role === "agent" || form.role === "supervisor";
     if (requiresDepartment && !form.teamId) {
-      setMessage("Selecione um departamento para esse usuario.");
+      setMessage("Selecione um departamento para esse usuário.");
       return;
     }
     const payload = {
@@ -651,7 +651,7 @@ export function AdminView({ token, user }: Props) {
     });
     if (!res.ok) {
       const body = await res.json();
-      setMessage(body?.error ?? "Erro ao criar usuario");
+      setMessage(body?.error ?? "Erro ao criar usuário");
       return;
     }
     setForm({ name: "", email: "", password: "", role: "agent", teamId: "" });
@@ -666,7 +666,7 @@ export function AdminView({ token, user }: Props) {
       return;
     }
     if (requiresDepartment && !form.teamId) {
-      setMessage("Selecione um departamento para esse usuario.");
+      setMessage("Selecione um departamento para esse usuário.");
       return;
     }
     setInviting(true);
@@ -683,7 +683,7 @@ export function AdminView({ token, user }: Props) {
       setMessage("Convite criado. Copie o link e envie para a pessoa.");
       await refreshSnapshot();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao convidar usuario");
+      setMessage(err instanceof Error ? err.message : "Erro ao convidar usuário");
     } finally {
       setInviting(false);
     }
@@ -696,7 +696,7 @@ export function AdminView({ token, user }: Props) {
       setBillingOverview(updated);
       setMessage(status === "active" ? "Pagamento registrado e acesso liberado." : "Status financeiro atualizado.");
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Nao foi possivel registrar pagamento");
+      setMessage(err instanceof Error ? err.message : "Não foi possível registrar pagamento");
     } finally {
       setManualPaymentSaving(false);
     }
@@ -829,7 +829,7 @@ export function AdminView({ token, user }: Props) {
       const created = await createApiKey(token, { name: apiKeyForm.name.trim() });
       setLastCreatedApiKey(created.key);
       setApiKeyForm({ name: "" });
-      setMessage(`Chave API criada. Copie agora — nao sera exibida novamente.`);
+      setMessage(`Chave API criada. Copie agora — não sera exibida novamente.`);
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao criar chave API");
@@ -859,12 +859,12 @@ export function AdminView({ token, user }: Props) {
     setIntegrationsBusy(true);
     try {
       const created = await createWebhookEndpoint(token, {
-        name: webhookForm.name.trim() || "Integracao",
+        name: webhookForm.name.trim() || "Integração",
         url: webhookForm.url.trim(),
         events: webhookForm.events
       });
       setLastWebhookSecret(created.secret);
-      setWebhookForm({ name: "Integracao", url: "", events: [] });
+      setWebhookForm({ name: "Integração", url: "", events: [] });
       setMessage("Webhook criado. Copie o secret de assinatura agora.");
       await refreshSnapshot();
     } catch (err) {
@@ -945,7 +945,7 @@ export function AdminView({ token, user }: Props) {
     if (!ok) return;
     try {
       await deleteShortcut(token, tag);
-      setMessage(`Atalho ${tag} excluido.`);
+      setMessage(`Atalho ${tag} excluído.`);
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao excluir atalho");
@@ -992,7 +992,7 @@ export function AdminView({ token, user }: Props) {
     if (!ok) return;
     try {
       await deleteTeam(token, team.id);
-      setMessage(`Departamento ${team.name} excluido.`);
+      setMessage(`Departamento ${team.name} excluído.`);
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao excluir departamento");
@@ -1010,7 +1010,7 @@ export function AdminView({ token, user }: Props) {
       setMessage("Numero criado. Agora clique Conectar QR.");
       await refreshSnapshot();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao criar numero");
+      setMessage(err instanceof Error ? err.message : "Erro ao criar número");
     }
   }
 
@@ -1052,53 +1052,53 @@ export function AdminView({ token, user }: Props) {
   async function removeSelectedUser() {
     if (!selectedUser) return;
     if (selectedUser.role === "owner") {
-      setMessage("O dono da empresa nao pode ser excluido.");
+      setMessage("O dono da empresa não pode ser excluído.");
       return;
     }
     try {
       await deleteUser(token, selectedUser.id);
-      setMessage(`Usuario ${selectedUser.name} excluido.`);
+      setMessage(`Usuario ${selectedUser.name} excluído.`);
       setSelectedUser(null);
       await refreshSnapshot();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao excluir usuario");
+      setMessage(err instanceof Error ? err.message : "Erro ao excluir usuário");
     }
   }
 
   async function removeUserDirect(user: UserRow) {
     if (user.role === "owner") {
-      setMessage("O dono da empresa nao pode ser excluido.");
+      setMessage("O dono da empresa não pode ser excluído.");
       return;
     }
-    const ok = window.confirm(`Excluir usuario ${user.name}? Essa acao nao pode ser desfeita.`);
+    const ok = window.confirm(`Excluir usuário ${user.name}? Essa ação não pode ser desfeita.`);
     if (!ok) return;
     try {
       await deleteUser(token, user.id);
-      setMessage(`Usuario ${user.name} excluido.`);
+      setMessage(`Usuario ${user.name} excluído.`);
       if (selectedUser?.id === user.id) setSelectedUser(null);
       await refreshSnapshot();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao excluir usuario");
+      setMessage(err instanceof Error ? err.message : "Erro ao excluir usuário");
     }
   }
 
   async function approveRequest(id: string) {
     try {
       await approveAccessRequest(token, id);
-      setMessage("Solicitacao aprovada. Usuario ativado.");
+      setMessage("Solicitação aprovada. Usuario ativado.");
       await refreshSnapshot();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao aprovar solicitacao");
+      setMessage(err instanceof Error ? err.message : "Erro ao aprovar solicitação");
     }
   }
 
   async function rejectRequest(id: string) {
     try {
       await rejectAccessRequest(token, id);
-      setMessage("Solicitacao recusada e removida.");
+      setMessage("Solicitação recusada e removida.");
       await refreshSnapshot();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao recusar solicitacao");
+      setMessage(err instanceof Error ? err.message : "Erro ao recusar solicitação");
     }
   }
 
@@ -1109,7 +1109,7 @@ export function AdminView({ token, user }: Props) {
       setMessage(`Numero ${name} removido.`);
       await refreshSnapshot();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao remover numero");
+      setMessage(err instanceof Error ? err.message : "Erro ao remover número");
     }
   }
 
@@ -1127,7 +1127,7 @@ export function AdminView({ token, user }: Props) {
         ownerPhone: resetForm.ownerPhone.trim(),
         confirmation: "RESETAR"
       });
-      setMessage(`${result.message} Voce sera desconectado para entrar com o novo owner.`);
+      setMessage(`${result.message} Você sera desconectado para entrar com o novo owner.`);
       setTimeout(() => {
         localStorage.removeItem("atlas:token");
         localStorage.removeItem("atlas-one-session");
@@ -1171,8 +1171,8 @@ export function AdminView({ token, user }: Props) {
     <main className="w-full p-4 pb-28 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <header>
-          <h1 className="text-3xl font-semibold">Administracao</h1>
-          <p className="text-sm text-atlas-muted">WhatsApp, usuarios e permissoes</p>
+          <h1 className="text-3xl font-semibold">Administração</h1>
+          <p className="text-sm text-atlas-muted">WhatsApp, usuários e permissoes</p>
           <p className="mt-1 text-xs">
             API:{" "}
             <span
@@ -1195,10 +1195,10 @@ export function AdminView({ token, user }: Props) {
               { id: "admin-metas", label: "Metas" },
               { id: "admin-convite", label: "Links de acesso" },
               { id: "admin-whatsapp", label: "WhatsApp" },
-              { id: "admin-usuarios", label: "Usuarios" },
+              { id: "admin-usuários", label: "Usuários" },
               { id: "admin-departamentos", label: "Departamentos" },
               { id: "admin-robo", label: "Robo URA" },
-              { id: "admin-aprovacao", label: "Aprovacao" },
+              { id: "admin-aprovação", label: "Aprovação" },
               { id: "admin-auditoria", label: "Auditoria" }
             ].map((item) => (
               <a
@@ -1218,7 +1218,7 @@ export function AdminView({ token, user }: Props) {
             <p className="font-semibold">Configuracoes da empresa</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            Nome, fuso horario e horario comercial usados na operacao do time.
+            Nome, fuso horario e horario comercial usados na operação do time.
             {companySettings ? ` · ID: ${companySettings.slug}` : null}
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1330,7 +1330,7 @@ export function AdminView({ token, user }: Props) {
               <p className="font-semibold">Login SSO (OIDC)</p>
             </div>
             <p className="mt-1 text-xs text-atlas-muted">
-              Google, Microsoft ou OIDC generico. Requer variaveis no servidor (SSO_PLAN.md).
+              Google, Microsoft ou OIDC generico. Requer variáveis no servidor (SSO_PLAN.md).
             </p>
             <label className="mt-4 flex items-center gap-2 text-sm">
               <input
@@ -1346,7 +1346,7 @@ export function AdminView({ token, user }: Props) {
                 checked={ssoSettings.jitProvisioning}
                 onChange={(e) => setSsoSettings((s) => (s ? { ...s, jitProvisioning: e.target.checked } : s))}
               />
-              Criar usuario automaticamente no primeiro login SSO
+              Criar usuário automaticamente no primeiro login SSO
             </label>
             <div className="mt-3 flex flex-wrap gap-3">
               {ssoSettings.availableProviders.map((provider) => (
@@ -1380,7 +1380,7 @@ export function AdminView({ token, user }: Props) {
             <p className="font-semibold">Integracoes (API e Webhooks)</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            Conecte CRM externo, Zapier, Make ou sistemas proprios. Documentacao em API.md e WEBHOOKS.md.
+            Conecte CRM externo, Zapier, Make ou sistemas proprios. Documentação em API.md e WEBHOOKS.md.
           </p>
 
           {lastCreatedApiKey ? (
@@ -1403,7 +1403,7 @@ export function AdminView({ token, user }: Props) {
               <div className="mt-3 flex gap-2">
                 <input
                   className="flex-1 rounded-xl bg-white/80 px-3 py-2 text-sm"
-                  placeholder="Nome da integracao"
+                  placeholder="Nome da integração"
                   value={apiKeyForm.name}
                   onChange={(e) => setApiKeyForm({ name: e.target.value })}
                 />
@@ -1529,7 +1529,7 @@ export function AdminView({ token, user }: Props) {
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-                  <p className="text-xs text-atlas-muted">Seats (usuarios)</p>
+                  <p className="text-xs text-atlas-muted">Seats (usuários)</p>
                   <p className="mt-1 text-2xl font-semibold">
                     {billingOverview.seats.used}/{billingOverview.seats.limit}
                   </p>
@@ -1563,13 +1563,13 @@ export function AdminView({ token, user }: Props) {
                     key={key}
                     className={`rounded-full px-2.5 py-1 ${enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}
                   >
-                    {key}: {enabled ? "sim" : "nao"}
+                    {key}: {enabled ? "sim" : "não"}
                   </span>
                 ))}
               </div>
               {!billingOverview.capabilities.canAddUser ? (
                 <p className="mt-3 text-xs font-medium text-amber-800">
-                  Limite de seats atingido. Faca upgrade do plano para convidar mais usuarios.
+                  Limite de seats atingido. Faca upgrade do plano para convidar mais usuários.
                 </p>
               ) : null}
               {billingOverview.plan.id !== "pro" ? (
@@ -1603,15 +1603,15 @@ export function AdminView({ token, user }: Props) {
               <div className="mt-5 rounded-2xl border border-white/70 bg-white/70 p-4">
                 <p className="text-sm font-semibold">Controle comercial manual</p>
                 <p className="mt-1 text-xs text-atlas-muted">
-                  Marque pagamento recebido, atraso ou bloqueio. Ideal enquanto o Asaas producao nao estiver ativo.
+                  Marque pagamento recebido, atraso ou bloqueio. Ideal enquanto o Asaas producao não estiver ativo.
                 </p>
                 <p className="mt-2 rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-[11px] text-blue-900">
-                  Transcricao de audio: configure <code>OPENAI_API_KEY</code> ou <code>GROQ_API_KEY</code> no servidor e reinicie a API
+                  Transcrição de audio: configure <code>OPENAI_API_KEY</code> ou <code>GROQ_API_KEY</code> no servidor e reinicie a API
                   (<code>pm2 restart atlas-api</code>). Groq tem tier gratuito com Whisper.
                 </p>
                 <textarea
                   className="mt-3 min-h-[64px] w-full rounded-xl bg-white/90 px-3 py-2 text-sm"
-                  placeholder="Observacao (ex: PIX recebido, boleto vencido, cliente em negociacao...)"
+                  placeholder="Observação (ex: PIX recebido, boleto vencido, cliente em negociação...)"
                   value={manualPaymentNote}
                   onChange={(e) => setManualPaymentNote(e.target.value)}
                 />
@@ -1628,11 +1628,11 @@ export function AdminView({ token, user }: Props) {
                 </div>
                 {billingOverview.billing.paymentHistory?.length ? (
                   <div className="mt-4 space-y-2">
-                    <p className="text-xs font-semibold text-slate-600">Historico manual recente</p>
+                    <p className="text-xs font-semibold text-slate-600">Histórico manual recente</p>
                     {billingOverview.billing.paymentHistory.slice(0, 5).map((entry, index) => (
                       <div key={`${String(entry.at)}-${index}`} className="rounded-xl bg-white/80 px-3 py-2 text-xs">
                         <p className="font-medium capitalize">{String(entry.status ?? "evento")}</p>
-                        <p className="text-slate-500">{entry.note ? String(entry.note) : "Sem observacao"}</p>
+                        <p className="text-slate-500">{entry.note ? String(entry.note) : "Sem observação"}</p>
                         <p className="text-[10px] text-slate-400">
                           {entry.at ? new Date(String(entry.at)).toLocaleString("pt-BR") : ""}
                         </p>
@@ -1679,11 +1679,11 @@ export function AdminView({ token, user }: Props) {
         </Card>
 
         <Card className="p-5">
-          <p className="text-sm font-semibold">Visao executiva da operacao</p>
+          <p className="text-sm font-semibold">Visao executiva da operação</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-atlas-muted">Usuarios do meu time</p>
+                <p className="text-xs text-atlas-muted">Usuários do meu time</p>
                 <Users size={16} className="text-atlas-blue" />
               </div>
               <p className="mt-2 text-2xl font-semibold">{users.length}</p>
@@ -1701,7 +1701,7 @@ export function AdminView({ token, user }: Props) {
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-atlas-muted">Numeros WhatsApp</p>
+                <p className="text-xs text-atlas-muted">Números WhatsApp</p>
                 <Smartphone size={16} className="text-atlas-blue" />
               </div>
               <p className="mt-2 text-2xl font-semibold">{instances.length}</p>
@@ -1716,7 +1716,7 @@ export function AdminView({ token, user }: Props) {
               </div>
               <p className="mt-2 text-2xl font-semibold">{tenantsCount || 1}</p>
               <p className="text-xs text-atlas-muted">
-                {tenantUsersTotal || users.length} usuarios · {tenantInstancesTotal || instances.length} numeros
+                {tenantUsersTotal || users.length} usuários · {tenantInstancesTotal || instances.length} números
               </p>
             </div>
           </div>
@@ -1729,8 +1729,8 @@ export function AdminView({ token, user }: Props) {
           </p>
           <div className="mt-3 grid gap-2 text-xs">
             <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
-              <p className="font-semibold">1) Qualificacao inicial (ate 10 min)</p>
-              <p className="text-atlas-muted">Confirmar nome, necessidade, orçamento e responsavel pela decisao.</p>
+              <p className="font-semibold">1) Qualificação inicial (ate 10 min)</p>
+              <p className="text-atlas-muted">Confirmar nome, necessidade, orçamento e responsável pela decisao.</p>
             </div>
             <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
               <p className="font-semibold">2) Registro no CRM</p>
@@ -1892,11 +1892,11 @@ export function AdminView({ token, user }: Props) {
             <p className="font-semibold">Links para teste e cadastro</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            Envie estes links para a pessoa testar o Atlas One no computador dela. Solicitacoes de equipe aparecem em Aprovacao.
+            Envie estes links para a pessoa testar o Atlas One no computador dela. Solicitacoes de equipe aparecem em Aprovação.
           </p>
           <div className="mt-4 space-y-3">
             <div className="rounded-2xl border border-white/70 bg-white/75 p-3">
-              <p className="text-xs font-semibold text-slate-700">Pagina de demonstracao</p>
+              <p className="text-xs font-semibold text-slate-700">Pagina de demonstração</p>
               <p className="mt-1 break-all text-xs text-slate-500">
                 {typeof window !== "undefined" ? `${window.location.origin}/teste` : "/teste"}
               </p>
@@ -1939,7 +1939,7 @@ export function AdminView({ token, user }: Props) {
             <div className="flex items-center gap-3">
               <Shield className="text-atlas-blue" />
               <div>
-                <p className="font-semibold">{activeInstance?.label ?? "Nenhum numero selecionado"}</p>
+                <p className="font-semibold">{activeInstance?.label ?? "Nenhum número selecionado"}</p>
                 <p className="text-xs text-atlas-muted">
                   {activeInstance
                     ? `Instancia: ${activeInstance.name}${activeInstance.phone ? ` · Telefone: ${activeInstance.phone}` : ""}`
@@ -1957,7 +1957,7 @@ export function AdminView({ token, user }: Props) {
                 value={selectedInstance}
                 onChange={(e) => setSelectedInstance(e.target.value)}
               >
-                <option value="">Selecionar numero</option>
+                <option value="">Selecionar número</option>
                 {instances.map((instance) => (
                   <option key={instance.id || instance.name} value={instance.name}>
                     {instance.label || instance.name} ({instance.name})
@@ -1984,11 +1984,11 @@ export function AdminView({ token, user }: Props) {
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-              <p className="text-[11px] font-semibold text-atlas-muted">Proxima acao recomendada</p>
+              <p className="text-[11px] font-semibold text-atlas-muted">Proxima ação recomendada</p>
               <p className="mt-1 text-xs text-slate-700">{recommendedAction}</p>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-              <p className="text-[11px] font-semibold text-atlas-muted">Ultima sincronizacao webhook</p>
+              <p className="text-[11px] font-semibold text-atlas-muted">Ultima sincronização webhook</p>
               <p className="mt-1 text-xs text-slate-700">{formatDateTime(activeInstance?.lastSyncAt)}</p>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
@@ -2001,9 +2001,9 @@ export function AdminView({ token, user }: Props) {
           <p className="mt-2 text-xs text-atlas-muted">
             {activeInstance
               ? `Numero selecionado: ${activeInstance.label} (${activeInstance.name}). ${
-                  isConnected ? "Ja conectado." : "Ainda nao conectado."
+                  isConnected ? "Já conectado." : "Ainda não conectado."
                 }`
-              : "Selecione um numero para iniciar conexao via QR."}{" "}
+              : "Selecione um número para iniciar conexão via QR."}{" "}
             Use Conectar QR para parear, Desconectar para encerrar e Sync webhook para atualizar o endpoint.
           </p>
           {message ? <p className="mt-3 text-sm">{message}</p> : null}
@@ -2013,7 +2013,7 @@ export function AdminView({ token, user }: Props) {
         </Card>
 
         <Card className="p-5">
-          <p className="font-semibold">Adicionar numero de WhatsApp</p>
+          <p className="font-semibold">Adicionar número de WhatsApp</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <input
               className="rounded-xl bg-white/80 px-3 py-2 text-sm"
@@ -2035,12 +2035,12 @@ export function AdminView({ token, user }: Props) {
             />
           </div>
           <Button className="mt-4" onClick={createNumber}>
-            <Plus size={16} /> Adicionar numero
+            <Plus size={16} /> Adicionar número
           </Button>
         </Card>
 
-        <Card id="admin-usuarios" className="scroll-mt-24 p-5">
-          <p className="font-semibold">Novo usuario</p>
+        <Card id="admin-usuários" className="scroll-mt-24 p-5">
+          <p className="font-semibold">Novo usuário</p>
           <p className="mt-1 text-xs text-atlas-muted">
             Crie com senha imediata ou envie um link de convite valido por 7 dias.
           </p>
@@ -2059,7 +2059,7 @@ export function AdminView({ token, user }: Props) {
             />
             <input
               className="rounded-xl bg-white/80 px-3 py-2 text-sm"
-              placeholder="Senha (criacao direta)"
+              placeholder="Senha (criação direta)"
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -2146,7 +2146,7 @@ export function AdminView({ token, user }: Props) {
                 <div>
                   <p className="font-semibold">{team.name}</p>
                   <p className="text-atlas-muted">
-                    Gerente: {users.find((u) => u.id === team.managerId)?.name ?? "Nao definido"}
+                    Gerente: {users.find((u) => u.id === team.managerId)?.name ?? "Não definido"}
                   </p>
                 </div>
                 <Button variant="glass" className="h-7 px-2" onClick={() => void removeDepartment(team)} aria-label={`Excluir ${team.name}`}>
@@ -2190,7 +2190,7 @@ export function AdminView({ token, user }: Props) {
             />
             <textarea
               className="min-h-[56px] rounded-xl bg-white/80 px-3 py-2 text-sm"
-              placeholder="Resposta quando a opcao for invalida"
+              placeholder="Resposta quando a opção for invalida"
               value={menuBotForm.invalidReply}
               onChange={(e) => setMenuBotForm((s) => ({ ...s, invalidReply: e.target.value }))}
             />
@@ -2209,7 +2209,7 @@ export function AdminView({ token, user }: Props) {
                 }
               >
                 <Plus size={13} />
-                Adicionar opcao
+                Adicionar opção
               </Button>
             </div>
             {menuBotForm.options.map((option, index) => (
@@ -2227,7 +2227,7 @@ export function AdminView({ token, user }: Props) {
                 />
                 <input
                   className="rounded-lg bg-white px-2 py-1.5 text-sm"
-                  placeholder="Texto da opcao (ex: Comercial)"
+                  placeholder="Texto da opção (ex: Comercial)"
                   value={option.label}
                   onChange={(e) =>
                     setMenuBotForm((s) => ({
@@ -2264,7 +2264,7 @@ export function AdminView({ token, user }: Props) {
                       options: s.options.filter((_, rowIndex) => rowIndex !== index)
                     }))
                   }
-                  aria-label="Remover opcao"
+                  aria-label="Remover opção"
                 >
                   <Trash2 size={13} />
                 </Button>
@@ -2272,9 +2272,9 @@ export function AdminView({ token, user }: Props) {
             ))}
             {!menuBotForm.options.length ? (
               <EmptyState
-                title="Nenhuma opcao configurada"
+                title="Nenhuma opção configurada"
                 description="Adicione opcoes como 1 Comercial, 2 Suporte, 3 Financeiro."
-                actionLabel="Adicionar primeira opcao"
+                actionLabel="Adicionar primeira opção"
               />
             ) : null}
           </div>
@@ -2283,9 +2283,9 @@ export function AdminView({ token, user }: Props) {
           </Button>
         </Card>
 
-        <Card id="admin-aprovacao" className="scroll-mt-24 p-5">
-          <p className="font-semibold">Aprovacao de acessos pendentes</p>
-          <p className="mt-1 text-xs text-atlas-muted">Solicitacoes de equipe aguardando autorizacao do dono.</p>
+        <Card id="admin-aprovação" className="scroll-mt-24 p-5">
+          <p className="font-semibold">Aprovação de acessos pendentes</p>
+          <p className="mt-1 text-xs text-atlas-muted">Solicitacoes de equipe aguardando autorização do dono.</p>
           <div className="mt-3 space-y-2">
             {accessRequests.map((req) => (
               <div key={req.id} className="rounded-2xl border border-white/70 bg-white/70 px-3 py-3">
@@ -2312,8 +2312,8 @@ export function AdminView({ token, user }: Props) {
             ))}
             {!accessRequests.length ? (
               <EmptyState
-                title="Nenhuma solicitacao pendente"
-                description="Quando alguem pedir acesso pela aba Equipe no login, aparecera aqui para aprovacao."
+                title="Nenhuma solicitação pendente"
+                description="Quando alguem pedir acesso pela aba Equipe no login, aparecera aqui para aprovação."
               />
             ) : null}
           </div>
@@ -2354,7 +2354,7 @@ export function AdminView({ token, user }: Props) {
             <div className="mt-4">
               <EmptyState
                 title="Equipe vazia"
-                description="Convide colegas por link ou crie usuarios com senha para comecar a operar."
+                description="Convide colegas por link ou crie usuários com senha para comecar a operar."
               />
             </div>
           )}
@@ -2363,7 +2363,7 @@ export function AdminView({ token, user }: Props) {
               <p className="text-sm font-semibold">Acoes rapidas · {selectedUser.name}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button variant="glass" onClick={removeSelectedUser}>
-                  <Trash2 size={14} /> Excluir usuario
+                  <Trash2 size={14} /> Excluir usuário
                 </Button>
                 <Button
                   variant="glass"
@@ -2384,7 +2384,7 @@ export function AdminView({ token, user }: Props) {
         </Card>
 
         <Card className="p-5">
-          <p className="font-semibold">Numeros salvos</p>
+          <p className="font-semibold">Números salvos</p>
           <div className="mt-3 space-y-2">
             {instances.map((instance) => (
               <div key={instance.id || instance.name} className="flex items-center justify-between rounded-2xl bg-white/70 px-3 py-2 text-sm">
@@ -2405,7 +2405,7 @@ export function AdminView({ token, user }: Props) {
                 </div>
               </div>
             ))}
-            {!instances.length ? <p className="text-xs text-atlas-muted">Nenhum numero salvo.</p> : null}
+            {!instances.length ? <p className="text-xs text-atlas-muted">Nenhum número salvo.</p> : null}
           </div>
         </Card>
 
@@ -2423,7 +2423,7 @@ export function AdminView({ token, user }: Props) {
               <option value="">Todas acoes</option>
               <option value="auth_login_success">Login OK</option>
               <option value="auth_logout">Logout</option>
-              <option value="data_export">Exportacao</option>
+              <option value="data_export">Exportação</option>
               <option value="permissions_updated">Permissoes</option>
               <option value="api_key_created">Chave API</option>
             </select>
@@ -2433,9 +2433,9 @@ export function AdminView({ token, user }: Props) {
               onChange={(e) => setAuditEntityFilter(e.target.value)}
             >
               <option value="">Todas entidades</option>
-              <option value="Auth">Autenticacao</option>
+              <option value="Auth">Autenticação</option>
               <option value="User">Usuario</option>
-              <option value="Export">Exportacao</option>
+              <option value="Export">Exportação</option>
               <option value="ApiKey">API</option>
               <option value="WebhookEndpoint">Webhook</option>
             </select>
@@ -2454,7 +2454,7 @@ export function AdminView({ token, user }: Props) {
         {isOwner ? <Card className="p-5">
           <p className="font-semibold">Reset operacional (owner)</p>
           <p className="mt-1 text-xs text-atlas-muted">
-            Apaga usuarios, numeros, conversas, CRM e automacoes. Mantem apenas um novo dono com 2FA obrigatorio.
+            Apaga usuários, números, conversas, CRM e automacoes. Mantem apenas um novo dono com 2FA obrigatorio.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <input

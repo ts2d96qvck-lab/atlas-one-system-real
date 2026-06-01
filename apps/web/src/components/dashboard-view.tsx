@@ -43,9 +43,9 @@ export function DashboardView({ token }: Props) {
       pipeline: {
         "Novos leads": { count: 0, value: 0 },
         "Contato feito": { count: 0, value: 0 },
-        "Reuniao marcada": { count: 0, value: 0 },
+        "Reunião marcada": { count: 0, value: 0 },
         "Proposta enviada": { count: 0, value: 0 },
-        Negociacao: { count: 0, value: 0 },
+        Negociação: { count: 0, value: 0 },
         Fechado: { count: 0, value: 0 },
         Perdido: { count: 0, value: 0 }
       },
@@ -86,14 +86,14 @@ export function DashboardView({ token }: Props) {
     fetch(`${apiUrl()}/dashboard`, { headers: { authorization: `Bearer ${token}` } })
       .then(async (r) => {
         if (!r.ok) {
-          setError("Dashboard indisponivel no momento. Exibindo dados padrao.");
+          setError("Painel indisponível no momento. Exibindo dados padrao.");
           return emptyDashboard();
         }
         return r.json();
       })
       .then((payload) => setData(payload ?? emptyDashboard()))
       .catch(() => {
-        setError("Dashboard indisponivel no momento. Exibindo dados padrao.");
+        setError("Painel indisponível no momento. Exibindo dados padrao.");
         setData(emptyDashboard());
       });
   }, [token]);
@@ -183,7 +183,7 @@ export function DashboardView({ token }: Props) {
 
   const projectionRows = [
     { label: "Real fechado", value: closedRevenue, tone: "bg-slate-300" },
-    { label: "Equipe (input)", value: projectedRevenueByTeamInput, tone: "bg-cyan-400" },
+    { label: "Equipe (simulação)", value: projectedRevenueByTeamInput, tone: "bg-cyan-400" },
     { label: "Conservador", value: Number(salesForecast.conservative ?? 0), tone: "bg-amber-300" },
     { label: "Realista", value: Number(salesForecast.realistic ?? 0), tone: "bg-blue-400" },
     { label: "Otimista", value: Number(salesForecast.optimistic ?? 0), tone: "bg-emerald-400" },
@@ -230,13 +230,13 @@ export function DashboardView({ token }: Props) {
               <BarChart3 size={20} />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Atlas One Control</p>
-              <h1 className="text-2xl font-semibold text-slate-900 lg:text-3xl">Performance Cockpit</h1>
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Atlas One</p>
+              <h1 className="text-2xl font-semibold text-slate-900 lg:text-3xl">Painel de performance</h1>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-right backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Confianca da previsao</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Confiança da previsão</p>
               <p className="text-xl font-semibold text-slate-900">{toPercent(Number(metrics.confidenceLevel ?? 0))}</p>
             </div>
             <Button
@@ -346,7 +346,7 @@ export function DashboardView({ token }: Props) {
             <p className="mt-1 text-lg font-semibold text-slate-900">{toMoney(Number(metrics.gapToTarget ?? 0))}</p>
           </Card>
           <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Run rate mensal</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Ritmo mensal</p>
             <p className="mt-1 text-lg font-semibold text-slate-900">{toMoney(Number(salesForecast.runRateRevenue ?? 0))}</p>
           </Card>
         </div>
@@ -444,7 +444,7 @@ export function DashboardView({ token }: Props) {
             </div>
             <div className="mt-3 grid gap-2">
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-                <strong>Simulador (nao altera a meta oficial).</strong> Use estes campos apenas para projetar cenarios:
+                <strong>Simulador (não altera a meta oficial).</strong> Use estes campos apenas para projetar cenarios:
                 reunioes × taxa de fechamento = negocios previstos; negocios × ticket + extra = receita simulada.
               </p>
               <label className="text-[11px] font-medium text-slate-600">
@@ -481,7 +481,7 @@ export function DashboardView({ token }: Props) {
                   value={projectionInput.averageTicket}
                   onChange={(e) => setProjectionInput((s) => ({ ...s, averageTicket: e.target.value }))}
                 />
-                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Valor medio de cada negocio fechado na simulacao.</span>
+                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Valor medio de cada negocio fechado na simulação.</span>
               </label>
               <label className="text-[11px] font-medium text-slate-600">
                 Receita extra prevista (R$)
@@ -496,20 +496,20 @@ export function DashboardView({ token }: Props) {
               </label>
             </div>
             <div className="mt-3 rounded-lg bg-cyan-50 px-3 py-2 text-[11px] text-cyan-950">
-              Resultado da simulacao: <strong>{projectedClosedByTeamInput} fechamentos</strong> ·{" "}
+              Resultado da simulação: <strong>{projectedClosedByTeamInput} fechamentos</strong> ·{" "}
               <strong>{toMoney(projectedRevenueByTeamInput)}</strong> de receita projetada.
             </div>
             <div className="mt-3 rounded-lg bg-white/90 px-3 py-2 text-xs">
               <p className="text-slate-500">Meta oficial do mes (CRM / Admin)</p>
               <p className="mt-1 text-base font-semibold text-slate-900">{toMoney(targetRevenue)}</p>
-              <p className="mt-1 text-[10px] text-slate-500">Defina em Admin → Metas comerciais. O gauge usa esta meta, nao a simulacao.</p>
+              <p className="mt-1 text-[10px] text-slate-500">Defina em Admin → Metas comerciais. O gauge usa esta meta, não a simulação.</p>
             </div>
             </Card>
 
           <Card className="lg:col-span-7 border border-white/70 bg-white/75 p-4 backdrop-blur">
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Pipeline intensity</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Intensidade do funil</p>
                 <p className="text-lg font-semibold text-slate-900">Etapas com maior valor em aberto</p>
               </div>
               <Activity size={18} className="text-slate-600" />
@@ -538,8 +538,8 @@ export function DashboardView({ token }: Props) {
           <Card className="lg:col-span-5 border border-white/70 bg-white/75 p-4 backdrop-blur">
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">WhatsApp operations</p>
-                <p className="text-lg font-semibold text-slate-900">Numeros conectados</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Operação WhatsApp</p>
+                <p className="text-lg font-semibold text-slate-900">Números conectados</p>
               </div>
               <Gauge size={18} className="text-slate-700" />
             </div>
@@ -591,7 +591,7 @@ export function DashboardView({ token }: Props) {
                   </div>
                 );
               })}
-              {!instances.length ? <p className="text-xs text-slate-500">Sem numeros cadastrados.</p> : null}
+              {!instances.length ? <p className="text-xs text-slate-500">Sem números cadastrados.</p> : null}
             </div>
           </Card>
         </div>
@@ -599,8 +599,8 @@ export function DashboardView({ token }: Props) {
         <Card className="mt-3 border border-white/70 bg-white/75 p-4 backdrop-blur">
           <div className="mb-2 flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Team leaderboard</p>
-              <p className="text-lg font-semibold text-slate-900">Desempenho por responsavel</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Ranking da equipe</p>
+              <p className="text-lg font-semibold text-slate-900">Desempenho por responsável</p>
             </div>
             <Zap size={18} className="text-slate-700" />
           </div>

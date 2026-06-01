@@ -27,16 +27,17 @@ import { AutomationsView } from "./automations-view";
 import { CampaignsView } from "./campaigns-view";
 import { CrmView } from "./crm-view";
 import { DashboardView } from "./dashboard-view";
+import { NAV, roleLabel } from "../lib/product-copy";
 
 const STORAGE_KEY = "atlas-one-session-v2";
 
 const views = [
-  { id: "inbox", label: "Inbox" },
-  { id: "dashboard", label: "Dashboard" },
-  { id: "admin", label: "Admin" },
-  { id: "crm", label: "CRM" },
-  { id: "campanhas", label: "Campanhas" },
-  { id: "automacoes", label: "Automacao" }
+  { id: "inbox", label: NAV.inbox },
+  { id: "dashboard", label: NAV.dashboard },
+  { id: "admin", label: NAV.admin },
+  { id: "crm", label: NAV.crm },
+  { id: "campanhas", label: NAV.campanhas },
+  { id: "automacoes", label: NAV.automacoes }
 ] as const;
 
 export type AtlasView = (typeof views)[number]["id"];
@@ -141,10 +142,10 @@ export function AtlasShell() {
         const res = await fetch(`${window.location.origin}/auth/me`, {
           headers: { authorization: `Bearer ${ssoToken}` }
         });
-        if (!res.ok) throw new Error("Sessao SSO invalida");
+        if (!res.ok) throw new Error("Sessão SSO inválida");
         const body = (await res.json()) as { user: SessionUser };
         const next = toAppSession({ token: ssoToken, user: body.user });
-        if (!next) throw new Error("Sessao SSO invalida");
+        if (!next) throw new Error("Sessão SSO inválida");
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         setSession(next);
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -188,7 +189,7 @@ export function AtlasShell() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(friendlyError(err instanceof Error ? err.message : "Convite invalido"));
+        setError(friendlyError(err instanceof Error ? err.message : "Convite inválido"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -296,7 +297,7 @@ export function AtlasShell() {
         setCanCreateOwner(status.canBootstrap);
         if (!status.canBootstrap && authMode === "register") {
           setAuthMode("login");
-          setInfo("Esta empresa ja possui cadastro. Entre ou solicite acesso como equipe.");
+          setInfo("Esta empresa já possui cadastro. Entre ou solicite acesso como equipe.");
         }
       })
       .catch(() => {
@@ -345,7 +346,7 @@ export function AtlasShell() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toAppSession(result)));
       commitSession(result);
     } catch (err) {
-      setError(friendlyError(err instanceof Error ? err.message : "Login invalido"));
+      setError(friendlyError(err instanceof Error ? err.message : "Login inválido"));
     } finally {
       setLoading(false);
     }
@@ -370,7 +371,7 @@ export function AtlasShell() {
           window.history.replaceState({}, "", window.location.pathname);
         }
       } catch (err) {
-        setError(friendlyError(err instanceof Error ? err.message : "Nao foi possivel aceitar convite"));
+        setError(friendlyError(err instanceof Error ? err.message : "Não foi possível aceitar convite"));
       } finally {
         setLoading(false);
       }
@@ -389,7 +390,7 @@ export function AtlasShell() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toAppSession(result)));
       commitSession(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Codigo invalido");
+      setError(err instanceof Error ? err.message : "Código inválido");
     } finally {
       setLoading(false);
     }
@@ -404,12 +405,12 @@ export function AtlasShell() {
       const result = await requestPasswordReset(tenantSlug, email);
       if (result.challengeId) {
         setResetChallengeId(result.challengeId);
-        setInfo(`Codigo enviado para ${result.maskedPhone}. Informe o codigo e a nova senha.`);
+        setInfo(`Código enviado para ${result.maskedPhone}. Informe o código e a nova senha.`);
       } else {
-        setInfo("Se existir conta com SMS ativo, o codigo foi enviado para o telefone cadastrado.");
+        setInfo("Se existir conta com SMS ativo, o código foi enviado para o telefone cadastrado.");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao solicitar recuperacao");
+      setError(err instanceof Error ? err.message : "Falha ao solicitar recuperação");
     } finally {
       setLoading(false);
     }
@@ -422,7 +423,7 @@ export function AtlasShell() {
     setInfo("");
     try {
       await confirmPasswordReset(resetChallengeId, resetCode, newPassword);
-      setInfo("Senha alterada com sucesso. Voce ja pode entrar.");
+      setInfo("Senha alterada com sucesso. Você já pode entrar.");
       setAuthMode("login");
       setResetCode("");
       setResetChallengeId("");
@@ -449,10 +450,10 @@ export function AtlasShell() {
           ownerPassword: password,
           ownerPhone
         });
-        setInfo("Conta criada com sucesso. Faca login e confirme o codigo no WhatsApp.");
+        setInfo("Conta criada com sucesso. Faça login e confirme o código no WhatsApp.");
         setAuthMode("login");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Falha ao criar conta dona");
+        setError(err instanceof Error ? err.message : "Falha ao criar conta da empresa");
       } finally {
         setLoading(false);
       }
@@ -497,10 +498,9 @@ export function AtlasShell() {
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Atlas One</h1>
             <p className="mt-1 text-sm text-atlas-muted">Plataforma de atendimento e vendas</p>
-            <p className="mt-2 text-xs text-slate-500">Acesso local: app.atlasone.local.gd</p>
             {typeof window !== "undefined" && window.location.protocol === "https:" ? (
-              <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                Conexao segura
+              <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                Conexão segura
               </p>
             ) : null}
           </div>
@@ -536,16 +536,16 @@ export function AtlasShell() {
               {challengeRole === "owner" ? (
                 <div className="rounded-2xl border border-blue-200/80 bg-blue-50/70 p-3">
                   <p className="text-sm font-semibold text-blue-900">
-                    {ownerFirstAccess ? "Primeiro acesso do dono" : "Acesso de dono confirmado"}
+                    {ownerFirstAccess ? "Primeiro acesso do proprietário" : "Acesso de proprietário confirmado"}
                   </p>
                   <p className="text-xs text-blue-800">
-                    Validacao em duas etapas obrigatoria para conta proprietaria.
+                    Validação em duas etapas obrigatória para conta proprietária.
                   </p>
                 </div>
               ) : null}
-              <p className="text-sm text-atlas-muted">Confirme o codigo enviado no WhatsApp para {maskedPhone}.</p>
+              <p className="text-sm text-atlas-muted">Confirme o código enviado no WhatsApp para {maskedPhone}.</p>
               <label className="block text-sm">
-                <span className="text-atlas-muted">Codigo (6 digitos)</span>
+                <span className="text-atlas-muted">Código (6 dígitos)</span>
                 <input
                   className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                   value={smsCode}
@@ -578,7 +578,7 @@ export function AtlasShell() {
             <div className="space-y-4">
               <form className="space-y-3" onSubmit={handleRequestReset}>
                 <label className="block text-sm">
-                  <span className="text-atlas-muted">Empresa (ID da empresa)</span>
+                <span className="text-atlas-muted">Identificador da empresa</span>
                   <input
                     className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                     value={tenantSlug}
@@ -602,10 +602,10 @@ export function AtlasShell() {
               </form>
               <form className="space-y-3" onSubmit={handleConfirmReset}>
                 {resetChallengeId ? (
-                  <p className="text-xs text-atlas-muted">Codigo enviado. Informe o SMS e a nova senha abaixo.</p>
+                  <p className="text-xs text-atlas-muted">Código enviado. Informe o SMS e a nova senha abaixo.</p>
                 ) : null}
                 <label className="block text-sm">
-                  <span className="text-atlas-muted">Codigo SMS</span>
+                  <span className="text-atlas-muted">Código SMS</span>
                   <input
                     className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                     value={resetCode}
@@ -641,8 +641,7 @@ export function AtlasShell() {
                 <div className="rounded-2xl border border-blue-200/80 bg-blue-50/70 p-3 dark:border-blue-900/50 dark:bg-blue-950/30">
                   <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Convite para {invitePreview.tenantName}</p>
                   <p className="mt-1 text-xs text-blue-800 dark:text-blue-200">
-                    Ola, {invitePreview.name}. Defina sua senha para entrar como{" "}
-                    {invitePreview.role === "admin" ? "administrador" : invitePreview.role === "supervisor" ? "supervisor" : "atendente"}.
+                    Olá, {invitePreview.name}. Defina sua senha para entrar como {roleLabel(invitePreview.role)}.
                   </p>
                   <p className="mt-1 text-[10px] text-blue-700 dark:text-blue-300">{invitePreview.email}</p>
                 </div>
@@ -679,13 +678,13 @@ export function AtlasShell() {
                   if (typeof window !== "undefined") window.history.replaceState({}, "", window.location.pathname);
                 }}
               >
-                Ja tenho conta
+                Já tenho conta
               </Button>
             </form>
           ) : authMode === "register" ? (
             <form className="space-y-4" onSubmit={handleBootstrapOwner}>
               <p className="text-sm text-atlas-muted">
-                Primeiro acesso da sua empresa: crie a conta do responsavel (dono/contratante).
+                Primeiro acesso da sua empresa: crie a conta do responsável (proprietário/contratante).
               </p>
               <label className="block text-sm">
                 <span className="text-atlas-muted">Nome da empresa</span>
@@ -697,7 +696,7 @@ export function AtlasShell() {
                 />
               </label>
               <label className="block text-sm">
-                  <span className="text-atlas-muted">Empresa (ID da empresa)</span>
+                <span className="text-atlas-muted">Identificador da empresa</span>
                 <input
                   className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                   value={tenantSlug}
@@ -707,7 +706,7 @@ export function AtlasShell() {
                 />
               </label>
               <label className="block text-sm">
-                <span className="text-atlas-muted">Seu nome (dono)</span>
+                <span className="text-atlas-muted">Seu nome (proprietário)</span>
                 <input
                   className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                   value={ownerName}
@@ -725,7 +724,7 @@ export function AtlasShell() {
                 />
               </label>
               <label className="block text-sm">
-                <span className="text-atlas-muted">E-mail do dono</span>
+                <span className="text-atlas-muted">E-mail do proprietário</span>
                 <input
                   className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                   value={email}
@@ -753,20 +752,20 @@ export function AtlasShell() {
               </Button>
               {!canCreateOwner ? (
                 <p className="text-xs text-amber-700 dark:text-amber-300">
-                  Este ID de empresa ja esta em uso. Entre na aba Entrar ou use outro ID.
+                  Este identificador de empresa já está em uso. Entre na aba Entrar ou use outro ID.
                 </p>
               ) : null}
               <Button className="w-full" variant="glass" type="button" onClick={() => setAuthMode("login")}>
-                Ja tenho conta
+                Já tenho conta
               </Button>
             </form>
           ) : authMode === "team" ? (
             <form className="space-y-4" onSubmit={handleRequestAccess}>
               <p className="text-sm text-atlas-muted">
-                Voce faz parte da equipe? Solicite acesso. O responsavel da empresa aprova no painel Admin.
+                Você faz parte da equipe? Solicite acesso. O responsável da empresa aprova na Administração.
               </p>
               <label className="block text-sm">
-                  <span className="text-atlas-muted">Empresa (ID da empresa)</span>
+                <span className="text-atlas-muted">Identificador da empresa</span>
                 <input
                   className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                   value={tenantSlug}
@@ -860,7 +859,7 @@ export function AtlasShell() {
               </Button>
               {ssoProviders.length ? (
                 <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-                  <p className="text-center text-xs text-atlas-muted">ou entre com SSO</p>
+                  <p className="text-center text-xs text-atlas-muted">ou entre com SSO corporativo</p>
                   {ssoProviders.map((provider) => (
                     <Button
                       key={provider.id}
@@ -916,7 +915,7 @@ export function AtlasShell() {
             );
           })}
         </div>
-        <div className="text-[10px] text-slate-500">ao vivo · {liveAt}</div>
+        <div className="text-[10px] text-slate-500">atualizado · {liveAt}</div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 pt-2 sm:pb-28">

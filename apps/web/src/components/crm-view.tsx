@@ -63,7 +63,7 @@ function AgentAssigneeSelect({
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="">Sem responsavel</option>
+      <option value="">Sem responsável</option>
       {agents.map((agent) => (
         <option key={agent.id} value={agent.id}>
           {agent.name}
@@ -133,12 +133,12 @@ export function CrmView({ token }: Props) {
   }
 
   async function removeLead(lead: Lead) {
-    const ok = window.confirm(`Excluir lead ${lead.company}? Essa acao nao pode ser desfeita.`);
+    const ok = window.confirm(`Excluir lead ${lead.company}? Essa ação não pode ser desfeita.`);
     if (!ok) return;
     setDeletingLeadId(lead.id);
     try {
       await deleteLead(token, lead.id);
-      setFeedback({ type: "success", text: `Lead ${lead.company} excluido com sucesso.` });
+      setFeedback({ type: "success", text: `Lead ${lead.company} excluído com sucesso.` });
       await load();
     } catch (err) {
       setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao excluir lead" });
@@ -332,10 +332,10 @@ export function CrmView({ token }: Props) {
                           {lead.assignedTo?.name ? agentInitials(lead.assignedTo.name) : "—"}
                         </span>
                         <p className="text-[11px] text-atlas-muted">
-                          {lead.assignedTo?.name ?? "Sem responsavel"}
+                          {lead.assignedTo?.name ?? "Sem responsável"}
                         </p>
                       </div>
-                      <p className="text-[11px] text-atlas-muted">{lead.phone ? `Telefone: ${lead.phone}` : "Telefone nao informado"}</p>
+                      <p className="text-[11px] text-atlas-muted">{lead.phone ? `Telefone: ${lead.phone}` : "Telefone não informado"}</p>
                       <p className="text-[11px] text-atlas-muted">
                         Fechamento previsto: {lead.expectedCloseDate ? formatDate(lead.expectedCloseDate) : "Sem previsao"}
                       </p>

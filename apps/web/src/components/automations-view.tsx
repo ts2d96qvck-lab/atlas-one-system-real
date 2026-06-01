@@ -53,7 +53,7 @@ export function AutomationsView({ token }: Props) {
 
   async function create() {
     if (!form.name.trim()) {
-      setError("Informe um nome para a automacao.");
+      setError("Informe um nome para a automação.");
       return;
     }
     const response = await fetch(`${apiUrl()}/automations`, {
@@ -77,7 +77,7 @@ export function AutomationsView({ token }: Props) {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao criar automacao");
+      setError(body?.error ?? "Falha ao criar automação");
       return;
     }
     setForm({
@@ -92,7 +92,7 @@ export function AutomationsView({ token }: Props) {
       scheduleTime: "",
       audioUrl: ""
     });
-    setInfo("Automacao criada com sucesso.");
+    setInfo("Automação criada com sucesso.");
     setError("");
     await load();
   }
@@ -105,23 +105,23 @@ export function AutomationsView({ token }: Props) {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao atualizar automacao");
+      setError(body?.error ?? "Falha ao atualizar automação");
       return;
     }
-    setInfo(enabled ? "Automacao pausada." : "Automacao reativada.");
+    setInfo(enabled ? "Automação pausada." : "Automação reativada.");
     setError("");
     await load();
   }
 
   async function remove(id: string, name: string) {
-    if (!window.confirm(`Excluir automacao "${name}"?`)) return;
+    if (!window.confirm(`Excluir automação "${name}"?`)) return;
     const response = await fetch(`${apiUrl()}/automations/${id}`, { method: "DELETE", headers });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao excluir automacao");
+      setError(body?.error ?? "Falha ao excluir automação");
       return;
     }
-    setInfo("Automacao excluida.");
+    setInfo("Automação excluída.");
     setError("");
     await load();
   }
@@ -138,9 +138,9 @@ export function AutomationsView({ token }: Props) {
         </header>
 
         <Card className="p-5">
-          <p className="font-semibold">Nova automacao</p>
+          <p className="font-semibold">Nova automação</p>
           <p className="mt-1 text-xs text-atlas-muted">
-            Use variaveis no texto: {"{{customer_name}}"}, {"{{lead_status}}"}, {"{{lead_value}}"}.
+            Use variáveis no texto: {"{{customer_name}}"}, {"{{lead_status}}"}, {"{{lead_value}}"}.
           </p>
           <div className="mt-4 space-y-3">
             <input
@@ -180,7 +180,7 @@ export function AutomationsView({ token }: Props) {
               onChange={(e) => setForm({ ...form, sendType: e.target.value })}
             >
               <option value="text">Enviar texto</option>
-              <option value="audit">Somente auditoria (nao envia mensagem)</option>
+              <option value="audit">Somente auditoria (não envia mensagem)</option>
             </select>
             <input
               className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
@@ -228,15 +228,15 @@ export function AutomationsView({ token }: Props) {
                   <p className="font-semibold">{item.name}</p>
                   <p className="text-sm text-atlas-muted">{item.trigger}</p>
                   <p className="mt-1 text-xs text-atlas-muted">
-                    Acao: {String(item.config?.sendType ?? "text")} · Horario comercial:{" "}
-                    {item.config?.onlyBusinessHours ? "sim" : "nao"}
+                    Ação: {String(item.config?.sendType ?? "text")} · Horario comercial:{" "}
+                    {item.config?.onlyBusinessHours ? "sim" : "não"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="glass" onClick={() => toggle(item.id, item.enabled)}>
                     <Badge>{item.enabled ? "Ativa" : "Pausada"}</Badge>
                   </Button>
-                  <Button variant="glass" onClick={() => remove(item.id, item.name)} aria-label="Excluir automacao">
+                  <Button variant="glass" onClick={() => remove(item.id, item.name)} aria-label="Excluir automação">
                     <Trash2 size={16} />
                   </Button>
                 </div>

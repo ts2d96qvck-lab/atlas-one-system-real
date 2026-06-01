@@ -25,7 +25,7 @@ const STATUS_LABEL: Record<string, string> = {
   scheduled: "Agendada",
   running: "Enviando",
   paused: "Pausada",
-  completed: "Concluida",
+  completed: "Concluída",
   cancelled: "Cancelada"
 };
 
@@ -86,7 +86,7 @@ export function CampaignsView({ token }: Props) {
       return;
     }
     if (!form.recipientsText.trim()) {
-      setError("Informe os destinatarios (um telefone por linha).");
+      setError("Informe os destinatários (um telefone por linha).");
       return;
     }
     const response = await fetch(`${apiUrl()}/campaigns`, {
@@ -137,7 +137,7 @@ export function CampaignsView({ token }: Props) {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? body?.details ?? "Falha na acao");
+      setError(body?.error ?? body?.details ?? "Falha na ação");
       return;
     }
     setInfo(
@@ -147,7 +147,7 @@ export function CampaignsView({ token }: Props) {
           ? "Campanha pausada."
           : kind === "cancel"
             ? "Campanha cancelada."
-            : "Campanha excluida."
+            : "Campanha excluída."
     );
     setError("");
     await load();
@@ -167,7 +167,7 @@ export function CampaignsView({ token }: Props) {
         <Card className="p-5">
           <p className="font-semibold">Nova campanha</p>
           <p className="mt-1 text-xs text-atlas-muted">
-            Destinatarios: um telefone por linha. Opcional: <code>5517999999999,Nome</code>. Variaveis:{" "}
+            Destinatários: um telefone por linha. Opcional: <code>5517999999999,Nome</code>. Variáveis:{" "}
             {"{{customer_name}}"}.
           </p>
           <div className="mt-4 space-y-3">

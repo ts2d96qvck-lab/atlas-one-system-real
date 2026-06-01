@@ -42,8 +42,8 @@ function renderMentionText(text: string) {
 
 function ActivityCard({ item }: { item: ConversationActivityItem }) {
   if (item.type === "transfer") {
-    const fromName = String(item.payload.fromUserName ?? "Sem responsavel");
-    const toName = String(item.payload.toUserName ?? "Sem responsavel");
+    const fromName = String(item.payload.fromUserName ?? "Sem responsável");
+    const toName = String(item.payload.toUserName ?? "Sem responsável");
     const note = typeof item.payload.note === "string" ? item.payload.note.trim() : "";
     return (
       <div className="rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2 text-xs">
@@ -79,8 +79,8 @@ function ActivityCard({ item }: { item: ConversationActivityItem }) {
   const assignedToId = item.payload.assignedToId;
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-      <p className="font-semibold text-slate-700">Atualizacao · {item.actor?.name ?? "Sistema"}</p>
-      <p className="mt-1">Responsavel alterado {assignedToId ? `(${String(assignedToId)})` : ""}</p>
+      <p className="font-semibold text-slate-700">Atualização · {item.actor?.name ?? "Sistema"}</p>
+      <p className="mt-1">Responsável alterado {assignedToId ? `(${String(assignedToId)})` : ""}</p>
       <p className="mt-1 text-[10px] text-slate-500">{formatWhen(item.createdAt)}</p>
     </div>
   );

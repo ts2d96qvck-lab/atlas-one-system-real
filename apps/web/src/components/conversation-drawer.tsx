@@ -41,7 +41,7 @@ const TABS: { id: ConversationDrawerTab; label: string }[] = [
   { id: "crm", label: "CRM" },
   { id: "tags", label: "Tags" },
   { id: "notas", label: "Notas" },
-  { id: "historico", label: "Historico" }
+  { id: "historico", label: "Histórico" }
 ];
 
 export function ConversationDrawer({
@@ -192,10 +192,10 @@ export function ConversationDrawer({
                   value={cadenceDraft}
                   onChange={(e) => setCadenceDraft(e.target.value)}
                 >
-                  <option value="padrao">Padrao</option>
+                  <option value="padrao">Padrão</option>
                   <option value="acelerada">Acelerada</option>
                   <option value="consultiva">Consultiva</option>
-                  <option value="reativacao">Reativacao</option>
+                  <option value="reativação">Reativação</option>
                 </select>
                 <Button className="mt-2 h-8 text-xs" variant="glass" onClick={() => void onSaveCadence()}>
                   Salvar cadencia

@@ -121,10 +121,10 @@ export function OwnerClientsPanel({
       "Status",
       "Trial ate",
       "Dias trial",
-      "Max usuarios",
-      "Max numeros",
-      "Usuarios",
-      "Numeros"
+      "Max usuários",
+      "Max números",
+      "Usuários",
+      "Números"
     ];
     const rows = filtered.map((tenant) => [
       tenant.name,
@@ -223,7 +223,7 @@ export function OwnerClientsPanel({
             <p className="mt-1 text-2xl font-semibold text-rose-300">{summary.blocked}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur">
-            <p className="text-[11px] text-slate-300">Usuarios / numeros</p>
+            <p className="text-[11px] text-slate-300">Usuários / números</p>
             <p className="mt-1 text-lg font-semibold">
               {summary.users} · {summary.numbers}
             </p>
@@ -292,10 +292,10 @@ export function OwnerClientsPanel({
 
                   <div className="text-xs text-slate-600">
                     <p className="flex items-center gap-1">
-                      <Users size={12} /> {tenant._count.users}/{tenant.maxUsers ?? "—"} usuarios
+                      <Users size={12} /> {tenant._count.users}/{tenant.maxUsers ?? "—"} usuários
                     </p>
                     <p className="mt-1">
-                      {tenant._count.instances}/{tenant.maxInstances ?? "—"} numeros · {tenant._count.conversations} conversas
+                      {tenant._count.instances}/{tenant.maxInstances ?? "—"} números · {tenant._count.conversations} conversas
                     </p>
                     <p className="mt-1 flex items-center gap-1">
                       <Clock3 size={12} /> Trial ate {formatDate(tenant.trialEndsAt)}
@@ -357,7 +357,7 @@ export function OwnerClientsPanel({
                         />
                       </label>
                       <label className="text-xs text-slate-600">
-                        Max usuarios
+                        Max usuários
                         <input
                           type="number"
                           min={1}
@@ -367,7 +367,7 @@ export function OwnerClientsPanel({
                         />
                       </label>
                       <label className="text-xs text-slate-600">
-                        Max numeros WhatsApp
+                        Max números WhatsApp
                         <input
                           type="number"
                           min={1}
