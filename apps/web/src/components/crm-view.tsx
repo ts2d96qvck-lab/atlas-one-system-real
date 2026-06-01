@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { createLead, deleteLead, listUsers, updateLead, type Lead, type UserRow } from "../lib/api";
+import { EmptyState } from "./empty-state";
 
 type Props = { token: string };
 
@@ -59,7 +60,7 @@ function AgentAssigneeSelect({
 }) {
   return (
     <select
-      className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none sm:col-span-2"
+      className="atlas-field w-full px-3 py-2 text-sm outline-none sm:col-span-2"
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
@@ -172,7 +173,7 @@ export function CrmView({ token }: Props) {
   async function saveLeadEdit() {
     if (!editingLead) return;
     if (!editForm.company.trim() || !editForm.contact.trim() || !editForm.phone.trim() || !editForm.status.trim()) {
-      setFeedback({ type: "error", text: "Preencha os campos obrigatorios do lead." });
+      setFeedback({ type: "error", text: "Preencha os campos obrigatórios do lead." });
       return;
     }
     setSavingLead(true);
@@ -254,42 +255,43 @@ export function CrmView({ token }: Props) {
   function formatDate(value?: string | null) {
     if (!value) return "Sem data";
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "Data invalida";
+    if (Number.isNaN(parsed.getTime())) return "Data inválida";
     return parsed.toLocaleDateString("pt-BR");
   }
 
   return (
-    <main className="w-full overflow-x-hidden p-4 pb-28 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-[1500px]">
+    <main className="atlas-page">
+      <div className="atlas-page-inner max-w-[1500px]">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">CRM · Funil</h1>
-            <p className="text-sm text-atlas-muted">Arraste cards entre colunas</p>
+            <p className="atlas-section-title">Comercial</p>
+            <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">CRM · Funil de vendas</h1>
+            <p className="mt-1 text-sm text-slate-500">Arraste cards entre colunas ou use Editar em cada lead.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button onClick={() => setCreatingLead(true)}>
-              <Plus size={16} className="mr-2" />
+              <Plus size={16} />
               Novo lead
             </Button>
-            <Card className="px-5 py-3">
-              <p className="text-xs text-atlas-muted">Pipeline total</p>
-              <p className="text-xl font-semibold">{formatMoney(total)}</p>
+            <Card className="px-4 py-3">
+              <p className="text-xs text-slate-500">Pipeline total</p>
+              <p className="text-xl font-semibold text-slate-900">{formatMoney(total)}</p>
             </Card>
           </div>
         </header>
 
         <div className="mb-4 grid gap-3 md:grid-cols-3">
           <Card className="p-4">
-            <p className="text-xs text-atlas-muted">Leads no funil</p>
-            <p className="mt-1 text-2xl font-semibold">{leads.length}</p>
+            <p className="text-xs text-slate-500">Leads no funil</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{leads.length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-atlas-muted">Ticket medio</p>
-            <p className="mt-1 text-2xl font-semibold">{formatMoney(averageTicket)}</p>
+            <p className="text-xs text-slate-500">Ticket médio</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(averageTicket)}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-xs text-atlas-muted">Leads com telefone</p>
-            <p className="mt-1 text-2xl font-semibold">{leadsWithPhone}</p>
+            <p className="text-xs text-slate-500">Leads com telefone</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{leadsWithPhone}</p>
           </Card>
         </div>
 
@@ -304,64 +306,81 @@ export function CrmView({ token }: Props) {
             return (
               <Card
                 key={stage.id}
-                className="min-w-[280px] flex-shrink-0 p-4"
+                className="flex min-h-[420px] min-w-[280px] flex-shrink-0 flex-col p-3"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
                   if (dragId) moveLead(dragId, stage.name);
                   setDragId(null);
                 }}
               >
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold">{stage.name}</p>
-                  <Badge>{column.length}</Badge>
+                <div className="mb-3 border-b border-slate-100 pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900">{stage.name}</p>
+                    <Badge className="h-5 px-2 text-[10px]">{column.length}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">{formatMoney(columnValue)}</p>
                 </div>
-                <p className="mt-1 text-xs text-atlas-muted">{formatMoney(columnValue)}</p>
-                <div className="mt-4 space-y-3">
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                  {!column.length ? (
+                    <EmptyState
+                      title="Coluna vazia"
+                      description="Arraste um lead para cá ou crie um novo lead."
+                      actionLabel="Novo lead"
+                      onAction={() => setCreatingLead(true)}
+                    />
+                  ) : null}
                   {column.map((lead) => (
                     <div
                       key={lead.id}
                       draggable
                       onDragStart={() => setDragId(lead.id)}
-                      onDoubleClick={() => openEditor(lead)}
-                      className="cursor-grab rounded-2xl bg-white/85 p-4 shadow-sm active:cursor-grabbing"
+                      className="cursor-grab rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:border-slate-300 active:cursor-grabbing"
                     >
-                      <p className="font-medium">{lead.company}</p>
-                      <p className="text-xs text-atlas-muted">{lead.contact || "Sem contato definido"}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-900">{lead.company}</p>
+                          <p className="truncate text-xs text-slate-500">{lead.contact || "Sem contato definido"}</p>
+                        </div>
+                        <Button
+                          variant="glass"
+                          className="h-8 w-8 shrink-0 px-0"
+                          onClick={() => openEditor(lead)}
+                          title="Editar lead"
+                          aria-label={`Editar lead ${lead.company}`}
+                        >
+                          <Pencil size={14} />
+                        </Button>
+                      </div>
                       <div className="mt-2 flex items-center gap-2">
-                        <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-700">
+                        <span className="grid h-7 w-7 place-items-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700">
                           {lead.assignedTo?.name ? agentInitials(lead.assignedTo.name) : "—"}
                         </span>
-                        <p className="text-[11px] text-atlas-muted">
-                          {lead.assignedTo?.name ?? "Sem responsável"}
-                        </p>
+                        <p className="truncate text-[11px] text-slate-600">{lead.assignedTo?.name ?? "Sem responsável"}</p>
                       </div>
-                      <p className="text-[11px] text-atlas-muted">{lead.phone ? `Telefone: ${lead.phone}` : "Telefone não informado"}</p>
-                      <p className="text-[11px] text-atlas-muted">
-                        Fechamento previsto: {lead.expectedCloseDate ? formatDate(lead.expectedCloseDate) : "Sem previsao"}
+                      <p className="mt-1 text-[11px] text-slate-500">{lead.phone ? lead.phone : "Telefone não informado"}</p>
+                      <p className="text-[11px] text-slate-500">
+                        Fechamento previsto: {lead.expectedCloseDate ? formatDate(lead.expectedCloseDate) : "Sem previsão"}
                       </p>
-                      <p className="mt-2 text-sm font-semibold text-atlas-blue">
-                        {formatMoney(Number(lead.value))}
-                      </p>
-                      <p className="mt-1 text-[11px] text-atlas-muted">Atualizado em {formatDate(lead.updatedAt)}</p>
-                      <p className="mt-1 text-[10px] text-atlas-muted">Duplo clique para editar</p>
+                      <p className="mt-2 text-sm font-semibold text-blue-700">{formatMoney(Number(lead.value))}</p>
                       <div className="mt-3 flex gap-2">
                         <Button
                           variant="glass"
-                          className="w-full text-xs"
+                          className="h-8 flex-1 text-xs"
                           onClick={() => {
                             const idx = stages.findIndex((s) => s.id === stage.id);
                             const next = stages[idx + 1];
                             if (next) moveLead(lead.id, next.name);
                           }}
                         >
-                          Avancar etapa
+                          Avançar etapa
                         </Button>
                         <Button
                           variant="glass"
-                          className="h-9 px-3"
+                          className="h-8 w-8 px-0"
                           disabled={deletingLeadId === lead.id}
                           onClick={() => void removeLead(lead)}
                           aria-label={`Excluir lead ${lead.company}`}
+                          title="Excluir lead"
                         >
                           {deletingLeadId === lead.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                         </Button>
@@ -376,11 +395,11 @@ export function CrmView({ token }: Props) {
       </div>
       {editingLead ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/25 p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-white/70 bg-white/95 p-4 shadow-xl backdrop-blur">
+          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-base font-semibold">Editar lead</p>
-                <p className="text-xs text-atlas-muted">Atualize os dados comerciais no mesmo padrao do sistema.</p>
+                <p className="text-base font-semibold text-slate-900">Editar lead</p>
+                <p className="text-xs text-slate-500">Atualize os dados comerciais do lead.</p>
               </div>
               <button
                 type="button"
@@ -390,69 +409,53 @@ export function CrmView({ token }: Props) {
                 <X size={14} />
               </button>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <input
-                className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none"
-                placeholder="Empresa"
-                value={editForm.company}
-                onChange={(e) => setEditForm((s) => ({ ...s, company: e.target.value }))}
-              />
-              <input
-                className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none"
-                placeholder="Contato"
-                value={editForm.contact}
-                onChange={(e) => setEditForm((s) => ({ ...s, contact: e.target.value }))}
-              />
-              <input
-                className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none"
-                placeholder="Telefone"
-                value={editForm.phone}
-                onChange={(e) => setEditForm((s) => ({ ...s, phone: formatPhoneBr(e.target.value) }))}
-              />
-              <input
-                className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none"
-                placeholder="Email (opcional)"
-                value={editForm.email}
-                onChange={(e) => setEditForm((s) => ({ ...s, email: e.target.value }))}
-              />
-              <select
-                className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none"
-                value={editForm.status}
-                onChange={(e) => setEditForm((s) => ({ ...s, status: e.target.value }))}
-              >
-                {stages.map((stage) => (
-                  <option key={stage.id} value={stage.name}>
-                    {stage.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none"
-                placeholder="Valor (R$)"
-                type="text"
-                inputMode="decimal"
-                value={editForm.value}
-                onChange={(e) => setEditForm((s) => ({ ...s, value: formatCurrencyBrInput(e.target.value) }))}
-              />
-              <input
-                className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm outline-none sm:col-span-2"
-                type="datetime-local"
-                value={editForm.expectedCloseDate}
-                onChange={(e) => setEditForm((s) => ({ ...s, expectedCloseDate: e.target.value }))}
-              />
-              <AgentAssigneeSelect
-                value={editForm.assignedToId}
-                agents={agents}
-                onChange={(assignedToId) => setEditForm((s) => ({ ...s, assignedToId }))}
-              />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="block sm:col-span-1">
+                <span className="atlas-label mb-1.5">Empresa</span>
+                <input className="atlas-field w-full px-3 py-2 text-sm outline-none" value={editForm.company} onChange={(e) => setEditForm((s) => ({ ...s, company: e.target.value }))} />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="atlas-label mb-1.5">Contato</span>
+                <input className="atlas-field w-full px-3 py-2 text-sm outline-none" value={editForm.contact} onChange={(e) => setEditForm((s) => ({ ...s, contact: e.target.value }))} />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="atlas-label mb-1.5">Telefone</span>
+                <input className="atlas-field w-full px-3 py-2 text-sm outline-none" value={editForm.phone} onChange={(e) => setEditForm((s) => ({ ...s, phone: formatPhoneBr(e.target.value) }))} />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="atlas-label mb-1.5">E-mail (opcional)</span>
+                <input className="atlas-field w-full px-3 py-2 text-sm outline-none" value={editForm.email} onChange={(e) => setEditForm((s) => ({ ...s, email: e.target.value }))} />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="atlas-label mb-1.5">Etapa</span>
+                <select className="atlas-field w-full px-3 py-2 text-sm outline-none" value={editForm.status} onChange={(e) => setEditForm((s) => ({ ...s, status: e.target.value }))}>
+                  {stages.map((stage) => (
+                    <option key={stage.id} value={stage.name}>
+                      {stage.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="atlas-label mb-1.5">Valor (R$)</span>
+                <input className="atlas-field w-full px-3 py-2 text-sm outline-none" type="text" inputMode="decimal" value={editForm.value} onChange={(e) => setEditForm((s) => ({ ...s, value: formatCurrencyBrInput(e.target.value) }))} />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="atlas-label mb-1.5">Previsão de fechamento</span>
+                <input className="atlas-field w-full px-3 py-2 text-sm outline-none" type="datetime-local" value={editForm.expectedCloseDate} onChange={(e) => setEditForm((s) => ({ ...s, expectedCloseDate: e.target.value }))} />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="atlas-label mb-1.5">Responsável</span>
+                <AgentAssigneeSelect value={editForm.assignedToId} agents={agents} onChange={(assignedToId) => setEditForm((s) => ({ ...s, assignedToId }))} />
+              </label>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <Button variant="glass" className="h-8 px-3 text-xs" onClick={() => setEditingLead(null)} disabled={savingLead}>
+              <Button variant="glass" className="h-9 px-3 text-xs" onClick={() => setEditingLead(null)} disabled={savingLead}>
                 Cancelar
               </Button>
-              <Button className="h-8 px-3 text-xs" onClick={() => void saveLeadEdit()} disabled={savingLead}>
+              <Button className="h-9 px-3 text-xs" onClick={() => void saveLeadEdit()} disabled={savingLead}>
                 {savingLead ? <Loader2 size={14} className="animate-spin" /> : null}
-                Salvar alteracoes
+                Salvar alterações
               </Button>
             </div>
           </div>
@@ -460,11 +463,11 @@ export function CrmView({ token }: Props) {
       ) : null}
       {creatingLead ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/25 p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-white/70 bg-white/95 p-4 shadow-xl backdrop-blur">
+          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-base font-semibold">Novo lead</p>
-                <p className="text-xs text-atlas-muted">Cadastre manualmente no funil comercial.</p>
+                <p className="text-base font-semibold text-slate-900">Novo lead</p>
+                <p className="text-xs text-slate-500">Cadastre manualmente no funil comercial.</p>
               </div>
               <button
                 type="button"
@@ -475,16 +478,16 @@ export function CrmView({ token }: Props) {
               </button>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <input className="atlas-field rounded-xl px-3 py-2 text-sm outline-none" placeholder="Empresa" value={createForm.company} onChange={(e) => setCreateForm((s) => ({ ...s, company: e.target.value }))} />
-              <input className="atlas-field rounded-xl px-3 py-2 text-sm outline-none" placeholder="Contato" value={createForm.contact} onChange={(e) => setCreateForm((s) => ({ ...s, contact: e.target.value }))} />
-              <input className="atlas-field rounded-xl px-3 py-2 text-sm outline-none" placeholder="Telefone" value={createForm.phone} onChange={(e) => setCreateForm((s) => ({ ...s, phone: formatPhoneBr(e.target.value) }))} />
-              <input className="atlas-field rounded-xl px-3 py-2 text-sm outline-none" placeholder="Email (opcional)" value={createForm.email} onChange={(e) => setCreateForm((s) => ({ ...s, email: e.target.value }))} />
-              <select className="atlas-field rounded-xl px-3 py-2 text-sm outline-none" value={createForm.status} onChange={(e) => setCreateForm((s) => ({ ...s, status: e.target.value }))}>
+              <input className="atlas-field w-full px-3 py-2 text-sm outline-none" placeholder="Empresa" value={createForm.company} onChange={(e) => setCreateForm((s) => ({ ...s, company: e.target.value }))} />
+              <input className="atlas-field w-full px-3 py-2 text-sm outline-none" placeholder="Contato" value={createForm.contact} onChange={(e) => setCreateForm((s) => ({ ...s, contact: e.target.value }))} />
+              <input className="atlas-field w-full px-3 py-2 text-sm outline-none" placeholder="Telefone" value={createForm.phone} onChange={(e) => setCreateForm((s) => ({ ...s, phone: formatPhoneBr(e.target.value) }))} />
+              <input className="atlas-field w-full px-3 py-2 text-sm outline-none" placeholder="E-mail (opcional)" value={createForm.email} onChange={(e) => setCreateForm((s) => ({ ...s, email: e.target.value }))} />
+              <select className="atlas-field w-full px-3 py-2 text-sm outline-none" value={createForm.status} onChange={(e) => setCreateForm((s) => ({ ...s, status: e.target.value }))}>
                 {stages.map((stage) => (
                   <option key={stage.id} value={stage.name}>{stage.name}</option>
                 ))}
               </select>
-              <input className="atlas-field rounded-xl px-3 py-2 text-sm outline-none" placeholder="Valor (R$)" value={createForm.value} onChange={(e) => setCreateForm((s) => ({ ...s, value: formatCurrencyBrInput(e.target.value) }))} />
+              <input className="atlas-field w-full px-3 py-2 text-sm outline-none" placeholder="Valor (R$)" value={createForm.value} onChange={(e) => setCreateForm((s) => ({ ...s, value: formatCurrencyBrInput(e.target.value) }))} />
               <AgentAssigneeSelect
                 value={createForm.assignedToId}
                 agents={agents}
