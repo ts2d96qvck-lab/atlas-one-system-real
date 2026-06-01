@@ -10,6 +10,7 @@ import { readSessionToken, revokeUserSessions, signSessionToken } from "../lib/s
 import { appLog } from "../lib/app-log";
 import { isPrivateOrLoopbackIp } from "../lib/client-ip";
 import { AuthLoginError } from "../lib/auth-login-errors";
+import { getTenantAccessDenial } from "./billing/billing.service";
 
 export const loginSchema = z
   .object({
@@ -261,9 +262,13 @@ export async function login(input: unknown, context?: AccessContext): Promise<Lo
     throw new AuthLoginError("invalid_credentials", "Login invalido");
   }
 
-  if (tenant.billingStatus === "blocked" || tenant.blockedAt) {
-    log("billing_blocked", { billingStatus: tenant.billingStatus, blockedAt: tenant.blockedAt });
-    throw new AuthLoginError("billing_blocked", "Conta bloqueada por pendencia de pagamento");
+  const accessDenial = getTenantAccessDenial(tenant);
+  if (accessDenial.denied) {
+    log(accessDenial.code, { billingStatus: tenant.billingStatus, blockedAt: tenant.blockedAt });
+    throw new AuthLoginError(
+      accessDenial.code === "trial_expired" ? "trial_expired" : "billing_blocked",
+      accessDenial.message
+    );
   }
 
   const sessionUser: SessionUser = {
@@ -403,8 +408,9 @@ export async function verifyLoginCode(
     data: { consumedAt: new Date() }
   });
 
-  if (challenge.tenant.billingStatus === "blocked" || challenge.tenant.blockedAt) {
-    throw new Error("Conta bloqueada por pendencia de pagamento");
+  const accessDenial = getTenantAccessDenial(challenge.tenant);
+  if (accessDenial.denied) {
+    throw new Error(accessDenial.message);
   }
 
   const sessionUser: SessionUser = {

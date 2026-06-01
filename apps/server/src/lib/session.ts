@@ -3,6 +3,7 @@ import type { FastifyReply } from "fastify";
 import { env } from "../config/env";
 import { prisma } from "./prisma";
 import type { SessionUser } from "../services/auth.service";
+import { getTenantAccessDenial } from "../services/billing/billing.service";
 import { sendError } from "../utils/http";
 
 type JwtPayload = SessionUser & { tv: number };
@@ -39,12 +40,18 @@ export async function resolveSessionUser(token: string): Promise<SessionUser | n
 
   const user = await prisma.user.findFirst({
     where: { id: parsed.user.id, tenantId: parsed.user.tenantId, status: "active" },
-    include: { tenant: { select: { slug: true, billingStatus: true, blockedAt: true } } }
+    include: { tenant: { select: { slug: true, billingStatus: true, blockedAt: true, settings: true } } }
   });
 
-  if (!user?.tenant || user.tenant.billingStatus === "blocked" || user.tenant.blockedAt) {
+  if (!user?.tenant) {
     return null;
   }
+
+  const accessDenial = getTenantAccessDenial(user.tenant);
+  if (accessDenial.denied) {
+    return null;
+  }
+
   if (user.tokenVersion !== parsed.tokenVersion) {
     return null;
   }

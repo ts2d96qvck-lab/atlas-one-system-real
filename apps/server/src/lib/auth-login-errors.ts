@@ -2,6 +2,7 @@ export type AuthLoginErrorCode =
   | "invalid_credentials"
   | "rate_limited"
   | "billing_blocked"
+  | "trial_expired"
   | "twofa_sms"
   | "twofa_phone_missing";
 

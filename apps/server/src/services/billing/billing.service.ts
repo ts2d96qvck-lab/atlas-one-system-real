@@ -9,6 +9,9 @@ function readSettings(raw: unknown): TenantSettings {
   return {};
 }
 
+export const TRIAL_EXPIRED_MESSAGE =
+  "Periodo de teste encerrado. Entre em contato com o suporte Atlas One para regularizar o acesso.";
+
 function readBillingSettings(settings: TenantSettings) {
   const billing =
     settings.billing && typeof settings.billing === "object" && !Array.isArray(settings.billing)
@@ -20,6 +23,33 @@ function readBillingSettings(settings: TenantSettings) {
     provider: billing.provider ? String(billing.provider) : null,
     externalCustomerId: billing.externalCustomerId ? String(billing.externalCustomerId) : null
   };
+}
+
+export function isTenantBillingBlocked(tenant: { billingStatus: string; blockedAt: Date | null | undefined }) {
+  return tenant.billingStatus === "blocked" || Boolean(tenant.blockedAt);
+}
+
+export function isTrialExpiredForTenant(tenant: { settings: unknown }) {
+  const billingMeta = readBillingSettings(readSettings(tenant.settings));
+  if (billingMeta.subscriptionStatus !== "trialing") return false;
+  if (!billingMeta.trialEndsAt || Number.isNaN(billingMeta.trialEndsAt.getTime())) return false;
+  return billingMeta.trialEndsAt.getTime() <= Date.now();
+}
+
+export function getTenantAccessDenial(tenant: {
+  billingStatus: string;
+  blockedAt: Date | null | undefined;
+  settings: unknown;
+}):
+  | { denied: false }
+  | { denied: true; code: "billing_blocked" | "trial_expired"; message: string } {
+  if (isTenantBillingBlocked(tenant)) {
+    return { denied: true, code: "billing_blocked", message: "Conta bloqueada por pendencia de pagamento" };
+  }
+  if (isTrialExpiredForTenant(tenant)) {
+    return { denied: true, code: "trial_expired", message: TRIAL_EXPIRED_MESSAGE };
+  }
+  return { denied: false };
 }
 
 export async function getEffectiveLimits(tenantId: string) {
@@ -78,7 +108,12 @@ export async function getTenantBillingOverview(tenantId: string) {
   const seatsAvailable = Math.max(0, limits.maxUsers - usage.users);
   const instancesAvailable = Math.max(0, limits.maxInstances - usage.instances);
 
-  const trialActive = billingMeta.trialEndsAt ? billingMeta.trialEndsAt.getTime() > Date.now() : false;
+  const trialActive =
+    billingMeta.subscriptionStatus === "trialing" && billingMeta.trialEndsAt
+      ? billingMeta.trialEndsAt.getTime() > Date.now()
+      : false;
+  const trialExpired = isTrialExpiredForTenant(tenant);
+  const accessDenied = isTenantBillingBlocked(tenant) || trialExpired;
 
   return {
     tenant: {
@@ -115,13 +150,14 @@ export async function getTenantBillingOverview(tenantId: string) {
       blockedAt: tenant.blockedAt,
       trialEndsAt: billingMeta.trialEndsAt,
       trialActive,
+      trialExpired,
       subscriptionStatus: billingMeta.subscriptionStatus,
       provider: billingMeta.provider,
       externalCustomerId: billingMeta.externalCustomerId
     },
     capabilities: {
-      canAddUser: seatsAvailable > 0 && tenant.billingStatus !== "blocked" && !tenant.blockedAt,
-      canAddInstance: instancesAvailable > 0 && tenant.billingStatus !== "blocked" && !tenant.blockedAt,
+      canAddUser: seatsAvailable > 0 && !accessDenied,
+      canAddInstance: instancesAvailable > 0 && !accessDenied,
       withinConversationQuota:
         limits.maxConversationsPerMonth == null || usage.conversationsThisMonth <= limits.maxConversationsPerMonth
     }
@@ -131,6 +167,9 @@ export async function getTenantBillingOverview(tenantId: string) {
 export async function assertCanAddUser(tenantId: string) {
   const overview = await getTenantBillingOverview(tenantId);
   if (!overview.capabilities.canAddUser) {
+    if (overview.billing.trialExpired) {
+      throw new Error(TRIAL_EXPIRED_MESSAGE);
+    }
     if (overview.billing.status === "blocked" || overview.billing.blockedAt) {
       throw new Error("Conta bloqueada por pendencia de pagamento.");
     }
@@ -143,6 +182,9 @@ export async function assertCanAddUser(tenantId: string) {
 export async function assertCanAddInstance(tenantId: string) {
   const overview = await getTenantBillingOverview(tenantId);
   if (!overview.capabilities.canAddInstance) {
+    if (overview.billing.trialExpired) {
+      throw new Error(TRIAL_EXPIRED_MESSAGE);
+    }
     if (overview.billing.status === "blocked" || overview.billing.blockedAt) {
       throw new Error("Conta bloqueada por pendencia de pagamento.");
     }
@@ -154,6 +196,12 @@ export async function assertCanAddInstance(tenantId: string) {
 
 export async function assertWithinConversationQuota(tenantId: string) {
   const overview = await getTenantBillingOverview(tenantId);
+  if (overview.billing.trialExpired) {
+    throw new Error(TRIAL_EXPIRED_MESSAGE);
+  }
+  if (overview.billing.status === "blocked" || overview.billing.blockedAt) {
+    throw new Error("Conta bloqueada por pendencia de pagamento.");
+  }
   if (overview.capabilities.withinConversationQuota) return;
   const limit = overview.limits.maxConversationsPerMonth;
   throw new Error(

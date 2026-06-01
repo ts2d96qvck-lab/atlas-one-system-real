@@ -34,6 +34,7 @@ import {
   updateMenuBotSettings,
   upsertShortcut,
   updateTenantBilling,
+  updateTenantControls,
   listApiKeys,
   createApiKey,
   revokeApiKey,
@@ -64,6 +65,7 @@ import {
   type ShortcutItem,
   type TagCatalogItem,
   type TenantSummary,
+  type TenantControlsPayload,
   type TeamRow,
   type WhatsAppInstance
 } from "../lib/api";
@@ -239,6 +241,8 @@ export function AdminView({ token, user }: Props) {
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [billingBusyId, setBillingBusyId] = useState<string | null>(null);
+  const [savingControlsId, setSavingControlsId] = useState<string | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -522,12 +526,14 @@ export function AdminView({ token, user }: Props) {
       const overview = await ownerTenantsOverview(token);
       setTenants(overview.tenants);
       setOwnerSummary(overview.summary);
+      setIsPlatformAdmin(true);
     } catch {
+      setIsPlatformAdmin(false);
       try {
         const tenantRows = await listTenants(token);
         setTenants(tenantRows);
       } catch {
-        /* owner only */
+        /* not platform admin */
       }
     }
   }, [token]);
@@ -1135,16 +1141,29 @@ export function AdminView({ token, user }: Props) {
     }
   }
 
-  async function changeTenantBilling(tenantId: string, billingStatus: "active" | "overdue" | "blocked") {
+  async function changeTenantBilling(tenantId: string, billingStatus: "active" | "blocked") {
     setBillingBusyId(tenantId);
     try {
       await updateTenantBilling(token, tenantId, { billingStatus });
-      setMessage(`Status financeiro atualizado para ${billingStatus}.`);
+      setMessage(billingStatus === "blocked" ? "Cliente bloqueado." : "Cliente desbloqueado.");
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao atualizar status financeiro");
     } finally {
       setBillingBusyId(null);
+    }
+  }
+
+  async function saveTenantControls(tenantId: string, payload: TenantControlsPayload) {
+    setSavingControlsId(tenantId);
+    try {
+      await updateTenantControls(token, tenantId, payload);
+      setMessage("Controles do cliente atualizados.");
+      await refreshSnapshot();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar controles do cliente");
+    } finally {
+      setSavingControlsId(null);
     }
   }
 
@@ -1827,12 +1846,14 @@ export function AdminView({ token, user }: Props) {
           </div>
         </Card>
 
-        {isOwner ? (
+        {isPlatformAdmin ? (
           <OwnerClientsPanel
             tenants={tenants}
             summary={ownerSummary}
             busyId={billingBusyId}
+            savingControlsId={savingControlsId}
             onBillingChange={changeTenantBilling}
+            onSaveControls={saveTenantControls}
           />
         ) : null}
 

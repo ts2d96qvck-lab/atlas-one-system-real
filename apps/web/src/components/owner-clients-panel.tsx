@@ -9,11 +9,11 @@ import {
   Download,
   Loader2,
   Search,
-  ShieldCheck,
+  Settings2,
   Users
 } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
-import type { TenantSummary } from "../lib/api";
+import type { TenantControlsPayload, TenantSummary } from "../lib/api";
 
 type OwnerSummary = {
   tenants: number;
@@ -28,14 +28,33 @@ type Props = {
   tenants: TenantSummary[];
   summary: OwnerSummary;
   busyId: string | null;
-  onBillingChange: (tenantId: string, status: "active" | "overdue" | "blocked") => void | Promise<void>;
+  savingControlsId: string | null;
+  onBillingChange: (tenantId: string, status: "active" | "blocked") => void | Promise<void>;
+  onSaveControls: (tenantId: string, payload: TenantControlsPayload) => void | Promise<void>;
 };
 
 type Filter = "all" | "active" | "overdue" | "blocked";
 
-function billingLabel(status: TenantSummary["billingStatus"]) {
-  if (status === "blocked") return { text: "Bloqueado", tone: "bg-rose-100 text-rose-800" };
-  if (status === "overdue") return { text: "Atrasado", tone: "bg-amber-100 text-amber-900" };
+type DraftControls = {
+  plan: "starter" | "pro" | "enterprise";
+  maxUsers: string;
+  maxInstances: string;
+  trialEndsAt: string;
+};
+
+function billingLabel(tenant: TenantSummary) {
+  if (tenant.billingStatus === "blocked" || tenant.blockedAt) {
+    return { text: "Bloqueado", tone: "bg-rose-100 text-rose-800" };
+  }
+  if (tenant.trialExpired) {
+    return { text: "Trial expirado", tone: "bg-orange-100 text-orange-900" };
+  }
+  if (tenant.billingStatus === "overdue") {
+    return { text: "Atrasado", tone: "bg-amber-100 text-amber-900" };
+  }
+  if (tenant.trialActive) {
+    return { text: "Trial ativo", tone: "bg-sky-100 text-sky-800" };
+  }
   return { text: "Ativo", tone: "bg-emerald-100 text-emerald-800" };
 }
 
@@ -46,18 +65,44 @@ function formatDate(value?: string | null) {
   return parsed.toLocaleDateString("pt-BR");
 }
 
-export function OwnerClientsPanel({ tenants, summary, busyId, onBillingChange }: Props) {
+function toDateInputValue(value?: string | null) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function draftFromTenant(tenant: TenantSummary): DraftControls {
+  return {
+    plan: (tenant.plan === "pro" || tenant.plan === "enterprise" ? tenant.plan : "starter") as DraftControls["plan"],
+    maxUsers: String(tenant.maxUsers ?? 5),
+    maxInstances: String(tenant.maxInstances ?? 1),
+    trialEndsAt: toDateInputValue(tenant.trialEndsAt)
+  };
+}
+
+export function OwnerClientsPanel({
+  tenants,
+  summary,
+  busyId,
+  savingControlsId,
+  onBillingChange,
+  onSaveControls
+}: Props) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, DraftControls>>({});
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return tenants.filter((tenant) => {
       const matchesFilter =
         filter === "all" ||
-        (filter === "active" && tenant.billingStatus === "active" && !tenant.blockedAt) ||
+        (filter === "active" && tenant.billingStatus === "active" && !tenant.blockedAt && !tenant.trialExpired) ||
         (filter === "overdue" && tenant.billingStatus === "overdue" && !tenant.blockedAt) ||
-        (filter === "blocked" && (tenant.billingStatus === "blocked" || Boolean(tenant.blockedAt)));
+        (filter === "blocked" &&
+          (tenant.billingStatus === "blocked" || Boolean(tenant.blockedAt) || Boolean(tenant.trialExpired)));
       if (!matchesFilter) return false;
       if (!normalized) return true;
       return (
@@ -69,17 +114,29 @@ export function OwnerClientsPanel({ tenants, summary, busyId, onBillingChange }:
   }, [tenants, query, filter]);
 
   function exportCsv() {
-    const header = ["Empresa", "Slug", "Plano", "Status", "Vencimento", "Usuarios", "Numeros", "Conversas", "Leads"];
+    const header = [
+      "Empresa",
+      "Slug",
+      "Plano",
+      "Status",
+      "Trial ate",
+      "Dias trial",
+      "Max usuarios",
+      "Max numeros",
+      "Usuarios",
+      "Numeros"
+    ];
     const rows = filtered.map((tenant) => [
       tenant.name,
       tenant.slug,
       tenant.plan,
       tenant.billingStatus,
-      tenant.billingDueAt ?? "",
+      tenant.trialEndsAt ?? "",
+      tenant.trialDaysRemaining != null ? String(tenant.trialDaysRemaining) : "",
+      String(tenant.maxUsers ?? ""),
+      String(tenant.maxInstances ?? ""),
       String(tenant._count.users),
-      String(tenant._count.instances),
-      String(tenant._count.conversations),
-      String(tenant._count.leads)
+      String(tenant._count.instances)
     ]);
     const csv = [header, ...rows]
       .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
@@ -91,6 +148,39 @@ export function OwnerClientsPanel({ tenants, summary, busyId, onBillingChange }:
     anchor.download = `clientes-atlas-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
+  }
+
+  function openEditor(tenant: TenantSummary) {
+    setExpandedId((current) => (current === tenant.id ? null : tenant.id));
+    setDrafts((current) => ({
+      ...current,
+      [tenant.id]: current[tenant.id] ?? draftFromTenant(tenant)
+    }));
+  }
+
+  function updateDraft(tenantId: string, patch: Partial<DraftControls>) {
+    setDrafts((current) => ({
+      ...current,
+      [tenantId]: { ...(current[tenantId] ?? draftFromTenant(tenants.find((row) => row.id === tenantId)!)), ...patch }
+    }));
+  }
+
+  async function saveControls(tenant: TenantSummary) {
+    const draft = drafts[tenant.id] ?? draftFromTenant(tenant);
+    const maxUsers = Number(draft.maxUsers);
+    const maxInstances = Number(draft.maxInstances);
+    if (!Number.isFinite(maxUsers) || maxUsers < 1 || !Number.isFinite(maxInstances) || maxInstances < 1) return;
+
+    const trialEndsAt = draft.trialEndsAt
+      ? new Date(`${draft.trialEndsAt}T23:59:59`).toISOString()
+      : null;
+
+    await onSaveControls(tenant.id, {
+      plan: draft.plan,
+      maxUsers,
+      maxInstances,
+      trialEndsAt
+    });
   }
 
   const filters: { id: Filter; label: string; count: number }[] = [
@@ -105,10 +195,10 @@ export function OwnerClientsPanel({ tenants, summary, busyId, onBillingChange }:
       <div className="border-b border-white/60 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-5 text-white">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-blue-200">SaaS · Gestao comercial</p>
-            <h2 className="mt-1 text-xl font-semibold">Central de clientes</h2>
+            <p className="text-xs uppercase tracking-[0.18em] text-blue-200">Plataforma · Beta</p>
+            <h2 className="mt-1 text-xl font-semibold">Controle de clientes</h2>
             <p className="mt-1 max-w-2xl text-sm text-slate-300">
-              Controle pagamentos, liberacao de acesso, numeros conectados e volume de conversas de cada empresa.
+              Limites, trial e bloqueio manual para empresas em teste. Acesso restrito ao administrador da plataforma.
             </p>
           </div>
           <Button variant="glass" className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={exportCsv}>
@@ -169,92 +259,145 @@ export function OwnerClientsPanel({ tenants, summary, busyId, onBillingChange }:
           />
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Cliente</th>
-                <th className="px-4 py-3 font-semibold">Plano</th>
-                <th className="px-4 py-3 font-semibold">Financeiro</th>
-                <th className="px-4 py-3 font-semibold">Uso</th>
-                <th className="px-4 py-3 font-semibold">Vencimento</th>
-                <th className="px-4 py-3 font-semibold">Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((tenant) => {
-                const busy = busyId === tenant.id;
-                const status = billingLabel(tenant.billingStatus);
-                return (
-                  <tr key={tenant.id} className="border-t border-slate-100 align-top hover:bg-slate-50/70">
-                    <td className="px-4 py-4">
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 rounded-xl bg-blue-50 p-2 text-blue-700">
-                          <Building2 size={16} />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900">{tenant.name}</p>
-                          <p className="text-xs text-slate-500">{tenant.slug}</p>
-                        </div>
+        <div className="space-y-3">
+          {filtered.map((tenant) => {
+            const busy = busyId === tenant.id;
+            const saving = savingControlsId === tenant.id;
+            const expanded = expandedId === tenant.id;
+            const draft = drafts[tenant.id] ?? draftFromTenant(tenant);
+            const status = billingLabel(tenant);
+            const isBlocked = tenant.billingStatus === "blocked" || Boolean(tenant.blockedAt);
+
+            return (
+              <div key={tenant.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="flex flex-wrap items-start justify-between gap-3 p-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
+                      <Building2 size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">{tenant.name}</p>
+                      <p className="text-xs text-slate-500">{tenant.slug}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${status.tone}`}>
+                          {status.text}
+                        </span>
+                        <Badge className="capitalize">{tenant.plan}</Badge>
+                        {tenant.trialActive && tenant.trialDaysRemaining != null ? (
+                          <span className="text-[11px] text-sky-700">{tenant.trialDaysRemaining} dias de trial</span>
+                        ) : null}
                       </div>
-                    </td>
-                    <td className="px-4 py-4 capitalize text-slate-700">{tenant.plan}</td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${status.tone}`}>{status.text}</span>
-                      {tenant.blockedAt ? (
-                        <p className="mt-1 text-[11px] text-rose-600">Bloqueado em {formatDate(tenant.blockedAt)}</p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-4 text-xs text-slate-600">
-                      <p className="flex items-center gap-1">
-                        <Users size={12} /> {tenant._count.users} usuarios
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-slate-600">
+                    <p className="flex items-center gap-1">
+                      <Users size={12} /> {tenant._count.users}/{tenant.maxUsers ?? "—"} usuarios
+                    </p>
+                    <p className="mt-1">
+                      {tenant._count.instances}/{tenant.maxInstances ?? "—"} numeros · {tenant._count.conversations} conversas
+                    </p>
+                    <p className="mt-1 flex items-center gap-1">
+                      <Clock3 size={12} /> Trial ate {formatDate(tenant.trialEndsAt)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button variant="glass" className="h-8 px-2.5 text-[11px]" onClick={() => openEditor(tenant)}>
+                      <Settings2 size={12} /> Gerenciar
+                    </Button>
+                    {isBlocked ? (
+                      <Button
+                        variant="glass"
+                        className="h-8 px-2.5 text-[11px]"
+                        disabled={busy}
+                        onClick={() => void onBillingChange(tenant.id, "active")}
+                      >
+                        {busy ? <Loader2 className="animate-spin" size={12} /> : <CheckCircle2 size={12} />}
+                        Desbloquear
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="glass"
+                        className="h-8 px-2.5 text-[11px] text-rose-700"
+                        disabled={busy}
+                        onClick={() => void onBillingChange(tenant.id, "blocked")}
+                      >
+                        {busy ? <Loader2 className="animate-spin" size={12} /> : <Ban size={12} />}
+                        Bloquear
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {expanded ? (
+                  <div className="border-t border-slate-100 bg-slate-50/80 p-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <label className="text-xs text-slate-600">
+                        Plano
+                        <select
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none"
+                          value={draft.plan}
+                          onChange={(e) =>
+                            updateDraft(tenant.id, { plan: e.target.value as DraftControls["plan"] })
+                          }
+                        >
+                          <option value="starter">Starter</option>
+                          <option value="pro">Pro</option>
+                          <option value="enterprise">Enterprise</option>
+                        </select>
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Trial ate
+                        <input
+                          type="date"
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none"
+                          value={draft.trialEndsAt}
+                          onChange={(e) => updateDraft(tenant.id, { trialEndsAt: e.target.value })}
+                        />
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Max usuarios
+                        <input
+                          type="number"
+                          min={1}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none"
+                          value={draft.maxUsers}
+                          onChange={(e) => updateDraft(tenant.id, { maxUsers: e.target.value })}
+                        />
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Max numeros WhatsApp
+                        <input
+                          type="number"
+                          min={1}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none"
+                          value={draft.maxInstances}
+                          onChange={(e) => updateDraft(tenant.id, { maxInstances: e.target.value })}
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-slate-500">
+                        Status financeiro: <strong className="capitalize">{tenant.billingStatus}</strong>
+                        {tenant.subscriptionStatus ? ` · Assinatura: ${tenant.subscriptionStatus}` : ""}
                       </p>
-                      <p className="mt-1">{tenant._count.instances} numeros · {tenant._count.conversations} conversas</p>
-                      <p className="mt-1">{tenant._count.leads} leads</p>
-                    </td>
-                    <td className="px-4 py-4 text-xs text-slate-600">
-                      <p className="flex items-center gap-1">
-                        <Clock3 size={12} /> {formatDate(tenant.billingDueAt)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        <Button
-                          variant="glass"
-                          className="h-8 px-2.5 text-[11px]"
-                          disabled={busy}
-                          onClick={() => void onBillingChange(tenant.id, "active")}
-                        >
-                          {busy ? <Loader2 className="animate-spin" size={12} /> : <CheckCircle2 size={12} />}
-                          Liberar
-                        </Button>
-                        <Button
-                          variant="glass"
-                          className="h-8 px-2.5 text-[11px]"
-                          disabled={busy}
-                          onClick={() => void onBillingChange(tenant.id, "overdue")}
-                        >
-                          <ShieldCheck size={12} /> Atraso
-                        </Button>
-                        <Button
-                          variant="glass"
-                          className="h-8 px-2.5 text-[11px] text-rose-700"
-                          disabled={busy}
-                          onClick={() => void onBillingChange(tenant.id, "blocked")}
-                        >
-                          <Ban size={12} /> Bloquear
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!filtered.length ? (
-            <div className="px-4 py-10 text-center text-sm text-slate-500">Nenhum cliente encontrado para os filtros atuais.</div>
-          ) : null}
+                      <Button className="h-8 px-3 text-xs" disabled={saving} onClick={() => void saveControls(tenant)}>
+                        {saving ? <Loader2 className="animate-spin" size={14} /> : "Salvar"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
+
+        {!filtered.length ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
+            Nenhum cliente encontrado para os filtros atuais.
+          </div>
+        ) : null}
       </div>
     </Card>
   );

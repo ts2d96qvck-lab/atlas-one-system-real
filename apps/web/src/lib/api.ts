@@ -129,7 +129,21 @@ export type TenantSummary = {
   billingStatus: "active" | "overdue" | "blocked";
   billingDueAt?: string | null;
   blockedAt?: string | null;
+  maxUsers?: number;
+  maxInstances?: number;
+  trialEndsAt?: string | null;
+  trialDaysRemaining?: number | null;
+  subscriptionStatus?: string;
+  trialActive?: boolean;
+  trialExpired?: boolean;
   _count: { users: number; conversations: number; leads: number; instances: number };
+};
+
+export type TenantControlsPayload = {
+  plan?: "starter" | "pro" | "enterprise";
+  maxUsers?: number;
+  maxInstances?: number;
+  trialEndsAt?: string | null;
 };
 
 export type AuditLogRow = {
@@ -808,6 +822,14 @@ export function updateTenantBilling(
   payload: { billingStatus: "active" | "overdue" | "blocked"; billingDueAt?: string | null }
 ) {
   return request<TenantSummary>(`/admin/tenants/${tenantId}/billing`, token, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateTenantControls(token: string, tenantId: string, payload: TenantControlsPayload) {
+  return request<TenantSummary>(`/admin/tenants/${tenantId}/controls`, token, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)

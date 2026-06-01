@@ -27,7 +27,7 @@ import { saveUserAvatar } from "../services/user-avatar.service";
 import { getTenantSsoSettings, updateTenantSsoSettings } from "../services/sso/sso.service";
 import { createUserInvite } from "../services/invite.service";
 import { auditLog, AUDIT_ACTIONS, listAuditLogsDetailed, exportAuditLogsCsv } from "../services/audit.service";
-import { listTenants, onboardTenant, ownerTenantOverview, updateTenantBilling } from "../services/tenant-onboarding.service";
+import { listTenants, onboardTenant, ownerTenantOverview, updateTenantBilling, updateTenantControls } from "../services/tenant-onboarding.service";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { sendError } from "../utils/http";
@@ -293,12 +293,40 @@ export async function adminRoutes(app: FastifyInstance) {
           action: "billing_status_updated",
           metadata: {
             billingStatus: updated.billingStatus,
-            blockedAt: updated.blockedAt?.toISOString() ?? null
+            blockedAt: updated.blockedAt ?? null
           }
         });
         return reply.send(updated);
       } catch (error) {
         return sendError(reply, 400, "Nao foi possivel atualizar o faturamento do tenant", error instanceof Error ? error.message : error);
+      }
+    }
+  );
+
+  app.patch(
+    "/tenants/:id/controls",
+    { preHandler: [requireAuth, requirePlatformAdmin()] },
+    async (request, reply) => {
+      const user = requireUser(request);
+      const { id } = request.params as { id: string };
+      try {
+        const updated = await updateTenantControls(id, request.body);
+        await auditLog({
+          tenantId: user.tenantId,
+          actorId: user.id,
+          entity: "Tenant",
+          entityId: id,
+          action: "tenant_controls_updated",
+          metadata: {
+            plan: updated.plan,
+            maxUsers: updated.maxUsers,
+            maxInstances: updated.maxInstances,
+            trialEndsAt: updated.trialEndsAt
+          }
+        });
+        return reply.send(updated);
+      } catch (error) {
+        return sendError(reply, 400, "Nao foi possivel atualizar controles do tenant", error instanceof Error ? error.message : error);
       }
     }
   );

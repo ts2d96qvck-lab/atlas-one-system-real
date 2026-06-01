@@ -347,6 +347,8 @@ export async function approveAccessRequest(tenantId: string, id: string) {
   });
   if (!user) throw new Error("Solicitacao nao encontrada");
 
+  await assertCanAddUser(tenantId);
+
   const permissions =
     Array.isArray(user.permissions) && user.permissions.length
       ? user.permissions

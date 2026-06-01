@@ -1,4 +1,5 @@
-import { DEFAULT_PLAN, TRIAL_DAYS } from "../services/billing/plans";
+import { DEFAULT_PLAN, getPlan, TRIAL_DAYS, type PlanId } from "../services/billing/plans";
+import { isTrialExpiredForTenant } from "../services/billing/billing.service";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
@@ -28,6 +29,63 @@ const updateTenantLimitsSchema = z.object({
   maxInstances: z.coerce.number().int().min(1).max(200),
   allowManagerAccess: z.boolean().optional()
 });
+
+const updateTenantControlsSchema = z.object({
+  plan: z.enum(["starter", "pro", "enterprise"]).optional(),
+  maxUsers: z.coerce.number().int().min(1).max(1000).optional(),
+  maxInstances: z.coerce.number().int().min(1).max(200).optional(),
+  trialEndsAt: z.string().datetime().nullable().optional()
+});
+
+function settingsObject(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  return {};
+}
+
+function billingObject(settings: Record<string, unknown>) {
+  if (settings.billing && typeof settings.billing === "object" && !Array.isArray(settings.billing)) {
+    return settings.billing as Record<string, unknown>;
+  }
+  return {};
+}
+
+type TenantWithCounts = Awaited<ReturnType<typeof listTenants>>[number];
+
+export function mapTenantForPlatformAdmin(tenant: TenantWithCounts) {
+  const settings = settingsObject(tenant.settings);
+  const plan = getPlan(tenant.plan);
+  const billing = billingObject(settings);
+  const maxUsers = Number(settings.maxUsers ?? plan.maxUsers);
+  const maxInstances = Number(settings.maxInstances ?? plan.maxInstances);
+  const trialEndsAtRaw = billing.trialEndsAt ? String(billing.trialEndsAt) : null;
+  const trialEndsAtDate = trialEndsAtRaw ? new Date(trialEndsAtRaw) : null;
+  const subscriptionStatus = String(billing.subscriptionStatus ?? "active");
+  const trialDaysRemaining =
+    trialEndsAtDate && !Number.isNaN(trialEndsAtDate.getTime())
+      ? Math.max(0, Math.ceil((trialEndsAtDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+      : null;
+
+  return {
+    id: tenant.id,
+    name: tenant.name,
+    slug: tenant.slug,
+    plan: tenant.plan,
+    billingStatus: tenant.billingStatus as "active" | "overdue" | "blocked",
+    billingDueAt: tenant.billingDueAt?.toISOString() ?? null,
+    blockedAt: tenant.blockedAt?.toISOString() ?? null,
+    maxUsers: Number.isFinite(maxUsers) ? maxUsers : plan.maxUsers,
+    maxInstances: Number.isFinite(maxInstances) ? maxInstances : plan.maxInstances,
+    trialEndsAt: trialEndsAtRaw,
+    trialDaysRemaining,
+    subscriptionStatus,
+    trialActive:
+      subscriptionStatus === "trialing" && trialEndsAtDate
+        ? trialEndsAtDate.getTime() > Date.now()
+        : false,
+    trialExpired: isTrialExpiredForTenant(tenant),
+    _count: tenant._count
+  };
+}
 
 export async function listTenants() {
   return prisma.tenant.findMany({
@@ -68,7 +126,45 @@ export async function ownerTenantOverview() {
     numbers: tenants.reduce((sum, row) => sum + row._count.instances, 0)
   };
 
-  return { summary, tenants };
+  return { summary, tenants: tenants.map(mapTenantForPlatformAdmin) };
+}
+
+export async function updateTenantControls(tenantId: string, input: unknown) {
+  const data = updateTenantControlsSchema.parse(input);
+  const exists = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!exists) throw new Error("Tenant nao encontrado");
+
+  const currentSettings = settingsObject(exists.settings);
+  const currentBilling = billingObject(currentSettings);
+  const settings = {
+    ...currentSettings,
+    ...(data.maxUsers != null ? { maxUsers: data.maxUsers } : {}),
+    ...(data.maxInstances != null ? { maxInstances: data.maxInstances } : {}),
+    billing: {
+      ...currentBilling,
+      ...(data.trialEndsAt !== undefined ? { trialEndsAt: data.trialEndsAt } : {})
+    }
+  };
+
+  const updated = await prisma.tenant.update({
+    where: { id: tenantId },
+    data: {
+      ...(data.plan ? { plan: data.plan as PlanId } : {}),
+      settings
+    },
+    include: {
+      _count: {
+        select: {
+          users: true,
+          conversations: true,
+          leads: true,
+          instances: true
+        }
+      }
+    }
+  });
+
+  return mapTenantForPlatformAdmin(updated);
 }
 
 export async function updateTenantBilling(tenantId: string, input: unknown) {
@@ -76,7 +172,7 @@ export async function updateTenantBilling(tenantId: string, input: unknown) {
   const exists = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!exists) throw new Error("Tenant nao encontrado");
 
-  return prisma.tenant.update({
+  const updated = await prisma.tenant.update({
     where: { id: tenantId },
     data: {
       billingStatus: data.billingStatus,
@@ -94,6 +190,8 @@ export async function updateTenantBilling(tenantId: string, input: unknown) {
       }
     }
   });
+
+  return mapTenantForPlatformAdmin(updated);
 }
 
 export async function updateTenantLimits(tenantId: string, input: unknown) {

@@ -96,6 +96,12 @@ export async function authRoutes(app: FastifyInstance) {
               exposeMessage: true
             });
           }
+          if (error.code === "trial_expired") {
+            return sendError(reply, 403, "Trial encerrado", error.message, {
+              requestId,
+              exposeMessage: true
+            });
+          }
           return sendError(reply, 422, "Verificacao adicional necessaria", error.message, {
             requestId,
             exposeMessage: true
