@@ -34,7 +34,6 @@ type Props = {
   tagCatalog: TagCatalogItem[];
   tagsSaving: boolean;
   onTagsChange: (tags: string[]) => void | Promise<void>;
-  onSetStatus: (status: "open" | "waiting_customer" | "closed") => void | Promise<void>;
 };
 
 const TABS: { id: ConversationDrawerTab; label: string }[] = [
@@ -64,8 +63,7 @@ export function ConversationDrawer({
   agents,
   tagCatalog,
   tagsSaving,
-  onTagsChange,
-  onSetStatus
+  onTagsChange
 }: Props) {
   const [transferAgentId, setTransferAgentId] = useState("");
   const [transferNote, setTransferNote] = useState("");
@@ -123,18 +121,6 @@ export function ConversationDrawer({
                 {active.assignedTo ? (
                   <p className="mt-1 text-[11px] text-slate-500">Atendente: {active.assignedTo.name}</p>
                 ) : null}
-              </div>
-              <div>
-                <label className="text-[11px] font-medium text-slate-600">Status do atendimento</label>
-                <select
-                  className="atlas-field mt-1 w-full rounded-lg px-3 py-2 text-sm outline-none"
-                  value={active.status}
-                  onChange={(e) => void onSetStatus(e.target.value as "open" | "waiting_customer" | "closed")}
-                >
-                  <option value="open">Aberto</option>
-                  <option value="waiting_customer">Aguardando cliente</option>
-                  <option value="closed">Fechado</option>
-                </select>
               </div>
               <div>
                 <label className="text-[11px] font-medium text-slate-600">Nome</label>
