@@ -105,6 +105,38 @@ function statusLabel(status: string) {
   return map[status] ?? status;
 }
 
+function statusShortLabel(status: string) {
+  const map: Record<string, string> = {
+    open: "Aberto",
+    waiting_customer: "Aguard.",
+    closed: "Fechado"
+  };
+  return map[status] ?? status.slice(0, 8);
+}
+
+function conversationAvatarFromTags(tags: unknown) {
+  if (!Array.isArray(tags)) return null;
+  const found = tags.find((tag) => typeof tag === "string" && tag.startsWith("avatar:"));
+  if (typeof found !== "string") return null;
+  return normalizeAvatarUrl(found.slice("avatar:".length).trim());
+}
+
+function formatPhoneDisplay(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.startsWith("55") && digits.length >= 12
+    ? `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`
+    : `+${digits}`;
+}
+
+function conversationDepartment(conversation: Conversation) {
+  return conversation.team?.name ?? "—";
+}
+
+function conversationAgentLabel(conversation: Conversation) {
+  return conversation.assignedTo?.name ?? "Sem responsavel";
+}
+
 function mediaUploadKey(conversationId: string, file: File) {
   return `${conversationId}:${file.name}:${file.size}:${file.lastModified}:${file.type}`;
 }
@@ -481,18 +513,38 @@ function MessageBubble({
 
 type ConversationHeaderBarProps = {
   active: Conversation;
+  accessToken: string;
   onOpenDrawer: () => void;
 };
 
-function ConversationHeaderBar({ active, onOpenDrawer }: ConversationHeaderBarProps) {
+function ConversationHeaderBar({ active, accessToken, onOpenDrawer }: ConversationHeaderBarProps) {
+  const avatarUrl = conversationAvatarFromTags(active.tags);
+  const phoneLine = formatPhoneDisplay(active.customerPhone);
+  const instanceLine = active.instance?.label ?? active.instance?.name ?? "";
+  const contextLine = [phoneLine, instanceLine].filter(Boolean).join(" · ");
+  const metaLine = `${statusLabel(active.status)} · ${conversationAgentLabel(active)} · ${conversationDepartment(active)}`;
+
   return (
-    <div className="flex items-center gap-3 border-b border-slate-100 bg-white px-4 py-3">
+    <div className="flex items-center gap-2 border-b border-slate-100 bg-white px-3 py-1.5 sm:px-4">
+      <CustomerAvatar
+        name={active.customerName}
+        phone={active.customerPhone}
+        avatarUrl={avatarUrl}
+        size="sm"
+        accessToken={accessToken}
+      />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{active.customerName}</p>
+          <span className="hidden text-slate-300 sm:inline">·</span>
+          <p className="hidden min-w-0 flex-1 truncate text-[11px] leading-tight text-slate-500 sm:block">{metaLine}</p>
+        </div>
+        <p className="truncate text-[10px] leading-tight text-slate-500 sm:hidden">{metaLine}</p>
+        {contextLine ? <p className="truncate text-[10px] leading-tight text-slate-400">{contextLine}</p> : null}
       </div>
       <button
         type="button"
-        className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
         onClick={onOpenDrawer}
       >
         Detalhes
@@ -1374,11 +1426,7 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   function getAvatarUrl(tags: unknown) {
-    if (!Array.isArray(tags)) return null;
-    const found = tags.find((tag) => typeof tag === "string" && tag.startsWith("avatar:"));
-    if (typeof found !== "string") return null;
-    const value = found.slice("avatar:".length).trim();
-    return normalizeAvatarUrl(value);
+    return conversationAvatarFromTags(tags);
   }
 
   async function handleCreateConversation() {
@@ -1614,23 +1662,47 @@ export function AtlasApp({ token, user }: Props) {
                   const selected = item.id === activeId;
                   const unread = isUnreadConversation(item);
                   const showDot = unread || isOverdueConversation(item);
+                  const listMeta = `${conversationAgentLabel(item)} · ${conversationDepartment(item)}`;
+                  const listTime = formatTime(item.lastMessageAt ?? last?.createdAt);
                   return (
                     <div key={item.id} className={`border-b border-slate-50 ${selected ? "bg-slate-50" : "bg-white"}`}>
                       <button
                         type="button"
                         onClick={() => openConversation(item.id)}
-                        className="flex w-full items-start gap-2.5 px-3 py-3.5 text-left hover:bg-slate-50/80"
+                        className="flex w-full items-start gap-2 px-2.5 py-2.5 text-left hover:bg-slate-50/80"
                       >
+                        <CustomerAvatar
+                          name={item.customerName}
+                          phone={item.customerPhone}
+                          avatarUrl={conversationAvatarFromTags(item.tags)}
+                          size="sm"
+                          accessToken={token}
+                        />
                         <div className="min-w-0 flex-1">
-                          <p className={`truncate text-[13px] leading-snug ${unread ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>
-                            {item.customerName}
-                          </p>
-                          <p className={`mt-1 truncate text-[12px] leading-snug ${unread ? "text-slate-500" : "text-slate-400"}`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <p
+                              className={`min-w-0 truncate text-[13px] leading-tight ${
+                                unread ? "font-semibold text-slate-900" : "font-medium text-slate-800"
+                              }`}
+                            >
+                              {item.customerName}
+                            </p>
+                            <div className="shrink-0 text-right leading-none">
+                              {listTime ? <p className="text-[10px] text-slate-400">{listTime}</p> : null}
+                              <p className="text-[10px] text-slate-400">{statusShortLabel(item.status)}</p>
+                            </div>
+                          </div>
+                          <p className="truncate text-[10px] leading-tight text-slate-400">{listMeta}</p>
+                          <p
+                            className={`mt-0.5 truncate text-[11px] leading-tight ${
+                              unread ? "text-slate-500" : "text-slate-400"
+                            }`}
+                          >
                             {last?.text ?? "—"}
                           </p>
                         </div>
                         {showDot ? (
-                          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-slate-900" aria-label={unread ? "Nao lida" : "Aguardando resposta"} />
+                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-700" aria-label={unread ? "Nao lida" : "Aguardando resposta"} />
                         ) : null}
                       </button>
                     </div>
@@ -1642,23 +1714,23 @@ export function AtlasApp({ token, user }: Props) {
             <Card className="flex min-h-[320px] min-w-0 flex-col rounded-none border-0 bg-white p-0 shadow-none md:min-h-0">
               {active ? (
                 <>
-                  <ConversationHeaderBar active={active} onOpenDrawer={() => setDrawerOpen(true)} />
-                  <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-slate-50/50 px-3 py-4 sm:px-5 sm:py-5">
+                  <ConversationHeaderBar active={active} accessToken={token} onOpenDrawer={() => setDrawerOpen(true)} />
+                  <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-slate-50/40 px-3 py-2 sm:px-4 sm:py-3">
                     {activeThreadFlash ? (
-                      <div className="sticky top-0 z-30 mb-3 flex justify-center">
-                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+                      <div className="sticky top-0 z-30 mb-2 flex justify-center">
+                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-medium text-slate-600 shadow-sm">
                           Nova mensagem
                         </span>
                       </div>
                     ) : null}
                     {groupMessagesForThread(active.messages ?? []).map((group) => (
-                      <section key={group.dateKey} className="mb-5 last:mb-0">
-                        <div className="sticky top-0 z-20 mb-3 flex justify-center">
-                          <span className="rounded-full border border-slate-200/80 bg-white/95 px-3 py-1 text-[11px] font-medium capitalize text-slate-600 shadow-sm backdrop-blur">
+                      <section key={group.dateKey} className="mb-3 last:mb-0">
+                        <div className="sticky top-0 z-20 mb-2 flex justify-center">
+                          <span className="rounded-full border border-slate-200/80 bg-white/95 px-2.5 py-0.5 text-[10px] font-medium capitalize text-slate-500 shadow-sm backdrop-blur">
                             {group.dateLabel}
                           </span>
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-1.5">
                           {group.clusters.map((cluster, clusterIndex) => (
                             <div key={`${group.dateKey}-${clusterIndex}`} className="space-y-0">
                               {cluster.map((m, messageIndex) => (
