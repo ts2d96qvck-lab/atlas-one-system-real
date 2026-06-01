@@ -20,6 +20,9 @@ import {
   Send,
   Square,
   Trash2,
+  User,
+  Volume2,
+  VolumeX,
   X
 } from "lucide-react";
 import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
@@ -61,6 +64,16 @@ import { apiUrl } from "../lib/config";
 import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
 import { mergeMessages, mediaSrc, messageDeliveryStatus, groupMessagesForThread } from "../lib/messages";
 import { hasPermission } from "../lib/session-user";
+import {
+  dispatchInboundNotification,
+  getNotificationPermission,
+  loadLastSeenMap,
+  loadNotificationPrefs,
+  persistLastSeenMap,
+  requestInboxNotificationPermission,
+  saveNotificationPrefs,
+  type InboxNotificationPrefs
+} from "../lib/inbox-notifications";
 
 type Props = { token: string; user: SessionUser };
 const ROLE_TO_DEPARTMENT: Record<string, string> = {
@@ -665,6 +678,11 @@ type UserProfileModalProps = {
   internalPhoto?: string | null;
   onUploadPhoto: (file: File) => Promise<void>;
   onLogout: () => void;
+  notificationPrefs: InboxNotificationPrefs;
+  onNotificationPrefsChange: (patch: Partial<InboxNotificationPrefs>) => void;
+  canMonitorQueue: boolean;
+  notifyPermission: NotificationPermission | "unsupported";
+  onRequestNotificationPermission: () => void | Promise<void>;
 };
 
 function UserProfileModal({
@@ -676,7 +694,12 @@ function UserProfileModal({
   activeDepartment,
   internalPhoto,
   onUploadPhoto,
-  onLogout
+  onLogout,
+  notificationPrefs,
+  onNotificationPrefsChange,
+  canMonitorQueue,
+  notifyPermission,
+  onRequestNotificationPermission
 }: UserProfileModalProps) {
   const [uploading, setUploading] = useState(false);
 
@@ -746,6 +769,49 @@ function UserProfileModal({
           />
         </label>
 
+        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <p className="text-xs font-semibold text-slate-800">Notificacoes do Inbox</p>
+          <p className="mt-1 text-[11px] text-slate-500">Alertas locais para novas mensagens recebidas.</p>
+          {notifyPermission === "unsupported" ? (
+            <p className="mt-2 text-[11px] text-amber-700">Este navegador nao suporta notificacoes.</p>
+          ) : notifyPermission === "denied" ? (
+            <p className="mt-2 text-[11px] text-amber-700">
+              Notificacoes bloqueadas no navegador. Libere nas configuracoes do site.
+            </p>
+          ) : notifyPermission === "default" ? (
+            <Button
+              variant="glass"
+              className="mt-2 h-8 px-3 text-xs"
+              onClick={() => void onRequestNotificationPermission()}
+            >
+              Ativar notificacoes
+            </Button>
+          ) : (
+            <p className="mt-2 text-[11px] text-emerald-700">Notificacoes ativas neste navegador.</p>
+          )}
+          <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+            <span className="inline-flex items-center gap-2 text-slate-700">
+              {notificationPrefs.soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+              Som ao receber mensagem
+            </span>
+            <input
+              type="checkbox"
+              checked={notificationPrefs.soundEnabled}
+              onChange={(e) => onNotificationPrefsChange({ soundEnabled: e.target.checked })}
+            />
+          </label>
+          {canMonitorQueue ? (
+            <label className="mt-2 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+              <span className="text-slate-700">Alertar fila sem atendente</span>
+              <input
+                type="checkbox"
+                checked={notificationPrefs.supervisorQueueAlerts}
+                onChange={(e) => onNotificationPrefsChange({ supervisorQueueAlerts: e.target.checked })}
+              />
+            </label>
+          ) : null}
+        </div>
+
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="glass" className="h-8 px-3 text-xs" onClick={onClose}>
             Fechar
@@ -793,7 +859,14 @@ export function AtlasApp({ token, user }: Props) {
   const [internalPhoto, setInternalPhoto] = useState<string | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
-  const [lastSeenByConversation, setLastSeenByConversation] = useState<Record<string, number>>({});
+  const [lastSeenByConversation, setLastSeenByConversation] = useState<Record<string, number>>(() =>
+    loadLastSeenMap(user.tenantId, user.id)
+  );
+  const [notificationPrefs, setNotificationPrefs] = useState<InboxNotificationPrefs>(() =>
+    loadNotificationPrefs(user.tenantId, user.id)
+  );
+  const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [activeThreadFlash, setActiveThreadFlash] = useState<string | null>(null);
   const [queueDepartmentId, setQueueDepartmentId] = useState<string>("all");
   const [queueOwnerId, setQueueOwnerId] = useState<string>("all");
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -801,6 +874,12 @@ export function AtlasApp({ token, user }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeIdRef = useRef<string | null>(null);
+  const notifyCtxRef = useRef({
+    userId: user.id,
+    canMonitorQueue: false,
+    prefs: notificationPrefs,
+    openConversation: (_id: string) => {}
+  });
   const sendingTextRef = useRef(false);
   const sendingMediaRef = useRef<string | null>(null);
   const [sendingText, setSendingText] = useState(false);
@@ -920,6 +999,25 @@ export function AtlasApp({ token, user }: Props) {
     joinTenant(user.tenantId, token);
 
     const onMessage = (payload: { conversation: Conversation; message: Message }) => {
+      const ctx = notifyCtxRef.current;
+      const conversationForNotify: Conversation = {
+        ...payload.conversation,
+        messages: mergeMessages(payload.conversation.messages ?? [], payload.message)
+      };
+      const decision = dispatchInboundNotification({
+        message: payload.message,
+        conversation: conversationForNotify,
+        userId: ctx.userId,
+        canMonitorQueue: ctx.canMonitorQueue,
+        prefs: ctx.prefs,
+        activeConversationId: activeIdRef.current,
+        onOpenConversation: (id) => ctx.openConversation(id)
+      });
+      if (decision.action === "active-thread") {
+        setActiveThreadFlash(payload.message.id);
+        window.setTimeout(() => setActiveThreadFlash(null), 2200);
+      }
+
       setConversations((current) => {
         const others = current.filter((item) => item.id !== payload.conversation.id);
         return [payload.conversation, ...others].sort((a, b) => {
@@ -953,6 +1051,38 @@ export function AtlasApp({ token, user }: Props) {
   const roleIsManager = user.role === "owner" || user.role === "admin" || user.role === "supervisor";
   const roleCanManageQueues = user.role === "owner" || user.role === "admin";
   const canMonitorByUser = roleCanManageQueues || hasPermission(user, "conversation:takeover");
+
+  useEffect(() => {
+    notifyCtxRef.current = {
+      userId: user.id,
+      canMonitorQueue: canMonitorByUser,
+      prefs: notificationPrefs,
+      openConversation: (id: string) => {
+        void openConversation(id);
+      }
+    };
+  }, [user.id, canMonitorByUser, notificationPrefs, openConversation]);
+
+  useEffect(() => {
+    setNotifyPermission(getNotificationPermission());
+    void requestInboxNotificationPermission().then((permission) => {
+      if (permission !== "unsupported") setNotifyPermission(permission);
+    });
+  }, []);
+
+  useEffect(() => {
+    persistLastSeenMap(user.tenantId, user.id, lastSeenByConversation);
+  }, [lastSeenByConversation, user.tenantId, user.id]);
+
+  function updateNotificationPrefs(patch: Partial<InboxNotificationPrefs>) {
+    setNotificationPrefs(saveNotificationPrefs(user.tenantId, user.id, patch));
+  }
+
+  async function handleRequestNotificationPermission() {
+    const permission = await requestInboxNotificationPermission();
+    if (permission !== "unsupported") setNotifyPermission(permission);
+  }
+
   const departmentOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const team of teams) map.set(team.id, team.name);
@@ -1493,7 +1623,23 @@ export function AtlasApp({ token, user }: Props) {
               {managerAlertCount} aguardando +5m
             </span>
           ) : null}
+          <button
+            type="button"
+            className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
+            title="Perfil e notificacoes"
+            onClick={() => setProfileOpen(true)}
+          >
+            <User size={16} />
+          </button>
         </header>
+        {notifyPermission === "default" ? (
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            <span>Ative notificacoes para receber alertas de novas mensagens do WhatsApp.</span>
+            <Button variant="glass" className="h-7 px-2.5 text-[11px]" onClick={() => void handleRequestNotificationPermission()}>
+              Ativar agora
+            </Button>
+          </div>
+        ) : null}
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
           <Card className={`flex min-h-[220px] min-w-0 flex-col border border-slate-200 bg-white/95 p-2.5 shadow-sm sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
@@ -1636,6 +1782,13 @@ export function AtlasApp({ token, user }: Props) {
                     onOpenDrawer={() => setDrawerOpen(true)}
                   />
                   <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-[#f7faff] px-3 py-4 sm:px-5 sm:py-5">
+                    {activeThreadFlash ? (
+                      <div className="sticky top-0 z-30 mb-3 flex justify-center">
+                        <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-800 shadow-sm">
+                          Nova mensagem recebida
+                        </span>
+                      </div>
+                    ) : null}
                     {groupMessagesForThread(active.messages ?? []).map((group) => (
                       <section key={group.dateKey} className="mb-5 last:mb-0">
                         <div className="sticky top-0 z-20 mb-3 flex justify-center">
@@ -1877,6 +2030,11 @@ export function AtlasApp({ token, user }: Props) {
         internalPhoto={internalPhoto}
         onUploadPhoto={uploadInternalPhoto}
         onLogout={logout}
+        notificationPrefs={notificationPrefs}
+        onNotificationPrefsChange={updateNotificationPrefs}
+        canMonitorQueue={canMonitorByUser}
+        notifyPermission={notifyPermission}
+        onRequestNotificationPermission={() => void handleRequestNotificationPermission()}
       />
     </main>
   );
