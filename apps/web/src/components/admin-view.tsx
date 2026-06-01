@@ -1168,12 +1168,13 @@ export function AdminView({ token, user }: Props) {
   }
 
   return (
-    <main className="w-full p-4 pb-28 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-5xl space-y-6">
+    <main className="atlas-page">
+      <div className="atlas-page-inner max-w-5xl space-y-6">
         <header>
-          <h1 className="text-3xl font-semibold">Administração</h1>
-          <p className="text-sm text-atlas-muted">WhatsApp, usuários e permissoes</p>
-          <p className="mt-1 text-xs">
+          <p className="atlas-section-title">Configuração</p>
+          <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">Administração</h1>
+          <p className="text-sm text-slate-500">Números WhatsApp, usuários, departamentos e integrações</p>
+          <p className="mt-2 text-xs text-slate-500">
             API:{" "}
             <span
               className={
@@ -1184,7 +1185,7 @@ export function AdminView({ token, user }: Props) {
                     : "font-semibold text-slate-500"
               }
             >
-              {apiHealth === "ok" ? "saudavel" : apiHealth === "down" ? "instavel" : "checando"}
+              {apiHealth === "ok" ? "saudável" : apiHealth === "down" ? "instável" : "verificando"}
             </span>
           </p>
           <nav className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -1197,14 +1198,14 @@ export function AdminView({ token, user }: Props) {
               { id: "admin-whatsapp", label: "WhatsApp" },
               { id: "admin-usuários", label: "Usuários" },
               { id: "admin-departamentos", label: "Departamentos" },
-              { id: "admin-robo", label: "Robo URA" },
+              { id: "admin-robo", label: "Robô URA" },
               { id: "admin-aprovação", label: "Aprovação" },
               { id: "admin-auditoria", label: "Auditoria" }
             ].map((item) => (
               <a
                 key={item.id}
                 href={`#${item.id}`}
-                className="shrink-0 rounded-full border border-white/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-800"
+                className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               >
                 {item.label}
               </a>

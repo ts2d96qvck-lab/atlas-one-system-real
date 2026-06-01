@@ -222,21 +222,21 @@ export function DashboardView({ token }: Props) {
       : "";
 
   return (
-    <main className="w-full p-4 pb-28 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl">
+    <main className="atlas-page">
+      <div className="atlas-page-inner max-w-7xl">
         <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-cyan-300">
+            <div className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-slate-900 text-cyan-300">
               <BarChart3 size={20} />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Atlas One</p>
+              <p className="atlas-section-title">Operação e vendas</p>
               <h1 className="text-2xl font-semibold text-slate-900 lg:text-3xl">Painel de performance</h1>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-right backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Confiança da previsão</p>
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-right">
+              <p className="text-[11px] font-medium text-slate-500">Confiança da previsão</p>
               <p className="text-xl font-semibold text-slate-900">{toPercent(Number(metrics.confidenceLevel ?? 0))}</p>
             </div>
             <Button
@@ -271,7 +271,7 @@ export function DashboardView({ token }: Props) {
         {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
 
         <div className="mb-5 grid gap-3 lg:grid-cols-4">
-          <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur lg:col-span-4">
+          <Card className="border border-slate-200 bg-white p-4 lg:col-span-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Timer size={18} className="text-cyan-700" />

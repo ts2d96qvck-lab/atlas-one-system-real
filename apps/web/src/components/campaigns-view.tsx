@@ -154,31 +154,37 @@ export function CampaignsView({ token }: Props) {
   }
 
   return (
-    <main className="w-full p-4 pb-28 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-3xl space-y-6">
+    <main className="atlas-page">
+      <div className="atlas-page-inner max-w-3xl space-y-6">
         <header className="flex items-center gap-3">
-          <Megaphone className="text-atlas-blue" size={28} />
+          <div className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-blue-600 text-white">
+            <Megaphone size={20} />
+          </div>
           <div>
-            <h1 className="text-3xl font-semibold">Campanhas</h1>
-            <p className="text-sm text-atlas-muted">Disparo em massa via WhatsApp (Evolution ou Meta template)</p>
+            <p className="atlas-section-title">Marketing</p>
+            <h1 className="text-2xl font-semibold text-slate-900">Campanhas</h1>
+            <p className="text-sm text-slate-500">Disparo em massa via WhatsApp</p>
           </div>
         </header>
 
         <Card className="p-5">
-          <p className="font-semibold">Nova campanha</p>
-          <p className="mt-1 text-xs text-atlas-muted">
-            Destinatários: um telefone por linha. Opcional: <code>5517999999999,Nome</code>. Variáveis:{" "}
+          <p className="font-semibold text-slate-900">Nova campanha</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Destinatários: um telefone por linha. Opcional: <code className="rounded bg-slate-100 px-1">5517999999999,Nome</code>. Variáveis:{" "}
             {"{{customer_name}}"}.
           </p>
           <div className="mt-4 space-y-3">
-            <input
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-900/80"
-              placeholder="Nome da campanha"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
+            <label className="block">
+              <span className="atlas-label mb-1.5">Nome da campanha</span>
+              <input
+                className="atlas-field w-full px-3 py-2 text-sm outline-none"
+                placeholder="Ex.: Promoção março"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </label>
             <select
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-900/80"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               value={form.instanceId}
               onChange={(e) => setForm({ ...form, instanceId: e.target.value })}
             >
@@ -190,7 +196,7 @@ export function CampaignsView({ token }: Props) {
               ))}
             </select>
             <select
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-900/80"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               value={form.messageKind}
               onChange={(e) => setForm({ ...form, messageKind: e.target.value as "session" | "template" })}
             >
@@ -200,13 +206,13 @@ export function CampaignsView({ token }: Props) {
             {form.messageKind === "template" ? (
               <>
                 <input
-                  className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-900/80"
+                  className="atlas-field w-full px-3 py-2 text-sm outline-none"
                   placeholder="Nome do template Meta (ex: hello_world)"
                   value={form.templateName}
                   onChange={(e) => setForm({ ...form, templateName: e.target.value })}
                 />
                 <input
-                  className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-900/80"
+                  className="atlas-field w-full px-3 py-2 text-sm outline-none"
                   placeholder="Idioma (ex: pt_BR)"
                   value={form.templateLanguage}
                   onChange={(e) => setForm({ ...form, templateLanguage: e.target.value })}
@@ -227,7 +233,7 @@ export function CampaignsView({ token }: Props) {
             />
             <div className="grid grid-cols-2 gap-3">
               <input
-                className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-900/80"
+                className="atlas-field w-full px-3 py-2 text-sm outline-none"
                 type="number"
                 min={1}
                 max={60}

@@ -127,37 +127,40 @@ export function AutomationsView({ token }: Props) {
   }
 
   return (
-    <main className="w-full p-4 pb-28 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-3xl space-y-6">
+    <main className="atlas-page">
+      <div className="atlas-page-inner max-w-3xl space-y-6">
         <header className="flex items-center gap-3">
-          <Bot className="text-atlas-blue" size={28} />
+          <div className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-violet-600 text-white">
+            <Bot size={20} />
+          </div>
           <div>
-            <h1 className="text-3xl font-semibold">Automacoes</h1>
-            <p className="text-sm text-atlas-muted">Regras + pagamentos Atlas One</p>
+            <p className="atlas-section-title">Operação</p>
+            <h1 className="text-2xl font-semibold text-slate-900">Automações</h1>
+            <p className="text-sm text-slate-500">Regras automáticas para leads e conversas</p>
           </div>
         </header>
 
         <Card className="p-5">
-          <p className="font-semibold">Nova automação</p>
-          <p className="mt-1 text-xs text-atlas-muted">
+          <p className="font-semibold text-slate-900">Nova automação</p>
+          <p className="mt-1 text-xs text-slate-500">
             Use variáveis no texto: {"{{customer_name}}"}, {"{{lead_status}}"}, {"{{lead_value}}"}.
           </p>
           <div className="mt-4 space-y-3">
             <input
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
-              placeholder="Nome"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
+              placeholder="Nome da automação"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
             <input
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               placeholder="Quando etapa for... (opcional)"
               value={form.whenStage}
               onChange={(e) => setForm({ ...form, whenStage: e.target.value })}
               disabled={form.trigger !== "lead.stage.changed"}
             />
             <select
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               value={form.trigger}
               onChange={(e) => setForm({ ...form, trigger: e.target.value })}
             >
@@ -169,13 +172,13 @@ export function AutomationsView({ token }: Props) {
               <option value="conversation.unassigned">Conversa sem atendente</option>
             </select>
             <textarea
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               placeholder="Mensagem automatica para enviar no WhatsApp"
               value={form.message}
               onChange={(e) => setForm({ ...form, message: e.target.value })}
             />
             <select
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               value={form.sendType}
               onChange={(e) => setForm({ ...form, sendType: e.target.value })}
             >
@@ -183,14 +186,14 @@ export function AutomationsView({ token }: Props) {
               <option value="audit">Somente auditoria (não envia mensagem)</option>
             </select>
             <input
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               type="number"
               min={0}
               placeholder="Valor minimo do lead para disparar (opcional)"
               value={form.minLeadValue}
               onChange={(e) => setForm({ ...form, minLeadValue: e.target.value })}
             />
-            <label className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm">
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
               <input
                 type="checkbox"
                 checked={form.onlyBusinessHours}
@@ -199,13 +202,13 @@ export function AutomationsView({ token }: Props) {
               Rodar apenas em horario comercial (seg-sex, 08h-18h)
             </label>
             <input
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               type="datetime-local"
               value={form.scheduleAt}
               onChange={(e) => setForm({ ...form, scheduleAt: e.target.value })}
             />
             <input
-              className="w-full rounded-xl bg-white/80 px-3 py-2 text-sm"
+              className="atlas-field w-full px-3 py-2 text-sm outline-none"
               type="time"
               value={form.scheduleTime}
               onChange={(e) => setForm({ ...form, scheduleTime: e.target.value })}
