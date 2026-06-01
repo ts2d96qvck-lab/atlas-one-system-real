@@ -4,8 +4,14 @@
 
 :root {
   color-scheme: light;
-  --atlas-ink: #07111f;
-  --atlas-muted: #61708a;
+  --atlas-ink: #0f172a;
+  --atlas-muted: #64748b;
+  --atlas-border: #e2e8f0;
+  --atlas-surface: #ffffff;
+  --atlas-accent: #2563eb;
+  --atlas-radius-sm: 8px;
+  --atlas-radius-md: 12px;
+  --atlas-radius-lg: 16px;
 }
 
 html.dark {
@@ -27,19 +33,14 @@ body {
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 18% 8%, rgba(110, 185, 255, 0.36), transparent 32rem),
-    radial-gradient(circle at 85% 12%, rgba(153, 129, 255, 0.22), transparent 28rem),
-    linear-gradient(135deg, #fbfdff 0%, #eef5ff 48%, #f8fbff 100%);
+  background: #f8fafc;
   color: var(--atlas-ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 html.dark body {
-  background:
-    radial-gradient(circle at 18% 8%, rgba(68, 117, 190, 0.18), transparent 32rem),
-    radial-gradient(circle at 85% 12%, rgba(98, 78, 171, 0.14), transparent 28rem),
-    linear-gradient(135deg, #0b1220 0%, #0f172a 46%, #111827 100%);
+  background: #0f172a;
   color: var(--atlas-ink);
 }
 
@@ -48,28 +49,66 @@ html.dark body {
 }
 
 .glass-panel {
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.64);
-  box-shadow: 0 8px 28px rgba(24, 62, 132, 0.08);
-  backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid var(--atlas-border);
+  background: var(--atlas-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 html.dark .glass-panel {
-  border-color: rgba(100, 116, 139, 0.35);
-  background: rgba(15, 23, 42, 0.72);
-  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.42);
+  border-color: rgba(71, 85, 105, 0.65);
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 4px 16px rgba(2, 6, 23, 0.35);
 }
 
 .atlas-field {
-  border: 1px solid rgba(203, 213, 225, 0.95);
-  background: rgba(255, 255, 255, 0.92);
-  color: #0f172a;
+  border: 1px solid var(--atlas-border);
+  background: var(--atlas-surface);
+  color: var(--atlas-ink);
+  border-radius: var(--atlas-radius-md);
 }
 
 html.dark .atlas-field {
   border-color: rgba(71, 85, 105, 0.85);
-  background: rgba(15, 23, 42, 0.92);
+  background: rgba(15, 23, 42, 0.96);
   color: #e2e8f0;
+}
+
+.atlas-page {
+  width: 100%;
+  padding: 1rem 1rem 7rem;
+}
+
+@media (min-width: 640px) {
+  .atlas-page {
+    padding: 1.5rem 1.5rem 7rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .atlas-page {
+    padding: 2rem 2rem 7rem;
+  }
+}
+
+.atlas-page-inner {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 80rem;
+}
+
+.atlas-section-title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--atlas-muted);
+}
+
+.atlas-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--atlas-muted);
 }
 
 html.dark .atlas-field::placeholder {

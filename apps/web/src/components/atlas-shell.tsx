@@ -490,10 +490,10 @@ export function AtlasShell() {
     return (
       <>
         <ThemeToggle theme={theme} onToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))} />
-        <main className="flex min-h-dvh items-center justify-center overflow-y-auto overflow-x-hidden bg-gradient-to-br from-slate-50 via-blue-50/40 to-violet-50/30 p-4 py-8 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 sm:p-6">
-          <Card className="my-auto w-full max-w-md border-white/80 p-6 shadow-xl shadow-blue-500/10 sm:p-8">
+        <main className="flex min-h-dvh items-center justify-center overflow-y-auto overflow-x-hidden bg-slate-50 p-4 py-8 dark:bg-slate-950 sm:p-6">
+          <Card className="my-auto w-full max-w-md border-slate-200 p-6 shadow-sm sm:p-8">
           <div className="mb-6 text-center">
-            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-500 text-white shadow-lg shadow-blue-500/30">
+            <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-blue-600 text-white shadow-sm">
               <Shield size={24} />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Atlas One</h1>
@@ -506,7 +506,7 @@ export function AtlasShell() {
           </div>
 
           {!challengeId && authMode !== "forgot" && authMode !== "invite" ? (
-            <div className="mb-5 grid grid-cols-3 gap-1 rounded-2xl bg-slate-100/80 p-1 dark:bg-slate-800/60">
+            <div className="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800/80">
               {([
                 ["login", "Entrar"],
                 ["register", "Criar conta"],
@@ -520,9 +520,9 @@ export function AtlasShell() {
                     setError("");
                     setInfo("");
                   }}
-                  className={`rounded-xl px-2 py-2 text-xs font-semibold transition sm:text-sm ${
+                  className={`rounded-lg px-2 py-2 text-xs font-semibold transition sm:text-sm ${
                     authMode === mode
-                      ? "bg-white text-blue-700 shadow dark:bg-slate-900 dark:text-blue-300"
+                      ? "bg-white text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300"
                       : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
                   }`}
                 >
@@ -896,7 +896,7 @@ export function AtlasShell() {
       />
 
       <div className="fixed bottom-3 left-1/2 z-50 flex w-[min(calc(100vw-1.5rem),920px)] -translate-x-1/2 flex-col items-center gap-1.5 px-2 pb-[env(safe-area-inset-bottom)]">
-        <div className="glass-panel flex max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl px-2 py-1.5 backdrop-blur-xl sm:gap-2">
+        <div className="glass-panel flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl p-1 sm:gap-1">
           {visibleViews.map((item) => {
             const isActive = view === item.id;
             return (
@@ -904,10 +904,10 @@ export function AtlasShell() {
                 key={item.id}
                 type="button"
                 onClick={() => setView(item.id)}
-                className={`relative shrink-0 rounded-xl px-2 py-1.5 text-xs font-semibold tracking-wide transition sm:px-2.5 sm:text-sm ${
+                className={`relative shrink-0 rounded-xl px-3 py-2 text-xs font-medium transition sm:text-sm ${
                   isActive
-                    ? "bg-white/90 text-blue-700 shadow-sm dark:bg-slate-900/90 dark:text-blue-300"
-                    : "text-slate-600 hover:text-blue-700 dark:text-slate-400"
+                    ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                 }`}
               >
                 {item.label}
@@ -915,7 +915,7 @@ export function AtlasShell() {
             );
           })}
         </div>
-        <div className="text-[10px] text-slate-500">atualizado · {liveAt}</div>
+        <div className="text-[10px] font-medium text-slate-400">atualizado · {liveAt}</div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 pt-2 sm:pb-28">

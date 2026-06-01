@@ -1,15 +1,16 @@
 export const atlasTheme = {
   radius: {
-    sm: "12px",
-    md: "18px",
-    lg: "28px"
+    sm: "8px",
+    md: "12px",
+    lg: "16px",
+    xl: "20px"
   },
   colors: {
-    ink: "#07111f",
-    muted: "#61708a",
-    blue: "#1f6fff",
-    violet: "#8b7cff",
-    surface: "rgba(255,255,255,0.72)"
+    ink: "#0f172a",
+    muted: "#64748b",
+    accent: "#2563eb",
+    surface: "#ffffff",
+    border: "#e2e8f0"
   }
 } as const;
 

@@ -14,14 +14,14 @@ type Props = {
 
 export function EmptyState({ icon: Icon = Inbox, title, description, actionLabel, onAction }: Props) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200/80 bg-white/40 px-6 py-10 text-center dark:border-slate-700 dark:bg-slate-900/30">
-      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-        <Icon size={22} />
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-900/40">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <Icon size={20} strokeWidth={1.75} />
       </div>
-      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
-      <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">{description}</p>
+      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</p>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">{description}</p>
       {actionLabel && onAction ? (
-        <Button className="mt-4 h-9 px-4 text-xs" variant="glass" onClick={onAction}>
+        <Button className="mt-5 h-9 px-4 text-xs" variant="glass" onClick={onAction}>
           {actionLabel}
         </Button>
       ) : null}
