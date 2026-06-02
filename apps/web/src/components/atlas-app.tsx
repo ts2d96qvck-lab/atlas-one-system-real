@@ -16,7 +16,6 @@ import {
   MoreVertical,
   Paperclip,
   Plus,
-  Search,
   Send,
   Square,
   Trash2,
@@ -459,7 +458,7 @@ function MessageBubble({
         {hiddenVisible ? (
           <p className="mb-1 text-[10px] font-medium text-amber-700">Conteúdo oculto (visível para supervisão)</p>
         ) : null}
-        {clustered && !clusterFirst ? null : (
+        {clustered && !clusterFirst ? null : !outgoing || messageSenderLabel(raw, outgoing) !== "Atendente" ? (
         <div className="mb-1 flex items-center justify-between gap-2">
           <p className="text-[10px] font-semibold text-slate-500">{messageSenderLabel(raw, outgoing)}</p>
           {(canManage && outgoing) || canHide ? (
@@ -489,7 +488,7 @@ function MessageBubble({
             </div>
           ) : null}
         </div>
-        )}
+        ) : null}
         {replyTo ? (
           <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
             <p className="text-[10px] font-semibold text-slate-600">Resposta direcionada</p>
@@ -557,7 +556,6 @@ type ConversationHeaderBarProps = {
   onFilterAssignee?: () => void;
   onFilterTeam?: () => void;
   onFilterInstance?: () => void;
-  onFilterStatus?: () => void;
 };
 
 function statusDotClass(status: string) {
@@ -576,8 +574,7 @@ function ConversationHeaderBar({
   onOpenDrawer,
   onFilterAssignee,
   onFilterTeam,
-  onFilterInstance,
-  onFilterStatus
+  onFilterInstance
 }: ConversationHeaderBarProps) {
   const assignee = active.assignedTo?.name ?? "Sem atendente";
   const teamName = active.team?.name ?? "Sem departamento";
@@ -595,26 +592,7 @@ function ConversationHeaderBar({
           accessToken={accessToken}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusToneClass(active.status)} ${
-                onFilterStatus ? "cursor-pointer hover:ring-1 hover:ring-slate-300" : ""
-              }`}
-              title={onFilterStatus ? "Filtrar fila por este status" : undefined}
-              onClick={onFilterStatus}
-              onKeyDown={(e) => {
-                if (onFilterStatus && (e.key === "Enter" || e.key === " ")) {
-                  e.preventDefault();
-                  onFilterStatus();
-                }
-              }}
-              role={onFilterStatus ? "button" : undefined}
-              tabIndex={onFilterStatus ? 0 : undefined}
-            >
-              {statusLabel(active.status)}
-            </span>
-          </div>
+          <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
           <p className="truncate text-xs text-slate-500">{formatPhoneDisplay(active.customerPhone)}</p>
         </div>
         <Popover>
@@ -625,7 +603,7 @@ function ConversationHeaderBar({
               title="Alterar status"
             >
               <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
-              Status
+              {statusLabel(active.status)}
               <ChevronDown size={12} className="text-slate-400" />
             </button>
           </PopoverTrigger>
@@ -952,7 +930,6 @@ export function AtlasApp({ token, user }: Props) {
     loadNotificationPrefs(user.tenantId, user.id)
   );
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
-  const [activeThreadFlash, setActiveThreadFlash] = useState<string | null>(null);
   const [queueBucket, setQueueBucket] = useState<"active" | "history" | "all">("active");
   const [queueDepartmentId, setQueueDepartmentId] = useState<string>("all");
   const [queueOwnerId, setQueueOwnerId] = useState<string>("all");
@@ -1138,8 +1115,6 @@ export function AtlasApp({ token, user }: Props) {
         onOpenConversation: (id) => ctx.openConversation(id)
       });
       if (decision.action === "active-thread") {
-        setActiveThreadFlash(message.id);
-        window.setTimeout(() => setActiveThreadFlash(null), 2200);
       }
 
       setConversations((current) => {
@@ -1189,9 +1164,6 @@ export function AtlasApp({ token, user }: Props) {
 
   useEffect(() => {
     setNotifyPermission(getNotificationPermission());
-    void requestInboxNotificationPermission().then((permission) => {
-      if (permission !== "unsupported") setNotifyPermission(permission);
-    });
   }, []);
 
   useEffect(() => {
@@ -1461,22 +1433,6 @@ export function AtlasApp({ token, user }: Props) {
     }
     return rows;
   }, [visibleConversations, search, tagFilter, activeId, conversations]);
-
-  const whatsappOperationalStatus = useMemo(() => {
-    const instances = new Map<string, { label: string; connected: boolean }>();
-    for (const row of visibleConversations) {
-      const inst = row.instance;
-      if (!inst?.id) continue;
-      const state = String(inst.status ?? "").toLowerCase();
-      instances.set(inst.id, {
-        label: inst.label || inst.name || "WhatsApp",
-        connected: state === "connected" || state === "open"
-      });
-    }
-    const rows = [...instances.values()];
-    const connected = rows.filter((item) => item.connected).length;
-    return { total: rows.length, connected, rows };
-  }, [visibleConversations]);
 
   async function sendCurrentDraft() {
     if (sendingTextRef.current) return;
@@ -1879,26 +1835,12 @@ export function AtlasApp({ token, user }: Props) {
     <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-2.5 lg:p-3">
       <section className="flex h-full min-h-0 flex-col overflow-hidden">
         <header className={`glass-panel flex min-h-12 shrink-0 flex-wrap items-center gap-2 ${INBOX_PANEL_CLASS} px-3 py-2 sm:gap-3 sm:px-4`}>
-          <Search className="shrink-0 text-slate-400" size={18} />
           <input
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
             placeholder="Buscar por nome, telefone ou empresa..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {whatsappOperationalStatus.total ? (
-            <span
-              className={`hidden items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-medium sm:inline-flex ${
-                whatsappOperationalStatus.connected === whatsappOperationalStatus.total
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : "border-amber-200 bg-amber-50 text-amber-800"
-              }`}
-              title="Status dos números WhatsApp visíveis na fila"
-            >
-              <MessageCircle size={12} />
-              WhatsApp {whatsappOperationalStatus.connected}/{whatsappOperationalStatus.total}
-            </span>
-          ) : null}
           {roleIsManager && managerAlertCount > 0 ? (
             <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
               {managerAlertCount} fora do SLA
@@ -1913,15 +1855,6 @@ export function AtlasApp({ token, user }: Props) {
             <User size={16} />
           </button>
         </header>
-        {notifyPermission === "default" ? (
-          <div className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-            <span>Ative notificações para receber alertas de novas mensagens do WhatsApp.</span>
-            <Button variant="glass" className="h-7 px-2.5 text-[11px]" onClick={() => void handleRequestNotificationPermission()}>
-              Ativar agora
-            </Button>
-          </div>
-        ) : null}
-
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
           <Card className={`flex min-h-[220px] min-w-0 flex-col p-2.5 sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
             <div className="mt-2 flex flex-wrap gap-1">
@@ -1942,12 +1875,6 @@ export function AtlasApp({ token, user }: Props) {
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-[10px] leading-snug text-slate-500">{INBOX_QUEUE_BUCKET_HELP[queueBucket]}</p>
-            {queueBucket === "history" ? (
-              <p className="mt-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-[10px] text-sky-900">
-                Conversas encerradas e arquivadas ficam aqui. Use <strong>Todas</strong> ou a busca para localizar qualquer histórico.
-              </p>
-            ) : null}
             {activeQueueFilters.length ? (
               <div className="mt-2 flex flex-wrap gap-1">
                 {activeQueueFilters.map((filter) => (
@@ -2089,8 +2016,6 @@ export function AtlasApp({ token, user }: Props) {
                   const slaState = computeConversationSla(item, slaConfig);
                   const dotClass = overdue ? "bg-rose-500" : unread ? "bg-blue-500" : statusDotClass(item.status);
                   const assigneeName = item.assignedTo?.name ?? "Sem atendente";
-                  const teamName = item.team?.name ?? "Sem departamento";
-                  const instanceLabel = item.instance?.label || item.instance?.name || "WhatsApp";
                   return (
                     <div
                       key={item.id}
@@ -2153,28 +2078,14 @@ export function AtlasApp({ token, user }: Props) {
                             >
                               {assigneeName}
                             </button>
-                            <button
-                              type="button"
-                              className="truncate rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
-                              title="Filtrar por departamento"
-                              onClick={() => applyChipFilter("team", item)}
-                            >
-                              {teamName}
-                            </button>
-                            <button
-                              type="button"
-                              className="truncate rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
-                              title="Filtrar por número WhatsApp"
-                              onClick={() => applyChipFilter("instance", item)}
-                            >
-                              {instanceLabel}
-                            </button>
-                            <span
-                              className={`rounded border px-1.5 py-0.5 text-[10px] ${slaToneClass(slaState.tone)}`}
-                              title={slaState.detailLabel}
-                            >
-                              {slaState.summaryLabel}
-                            </span>
+                            {overdue ? (
+                              <span
+                                className={`rounded border px-1.5 py-0.5 text-[10px] ${slaToneClass(slaState.tone)}`}
+                                title={slaState.detailLabel}
+                              >
+                                {slaState.summaryLabel}
+                              </span>
+                            ) : null}
                           </div>
                           <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-1 pl-10" />
                         </div>
@@ -2212,16 +2123,8 @@ export function AtlasApp({ token, user }: Props) {
                     onFilterAssignee={() => applyChipFilter("assignee", active)}
                     onFilterTeam={() => applyChipFilter("team", active)}
                     onFilterInstance={() => applyChipFilter("instance", active)}
-                    onFilterStatus={() => applyChipFilter("status", active)}
                   />
-                  <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-[#f7faff] px-3 py-4 sm:px-5 sm:py-5">
-                    {activeThreadFlash ? (
-                      <div className="sticky top-0 z-30 mb-3 flex justify-center">
-                        <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-800 shadow-sm">
-                          Nova mensagem recebida
-                        </span>
-                      </div>
-                    ) : null}
+                  <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-slate-50/80 px-3 py-4 sm:px-5 sm:py-5">
                     {groupMessagesForThread(active.messages ?? []).map((group) => (
                       <section key={group.dateKey} className="mb-5 last:mb-0">
                         <div className="sticky top-0 z-20 mb-3 flex justify-center">
