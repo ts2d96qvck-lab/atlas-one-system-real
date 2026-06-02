@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Moon, Shield, Sun } from "lucide-react";
+import { Bot, Inbox, LayoutDashboard, Loader2, Megaphone, Moon, Settings, Shield, Sun, Users } from "lucide-react";
 import { Button, Card } from "@atlas-one/ui";
 import {
   acceptInvite,
@@ -32,12 +32,12 @@ import { NAV, roleLabel } from "../lib/product-copy";
 const STORAGE_KEY = "atlas-one-session-v2";
 
 const views = [
-  { id: "inbox", label: NAV.inbox },
-  { id: "dashboard", label: NAV.dashboard },
-  { id: "admin", label: NAV.admin },
-  { id: "crm", label: NAV.crm },
-  { id: "campanhas", label: NAV.campanhas },
-  { id: "automacoes", label: NAV.automacoes }
+  { id: "inbox", label: NAV.inbox, icon: Inbox },
+  { id: "dashboard", label: NAV.dashboard, icon: LayoutDashboard },
+  { id: "admin", label: NAV.admin, icon: Settings },
+  { id: "crm", label: NAV.crm, icon: Users },
+  { id: "campanhas", label: NAV.campanhas, icon: Megaphone },
+  { id: "automacoes", label: NAV.automacoes, icon: Bot }
 ] as const;
 
 export type AtlasView = (typeof views)[number]["id"];
@@ -490,7 +490,7 @@ export function AtlasShell() {
     return (
       <>
         <ThemeToggle theme={theme} onToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))} />
-        <main className="flex min-h-dvh items-center justify-center overflow-y-auto overflow-x-hidden bg-slate-50 p-4 py-8 dark:bg-slate-950 sm:p-6">
+        <main className="atlas-app-bg flex min-h-dvh items-center justify-center overflow-y-auto overflow-x-hidden p-4 py-8 sm:p-6">
           <Card className="my-auto w-full max-w-md border-slate-200 p-6 shadow-sm sm:p-8">
           <div className="mb-6 text-center">
             <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-blue-600 text-white shadow-sm">
@@ -888,49 +888,93 @@ export function AtlasShell() {
   }
 
   return (
-    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden">
-      <ThemeToggle
-        theme={theme}
-        onToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-        className="fixed right-4 top-4 z-[60]"
-      />
-
-      <div className="fixed bottom-3 left-1/2 z-50 flex w-[min(calc(100vw-1.5rem),920px)] -translate-x-1/2 flex-col items-center gap-1.5 px-2 pb-[env(safe-area-inset-bottom)]">
-        <div className="glass-panel flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl p-1 sm:gap-1">
+    <div className="atlas-app-bg flex h-dvh max-h-dvh overflow-hidden">
+      <aside className="atlas-glass-strong hidden w-[15.5rem] shrink-0 flex-col border-r border-white/50 lg:flex">
+        <div className="border-b border-white/40 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Atlas One</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900">{session.user.tenantSlug}</p>
+          <p className="truncate text-xs text-slate-500">
+            {session.user.name} · {roleLabel(session.user.role)}
+          </p>
+        </div>
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
           {visibleViews.map((item) => {
             const isActive = view === item.id;
+            const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setView(item.id)}
-                className={`relative shrink-0 rounded-xl px-3 py-2 text-xs font-medium transition sm:text-sm ${
-                  isActive
-                    ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                }`}
+                className={`atlas-nav-item ${isActive ? "atlas-nav-item-active" : ""}`}
               >
+                <Icon size={17} className="shrink-0 opacity-80" />
                 {item.label}
               </button>
             );
           })}
+        </nav>
+        <div className="border-t border-white/40 p-3">
+          <button
+            type="button"
+            className="atlas-nav-item w-full"
+            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+          >
+            {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+            {theme === "dark" ? "Modo claro" : "Modo noturno"}
+          </button>
+          <p className="mt-2 px-1 text-[10px] text-slate-400">Atualizado · {liveAt}</p>
         </div>
-        <div className="text-[10px] font-medium text-slate-400">atualizado · {liveAt}</div>
-      </div>
+      </aside>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 sm:pb-32">
-      {view === "inbox" ? <AtlasApp token={session.token} user={session.user} /> : null}
-      {view === "dashboard" && canAccessView(session.user, "dashboard") ? <DashboardView token={session.token} /> : null}
-      {canAccessView(session.user, "admin") && adminMounted ? (
-        <div className={view === "admin" ? "" : "hidden"} aria-hidden={view !== "admin"}>
-          <AdminView token={session.token} user={session.user} />
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <ThemeToggle
+          theme={theme}
+          onToggle={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+          className="fixed right-4 top-4 z-[60] lg:hidden"
+        />
+
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 lg:pb-4 lg:pt-3">
+          {view === "inbox" ? <AtlasApp token={session.token} user={session.user} /> : null}
+          {view === "dashboard" && canAccessView(session.user, "dashboard") ? <DashboardView token={session.token} /> : null}
+          {canAccessView(session.user, "admin") && adminMounted ? (
+            <div className={view === "admin" ? "" : "hidden"} aria-hidden={view !== "admin"}>
+              <AdminView token={session.token} user={session.user} />
+            </div>
+          ) : null}
+          {view === "crm" ? <CrmView token={session.token} /> : null}
+          {view === "campanhas" && canAccessView(session.user, "campanhas") ? (
+            <CampaignsView token={session.token} />
+          ) : null}
+          {view === "automacoes" && canAccessView(session.user, "automacoes") ? (
+            <AutomationsView token={session.token} />
+          ) : null}
         </div>
-      ) : null}
-      {view === "crm" ? <CrmView token={session.token} /> : null}
-      {view === "campanhas" && canAccessView(session.user, "campanhas") ? (
-        <CampaignsView token={session.token} />
-      ) : null}
-      {view === "automacoes" && canAccessView(session.user, "automacoes") ? <AutomationsView token={session.token} /> : null}
+
+        <div className="fixed bottom-3 left-1/2 z-50 flex w-[min(calc(100vw-1.5rem),920px)] -translate-x-1/2 flex-col items-center gap-1.5 px-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
+          <div className="glass-panel flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl p-1 sm:gap-1">
+            {visibleViews.map((item) => {
+              const isActive = view === item.id;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setView(item.id)}
+                  className={`relative flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-medium transition sm:px-3 sm:text-sm ${
+                    isActive
+                      ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900"
+                      : "text-slate-600 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                  }`}
+                >
+                  <Icon size={14} />
+                  <span className="hidden sm:inline">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="text-[10px] font-medium text-slate-400">Atualizado · {liveAt}</div>
+        </div>
       </div>
     </div>
   );

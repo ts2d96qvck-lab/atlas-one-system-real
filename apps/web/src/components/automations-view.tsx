@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bot, Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
+import { AtlasViewHeader } from "./atlas-view-header";
 
 type Props = { token: string };
 
@@ -129,16 +130,13 @@ export function AutomationsView({ token }: Props) {
   return (
     <main className="atlas-page">
       <div className="atlas-page-inner max-w-3xl space-y-6">
-        <header className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-violet-600 text-white">
-            <Bot size={20} />
-          </div>
-          <div>
-            <p className="atlas-section-title">Operação</p>
-            <h1 className="text-2xl font-semibold text-slate-900">Automações</h1>
-            <p className="text-sm text-slate-500">Regras automáticas para leads e conversas</p>
-          </div>
-        </header>
+        <AtlasViewHeader
+          icon={Bot}
+          section="Operação"
+          title="Automações"
+          description="Regras automáticas para leads e conversas"
+          iconClassName="bg-violet-600 text-white border-violet-500/30"
+        />
 
         <Card className="p-5">
           <p className="font-semibold text-slate-900">Nova automação</p>

@@ -5,6 +5,7 @@ import { Activity, BarChart3, Download, Gauge, Loader2, Target, Timer, TrendingU
 import { Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { downloadOpsExport } from "../lib/api";
+import { AtlasViewHeader } from "./atlas-view-header";
 
 type Props = { token: string };
 
@@ -224,50 +225,46 @@ export function DashboardView({ token }: Props) {
   return (
     <main className="atlas-page">
       <div className="atlas-page-inner w-full min-w-0 max-w-[88rem]">
-        <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-slate-900 text-cyan-300">
-              <BarChart3 size={20} />
-            </div>
-            <div>
-              <p className="atlas-section-title">Operação e vendas</p>
-              <h1 className="text-2xl font-semibold text-slate-900 lg:text-3xl">Painel de performance</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-right">
-              <p className="text-[11px] font-medium text-slate-500">Confiança da previsão</p>
-              <p className="text-xl font-semibold text-slate-900">{toPercent(Number(metrics.confidenceLevel ?? 0))}</p>
-            </div>
-            <Button
-              variant="glass"
-              className="h-10 gap-2 text-xs"
-              disabled={!!exporting}
-              onClick={() => void handleExport("leads")}
-            >
-              {exporting === "leads" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-              Leads CSV
-            </Button>
-            <Button
-              variant="glass"
-              className="h-10 gap-2 text-xs"
-              disabled={!!exporting}
-              onClick={() => void handleExport("conversations")}
-            >
-              {exporting === "conversations" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-              Conversas CSV
-            </Button>
-            <Button
-              variant="glass"
-              className="h-10 gap-2 text-xs"
-              disabled={!!exporting}
-              onClick={() => void handleExport("messages")}
-            >
-              {exporting === "messages" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-              Mensagens CSV
-            </Button>
-          </div>
-        </header>
+        <AtlasViewHeader
+          icon={BarChart3}
+          section="Operação e vendas"
+          title="Painel de performance"
+          actions={
+            <>
+              <div className="glass-panel rounded-atlas px-3 py-2 text-right">
+                <p className="text-[11px] font-medium text-slate-500">Confiança da previsão</p>
+                <p className="text-xl font-semibold text-slate-900">{toPercent(Number(metrics.confidenceLevel ?? 0))}</p>
+              </div>
+              <Button
+                variant="glass"
+                className="h-10 gap-2 text-xs"
+                disabled={!!exporting}
+                onClick={() => void handleExport("leads")}
+              >
+                {exporting === "leads" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                Leads CSV
+              </Button>
+              <Button
+                variant="glass"
+                className="h-10 gap-2 text-xs"
+                disabled={!!exporting}
+                onClick={() => void handleExport("conversations")}
+              >
+                {exporting === "conversations" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                Conversas CSV
+              </Button>
+              <Button
+                variant="glass"
+                className="h-10 gap-2 text-xs"
+                disabled={!!exporting}
+                onClick={() => void handleExport("messages")}
+              >
+                {exporting === "messages" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                Mensagens CSV
+              </Button>
+            </>
+          }
+        />
         {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
 
         <div className="mb-5 grid gap-3 lg:grid-cols-4">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Building2, CreditCard, Hash, Loader2, Link2, MessageCircle, Plug, Plus, QrCode, RefreshCw, Settings, Shield, Smartphone, Trash2, Users } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
+import { AtlasViewHeader } from "./atlas-view-header";
 import {
   approveAccessRequest,
   connectInstance,
@@ -1170,11 +1171,14 @@ export function AdminView({ token, user }: Props) {
   return (
     <main className="atlas-page">
       <div className="atlas-page-inner max-w-5xl space-y-6">
-        <header>
-          <p className="atlas-section-title">Configuração</p>
-          <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">Administração</h1>
-          <p className="text-sm text-slate-500">Números WhatsApp, usuários, departamentos e integrações</p>
-          <p className="mt-2 text-xs text-slate-500">
+        <AtlasViewHeader
+          icon={Settings}
+          section="Configuração"
+          title="Administração"
+          description="Números WhatsApp, usuários, departamentos e integrações"
+        />
+        <div className="glass-panel mb-2 rounded-atlas-lg p-3 sm:p-4">
+          <p className="text-xs text-slate-500">
             API:{" "}
             <span
               className={
@@ -1188,7 +1192,7 @@ export function AdminView({ token, user }: Props) {
               {apiHealth === "ok" ? "saudável" : apiHealth === "down" ? "instável" : "verificando"}
             </span>
           </p>
-          <nav className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+          <nav className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
             {[
               { id: "admin-config", label: "Empresa" },
               { id: "admin-integrações", label: "API / Webhooks" },
@@ -1205,13 +1209,13 @@ export function AdminView({ token, user }: Props) {
               <a
                 key={item.id}
                 href={`#${item.id}`}
-                className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                className="shrink-0 rounded-lg border border-white/60 bg-white/50 px-3 py-1.5 text-xs font-medium text-slate-700 backdrop-blur-sm hover:border-slate-300/80 hover:bg-white/75"
               >
                 {item.label}
               </a>
             ))}
           </nav>
-        </header>
+        </div>
 
         <Card id="admin-config" className="scroll-mt-24 p-5">
           <div className="flex items-center gap-2">

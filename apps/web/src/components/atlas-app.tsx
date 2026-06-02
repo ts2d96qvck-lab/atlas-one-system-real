@@ -112,7 +112,7 @@ function statusToneClass(status: string) {
   return "bg-emerald-100 text-emerald-800";
 }
 
-const INBOX_PANEL_CLASS = "overflow-hidden rounded-2xl";
+const INBOX_PANEL_CLASS = "overflow-hidden rounded-atlas-lg";
 
 function mediaUploadKey(conversationId: string, file: File) {
   return `${conversationId}:${file.name}:${file.size}:${file.lastModified}:${file.type}`;
@@ -1703,7 +1703,7 @@ export function AtlasApp({ token, user }: Props) {
         ) : null}
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
-          <Card className={`flex min-h-[220px] min-w-0 flex-col border border-slate-200 bg-white/95 p-2.5 shadow-sm sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+          <Card className={`flex min-h-[220px] min-w-0 flex-col p-2.5 sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-semibold text-slate-900">Caixa de entrada</h1>
@@ -1855,7 +1855,7 @@ export function AtlasApp({ token, user }: Props) {
               </div>
             </Card>
 
-            <Card className={`flex min-h-[320px] min-w-0 flex-col border border-slate-200 bg-white/95 p-0 shadow-sm md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+            <Card className={`flex min-h-[320px] min-w-0 flex-col p-0 md:min-h-0 ${INBOX_PANEL_CLASS}`}>
               {active ? (
                 <>
                   <ConversationHeaderBar

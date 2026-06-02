@@ -11,7 +11,7 @@ const buttonVariants = cva(
         primary:
           "bg-blue-600 text-white shadow-sm hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500",
         glass:
-          "border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800",
+          "border border-white/60 bg-white/75 text-slate-700 shadow-glass backdrop-blur-glass hover:border-slate-300/80 hover:bg-white/90 dark:border-slate-600/60 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:bg-slate-800/80",
         ghost: "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80"
       },
       size: {

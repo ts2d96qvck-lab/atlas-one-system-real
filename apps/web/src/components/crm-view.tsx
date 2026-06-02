@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { createLead, deleteLead, listUsers, updateLead, type Lead, type UserRow } from "../lib/api";
 import { crmStageLabel } from "../lib/product-copy";
 import { EmptyState } from "./empty-state";
+import { AtlasViewHeader } from "./atlas-view-header";
 
 type Props = { token: string };
 
@@ -263,23 +264,24 @@ export function CrmView({ token }: Props) {
   return (
     <main className="atlas-page">
       <div className="atlas-page-inner w-full max-w-[1400px]">
-        <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="atlas-section-title">Comercial</p>
-            <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">CRM · Funil de vendas</h1>
-            <p className="mt-1 text-sm text-slate-500">Arraste cards entre colunas ou use Editar em cada lead.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={() => setCreatingLead(true)}>
-              <Plus size={16} />
-              Novo lead
-            </Button>
-            <Card className="px-4 py-3">
-              <p className="text-xs text-slate-500">Pipeline total</p>
-              <p className="text-xl font-semibold text-slate-900">{formatMoney(total)}</p>
-            </Card>
-          </div>
-        </header>
+        <AtlasViewHeader
+          icon={Users}
+          section="Comercial"
+          title="CRM · Funil de vendas"
+          description="Arraste cards entre colunas ou use Editar em cada lead."
+          actions={
+            <>
+              <Button onClick={() => setCreatingLead(true)}>
+                <Plus size={16} />
+                Novo lead
+              </Button>
+              <Card className="px-4 py-3">
+                <p className="text-xs text-slate-500">Pipeline total</p>
+                <p className="text-xl font-semibold text-slate-900">{formatMoney(total)}</p>
+              </Card>
+            </>
+          }
+        />
 
         <div className="mb-4 grid gap-3 md:grid-cols-3">
           <Card className="p-4">
