@@ -14,6 +14,10 @@ import {
 import { assertWithinConversationQuota } from "./billing/billing.service";
 import { applyOutgoingSignature, getMessagingSettings } from "./messaging/message-signature.service";
 import { MENU_DONE_TAG, MENU_PENDING_TAG } from "./menu-bot.service";
+import { assertTeamInTenant, assertUserInTenant } from "../lib/tenant-guard";
+import { recordConversationTransfer } from "./inbox-collaboration.service";
+import { runConversationAutomations } from "./automation.service";
+import { auditLog } from "./audit.service";
 
 type MessageActor = { id: string; name: string; role: string };
 
@@ -245,6 +249,136 @@ export async function archiveConversation(tenantId: string, id: string) {
 /** Permanent archive — conversations are never hard-deleted. */
 export async function deleteConversation(tenantId: string, id: string) {
   return archiveConversation(tenantId, id);
+}
+
+function normalizeTagList(value: unknown) {
+  if (!Array.isArray(value)) return [] as string[];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function mergeTagList(existing: unknown, addTags: string[]) {
+  const base = normalizeTagList(existing);
+  const seen = new Set(base.map((tag) => tag.toLowerCase()));
+  for (const tag of addTags) {
+    const trimmed = tag.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    base.push(trimmed);
+  }
+  return base;
+}
+
+type BulkActor = { id: string; name: string; role: string; permissions: string[] };
+
+function canManageConversation(actor: BulkActor, assignedToId: string | null) {
+  if (actor.role === "owner" || actor.role === "admin" || actor.role === "supervisor") return true;
+  if (actor.permissions.includes("*") || actor.permissions.includes("conversation:takeover")) return true;
+  return assignedToId === actor.id;
+}
+
+export async function bulkUpdateConversations(
+  tenantId: string,
+  actor: BulkActor,
+  input: {
+    ids: string[];
+    assignedToId?: string | null;
+    teamId?: string | null;
+    status?: string;
+    addTags?: string[];
+    archive?: boolean;
+    transferNote?: string;
+  }
+) {
+  const ids = [...new Set(input.ids.map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length) throw new Error("Selecione ao menos uma conversa.");
+  if (ids.length > 100) throw new Error("Selecione no maximo 100 conversas por vez.");
+
+  if (input.assignedToId !== undefined) await assertUserInTenant(tenantId, input.assignedToId ?? undefined);
+  if (input.teamId !== undefined) await assertTeamInTenant(tenantId, input.teamId ?? undefined);
+
+  const conversations = await prisma.conversation.findMany({
+    where: { tenantId, id: { in: ids } },
+    select: {
+      id: true,
+      assignedToId: true,
+      teamId: true,
+      status: true,
+      tags: true
+    }
+  });
+
+  if (conversations.length !== ids.length) throw new Error("Uma ou mais conversas nao foram encontradas.");
+
+  for (const conversation of conversations) {
+    if (!canManageConversation(actor, conversation.assignedToId)) {
+      throw new Error("Voce nao tem permissao para alterar uma ou mais conversas selecionadas.");
+    }
+  }
+
+  const updatedIds: string[] = [];
+  for (const conversation of conversations) {
+    const data: {
+      assignedToId?: string | null;
+      teamId?: string | null;
+      status?: string;
+      tags?: string[];
+    } = {};
+
+    if (input.archive) {
+      data.status = "archived";
+      data.assignedToId = null;
+    } else {
+      if (input.assignedToId !== undefined) data.assignedToId = input.assignedToId;
+      if (input.teamId !== undefined) data.teamId = input.teamId;
+      if (input.status) data.status = input.status;
+      if (input.addTags?.length) data.tags = mergeTagList(conversation.tags, input.addTags);
+    }
+
+    if (!Object.keys(data).length) continue;
+
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data
+    });
+
+    if (input.assignedToId !== undefined && input.assignedToId !== conversation.assignedToId) {
+      await recordConversationTransfer({
+        tenantId,
+        actorId: actor.id,
+        conversationId: conversation.id,
+        fromUserId: conversation.assignedToId,
+        toUserId: input.assignedToId ?? null,
+        teamId: input.teamId ?? conversation.teamId ?? null,
+        note: input.transferNote
+      });
+    }
+
+    if (conversation.assignedToId && input.assignedToId === null) {
+      await runConversationAutomations(tenantId, conversation.id, "conversation.unassigned");
+    }
+
+    updatedIds.push(conversation.id);
+  }
+
+  await auditLog({
+    tenantId,
+    actorId: actor.id,
+    entity: "Conversation",
+    entityId: updatedIds.join(","),
+    action: "bulk_updated",
+    metadata: {
+      count: updatedIds.length,
+      archive: Boolean(input.archive),
+      status: input.status ?? null,
+      assignedToId: input.assignedToId ?? null,
+      teamId: input.teamId ?? null,
+      addTags: input.addTags ?? null
+    }
+  });
+
+  return { updated: updatedIds.length, ids: updatedIds };
 }
 
 export async function sendMessage(tenantId: string, conversationId: string, input: unknown, actor?: MessageActor) {

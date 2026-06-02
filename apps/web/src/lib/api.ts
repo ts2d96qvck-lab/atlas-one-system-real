@@ -58,6 +58,8 @@ export type Conversation = {
   priority: string;
   tags: unknown;
   lastMessageAt: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   teamId?: string | null;
   assignedToId?: string | null;
   assignedTo?: { id: string; name: string; role: string } | null;
@@ -405,6 +407,25 @@ export function updateConversation(
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(data)
+  });
+}
+
+export function bulkUpdateConversations(
+  token: string,
+  payload: {
+    ids: string[];
+    assignedToId?: string | null;
+    teamId?: string | null;
+    status?: string;
+    addTags?: string[];
+    archive?: boolean;
+    transferNote?: string;
+  }
+) {
+  return request<{ updated: number; ids: string[] }>(`/inbox/conversations/bulk`, token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
   });
 }
 

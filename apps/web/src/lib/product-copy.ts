@@ -94,3 +94,9 @@ export const INBOX_QUEUE_BUCKETS = {
   history: "Histórico",
   all: "Todas"
 } as const;
+
+export const INBOX_QUEUE_BUCKET_HELP = {
+  active: "Conversas abertas e aguardando resposta.",
+  history: "Encerradas, resolvidas e arquivadas — nada desaparece, fica aqui.",
+  all: "Todas as conversas, inclusive arquivadas."
+} as const;

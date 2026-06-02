@@ -29,6 +29,7 @@ import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from "@a
 import {
   createConversation,
   archiveConversation,
+  bulkUpdateConversations,
   hideMessage,
   editMessage,
   getConversation,
@@ -62,15 +63,18 @@ import {
   CONVERSATION_STATUS_SHORT,
   INBOX_COPY,
   INBOX_QUEUE_BUCKETS,
+  INBOX_QUEUE_BUCKET_HELP,
   LIFECYCLE_STATUSES,
   roleLabel as productRoleLabel,
   type LifecycleStatus
 } from "../lib/product-copy";
 import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
+import { InboxBulkBar } from "./inbox-bulk-bar";
 import { AppCombobox } from "./ui/app-select";
 import { apiUrl } from "../lib/config";
 import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
+import { computeConversationSla, defaultInboxSlaConfig, isConversationOverSla } from "../lib/inbox-sla";
 import { mergeMessages, mediaSrc, messageDeliveryStatus, groupMessagesForThread, sanitizeMessageForViewer } from "../lib/messages";
 import { hasPermission } from "../lib/session-user";
 import {
@@ -550,6 +554,10 @@ type ConversationHeaderBarProps = {
   accessToken: string;
   onSetStatus: (status: LifecycleStatus) => void;
   onOpenDrawer: () => void;
+  onFilterAssignee?: () => void;
+  onFilterTeam?: () => void;
+  onFilterInstance?: () => void;
+  onFilterStatus?: () => void;
 };
 
 function statusDotClass(status: string) {
@@ -565,7 +573,11 @@ function ConversationHeaderBar({
   customerAvatarUrl,
   accessToken,
   onSetStatus,
-  onOpenDrawer
+  onOpenDrawer,
+  onFilterAssignee,
+  onFilterTeam,
+  onFilterInstance,
+  onFilterStatus
 }: ConversationHeaderBarProps) {
   const assignee = active.assignedTo?.name ?? "Sem atendente";
   const teamName = active.team?.name ?? "Sem departamento";
@@ -585,7 +597,21 @@ function ConversationHeaderBar({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusToneClass(active.status)}`}>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusToneClass(active.status)} ${
+                onFilterStatus ? "cursor-pointer hover:ring-1 hover:ring-slate-300" : ""
+              }`}
+              title={onFilterStatus ? "Filtrar fila por este status" : undefined}
+              onClick={onFilterStatus}
+              onKeyDown={(e) => {
+                if (onFilterStatus && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  onFilterStatus();
+                }
+              }}
+              role={onFilterStatus ? "button" : undefined}
+              tabIndex={onFilterStatus ? 0 : undefined}
+            >
               {statusLabel(active.status)}
             </span>
           </div>
@@ -630,22 +656,34 @@ function ConversationHeaderBar({
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">
-        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 hover:bg-slate-100"
+          title={onFilterAssignee ? "Filtrar fila por atendente" : "Atendente"}
+          onClick={onFilterAssignee}
+        >
           <User size={11} className="text-slate-400" />
           {assignee}
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 hover:bg-slate-100"
+          title={onFilterTeam ? "Filtrar fila por departamento" : "Departamento"}
+          onClick={onFilterTeam}
+        >
           {teamName}
-        </span>
-        <span
-          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 ${
+        </button>
+        <button
+          type="button"
+          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 hover:opacity-90 ${
             instanceConnected ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
           }`}
-          title={instanceConnected ? "WhatsApp conectado" : "WhatsApp desconectado ou instável"}
+          title={onFilterInstance ? "Filtrar fila por número WhatsApp" : instanceConnected ? "WhatsApp conectado" : "WhatsApp desconectado ou instável"}
+          onClick={onFilterInstance}
         >
           <MessageCircle size={11} />
           {instanceLabel}
-        </span>
+        </button>
       </div>
     </div>
   );
@@ -918,6 +956,11 @@ export function AtlasApp({ token, user }: Props) {
   const [queueBucket, setQueueBucket] = useState<"active" | "history" | "all">("active");
   const [queueDepartmentId, setQueueDepartmentId] = useState<string>("all");
   const [queueOwnerId, setQueueOwnerId] = useState<string>("all");
+  const [queueStatusFilter, setQueueStatusFilter] = useState<string>("all");
+  const [queueInstanceId, setQueueInstanceId] = useState<string>("all");
+  const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
+  const [bulkWorking, setBulkWorking] = useState(false);
+  const [slaTick, setSlaTick] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -945,6 +988,29 @@ export function AtlasApp({ token, user }: Props) {
     },
     [agents, token, user.tenantId]
   );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setSlaTick((value) => value + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const slaConfig = useMemo(
+    () =>
+      defaultInboxSlaConfig({
+        firstResponseMinutes: companySettings?.slaFirstResponseMinutes,
+        resolutionHours: companySettings?.slaResolutionHours
+      }),
+    [companySettings?.slaFirstResponseMinutes, companySettings?.slaResolutionHours]
+  );
+
+  const instanceFilterOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of conversations) {
+      if (!row.instance?.id) continue;
+      map.set(row.instance.id, row.instance.label || row.instance.name || "WhatsApp");
+    }
+    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
+  }, [conversations]);
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -1160,6 +1226,100 @@ export function AtlasApp({ token, user }: Props) {
     return agents.filter((agent) => agent.teamId === queueDepartmentId);
   }, [agents, queueDepartmentId]);
 
+  const activeQueueFilters = useMemo(() => {
+    const filters: Array<{ key: string; label: string; onClear: () => void }> = [];
+    if (queueDepartmentId !== "all") {
+      const name = departmentOptions.find((item) => item.id === queueDepartmentId)?.name ?? "Departamento";
+      filters.push({ key: "dept", label: name, onClear: () => setQueueDepartmentId("all") });
+    }
+    if (queueOwnerId === "unassigned") {
+      filters.push({ key: "owner", label: "Sem atendente", onClear: () => setQueueOwnerId("all") });
+    } else if (queueOwnerId !== "all") {
+      const name = agents.find((item) => item.id === queueOwnerId)?.name ?? "Atendente";
+      filters.push({ key: "owner", label: name, onClear: () => setQueueOwnerId("all") });
+    }
+    if (queueStatusFilter !== "all") {
+      filters.push({
+        key: "status",
+        label: conversationStatusLabel(queueStatusFilter),
+        onClear: () => setQueueStatusFilter("all")
+      });
+    }
+    if (queueInstanceId !== "all") {
+      const label = instanceFilterOptions.find((item) => item.id === queueInstanceId)?.label ?? "WhatsApp";
+      filters.push({ key: "instance", label, onClear: () => setQueueInstanceId("all") });
+    }
+    return filters;
+  }, [agents, departmentOptions, instanceFilterOptions, queueDepartmentId, queueInstanceId, queueOwnerId, queueStatusFilter]);
+
+  function applyChipFilter(kind: "assignee" | "team" | "instance" | "status", conversation: Conversation) {
+    if (kind === "assignee") {
+      if (canMonitorByUser) {
+        if (conversation.assignedToId) {
+          setQueueOwnerId(conversation.assignedToId);
+          if (conversation.teamId) setQueueDepartmentId(conversation.teamId);
+        } else {
+          setQueueOwnerId("unassigned");
+        }
+        return;
+      }
+      setDrawerTab("cliente");
+      setDrawerOpen(true);
+      return;
+    }
+    if (kind === "team") {
+      if (canMonitorByUser && conversation.teamId) {
+        setQueueDepartmentId(conversation.teamId);
+        setQueueOwnerId("all");
+        return;
+      }
+      setDrawerTab("cliente");
+      setDrawerOpen(true);
+      return;
+    }
+    if (kind === "instance") {
+      if (conversation.instance?.id) setQueueInstanceId(conversation.instance.id);
+      return;
+    }
+    if (kind === "status") {
+      setQueueStatusFilter(conversation.status);
+      if (["resolved", "closed", "archived"].includes(conversation.status)) setQueueBucket("history");
+      else if (queueBucket === "history") setQueueBucket("active");
+    }
+  }
+
+  function toggleConversationSelection(id: string) {
+    setSelectedConversationIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  }
+
+  function clearConversationSelection() {
+    setSelectedConversationIds([]);
+  }
+
+  async function runBulkAction(payload: Parameters<typeof bulkUpdateConversations>[1]) {
+    if (!payload.ids.length) return;
+    setBulkWorking(true);
+    try {
+      const result = await bulkUpdateConversations(token, payload);
+      clearConversationSelection();
+      await refreshConversations();
+      if (activeId && payload.archive && payload.ids.includes(activeId)) {
+        setActiveId(null);
+        setActiveConversation(null);
+      } else if (activeId) {
+        await openConversation(activeId);
+      }
+      setInfo(`${result.updated} conversa(s) atualizada(s).`);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível aplicar a ação em lote");
+    } finally {
+      setBulkWorking(false);
+    }
+  }
+
   useEffect(() => {
     if (roleIsAgent) {
       setQueueDepartmentId(selfUser?.teamId ?? "all");
@@ -1211,13 +1371,36 @@ export function AtlasApp({ token, user }: Props) {
   }, [cadenceDraft, activeConversation?.lead?.id, saveCadence]);
 
   const visibleConversations = useMemo(() => {
-    if (roleIsAgent) return conversations.filter((item) => item.assignedToId === user.id);
-    if (!canMonitorByUser) return conversations.filter((item) => item.assignedToId === user.id);
+    if (roleIsAgent) {
+      let rows = conversations.filter((item) => item.assignedToId === user.id);
+      if (queueStatusFilter !== "all") rows = rows.filter((item) => item.status === queueStatusFilter);
+      if (queueInstanceId !== "all") rows = rows.filter((item) => item.instance?.id === queueInstanceId);
+      return rows;
+    }
+    if (!canMonitorByUser) {
+      let rows = conversations.filter((item) => item.assignedToId === user.id);
+      if (queueStatusFilter !== "all") rows = rows.filter((item) => item.status === queueStatusFilter);
+      if (queueInstanceId !== "all") rows = rows.filter((item) => item.instance?.id === queueInstanceId);
+      return rows;
+    }
     const byDepartment =
       queueDepartmentId === "all" ? conversations : conversations.filter((item) => item.teamId === queueDepartmentId);
-    if (queueOwnerId === "all") return byDepartment;
-    return byDepartment.filter((item) => item.assignedToId === queueOwnerId);
-  }, [canMonitorByUser, conversations, queueDepartmentId, queueOwnerId, roleIsAgent, user.id]);
+    let rows = byDepartment;
+    if (queueOwnerId === "unassigned") rows = rows.filter((item) => !item.assignedToId);
+    else if (queueOwnerId !== "all") rows = rows.filter((item) => item.assignedToId === queueOwnerId);
+    if (queueStatusFilter !== "all") rows = rows.filter((item) => item.status === queueStatusFilter);
+    if (queueInstanceId !== "all") rows = rows.filter((item) => item.instance?.id === queueInstanceId);
+    return rows;
+  }, [
+    canMonitorByUser,
+    conversations,
+    queueDepartmentId,
+    queueInstanceId,
+    queueOwnerId,
+    queueStatusFilter,
+    roleIsAgent,
+    user.id
+  ]);
 
   const pendingUploadKey = useMemo(
     () => (activeId && pendingUploadFile ? mediaUploadKey(activeId, pendingUploadFile) : null),
@@ -1240,12 +1423,15 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   function isOverdueConversation(item: Conversation) {
-    const latest = item.messages?.[0];
-    if (!latest || latest.direction !== "in") return false;
-    const base = latest.createdAt ?? item.lastMessageAt;
-    if (!base) return false;
-    const elapsedMs = Date.now() - new Date(base).getTime();
-    return elapsedMs >= 5 * 60 * 1000;
+    void slaTick;
+    return isConversationOverSla(item, slaConfig);
+  }
+
+  function slaToneClass(tone: ReturnType<typeof computeConversationSla>["tone"]) {
+    if (tone === "danger") return "border-rose-200 bg-rose-50 text-rose-700";
+    if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-800";
+    if (tone === "ok") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    return "border-slate-200 bg-slate-50 text-slate-600";
   }
 
   const managerAlertCount = visibleConversations.filter((item) => isOverdueConversation(item)).length;
@@ -1715,7 +1901,7 @@ export function AtlasApp({ token, user }: Props) {
           ) : null}
           {roleIsManager && managerAlertCount > 0 ? (
             <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
-              {managerAlertCount} aguardando +5m
+              {managerAlertCount} fora do SLA
             </span>
           ) : null}
           <button
@@ -1746,18 +1932,68 @@ export function AtlasApp({ token, user }: Props) {
                   className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
                     queueBucket === bucket ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white/70 text-slate-600"
                   }`}
-                  onClick={() => setQueueBucket(bucket)}
+                  onClick={() => {
+                    setQueueBucket(bucket);
+                    if (bucket === "active") setQueueStatusFilter("all");
+                  }}
+                  title={INBOX_QUEUE_BUCKET_HELP[bucket]}
                 >
                   {INBOX_QUEUE_BUCKETS[bucket]}
                 </button>
               ))}
             </div>
+            <p className="mt-1 text-[10px] leading-snug text-slate-500">{INBOX_QUEUE_BUCKET_HELP[queueBucket]}</p>
+            {queueBucket === "history" ? (
+              <p className="mt-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-[10px] text-sky-900">
+                Conversas encerradas e arquivadas ficam aqui. Use <strong>Todas</strong> ou a busca para localizar qualquer histórico.
+              </p>
+            ) : null}
+            {activeQueueFilters.length ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {activeQueueFilters.map((filter) => (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-50"
+                    onClick={filter.onClear}
+                  >
+                    {filter.label}
+                    <X size={10} />
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="rounded-full px-2 py-0.5 text-[10px] text-slate-500 hover:text-slate-700"
+                  onClick={() => {
+                    setQueueDepartmentId("all");
+                    setQueueOwnerId("all");
+                    setQueueStatusFilter("all");
+                    setQueueInstanceId("all");
+                  }}
+                >
+                  Limpar filtros
+                </button>
+              </div>
+            ) : null}
             <div className="mt-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-semibold text-slate-900">Caixa de entrada</h1>
                 <Badge className="h-5 px-2 text-[10px]">{filtered.length}</Badge>
               </div>
               <div className="flex items-center gap-1">
+                {filtered.length ? (
+                  <button
+                    type="button"
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-50"
+                    onClick={() =>
+                      setSelectedConversationIds((current) =>
+                        current.length === filtered.length ? [] : filtered.map((item) => item.id)
+                      )
+                    }
+                  >
+                    {selectedConversationIds.length === filtered.length && filtered.length > 0 ? "Desmarcar" : "Selecionar"}
+                  </button>
+                ) : null}
                 {canMonitorByUser ? (
                   <Popover>
                     <PopoverTrigger asChild>
@@ -1806,6 +2042,7 @@ export function AtlasApp({ token, user }: Props) {
                             searchable
                             options={[
                               { value: "all", label: "Todos deste departamento" },
+                              { value: "unassigned", label: "Sem atendente" },
                               ...agentsByDepartment.map((agent) => ({
                                 value: agent.id,
                                 label: agent.name,
@@ -1835,16 +2072,24 @@ export function AtlasApp({ token, user }: Props) {
               <div className="mt-8 flex justify-center">
                 <Loader2 className="animate-spin" />
               </div>
+            ) : !filtered.length ? (
+              <div className="mt-6 px-2 text-center text-xs text-slate-500">
+                {queueBucket === "history"
+                  ? "Nenhuma conversa no histórico com estes filtros. Tente Todas ou limpe a busca."
+                  : "Nenhuma conversa encontrada com os filtros atuais."}
+              </div>
             ) : null}
               <div className="atlas-scroll mt-2 min-h-0 flex-1 space-y-0.5 overflow-auto pr-0.5">
                 {filtered.map((item) => {
                   const last = item.messages?.[0];
                   const selected = item.id === activeId;
+                  const checked = selectedConversationIds.includes(item.id);
                   const unread = isUnreadConversation(item);
                   const overdue = isOverdueConversation(item);
+                  const slaState = computeConversationSla(item, slaConfig);
                   const dotClass = overdue ? "bg-rose-500" : unread ? "bg-blue-500" : statusDotClass(item.status);
                   const assigneeName = item.assignedTo?.name ?? "Sem atendente";
-                  const teamName = item.team?.name ?? "—";
+                  const teamName = item.team?.name ?? "Sem departamento";
                   const instanceLabel = item.instance?.label || item.instance?.name || "WhatsApp";
                   return (
                     <div
@@ -1852,55 +2097,107 @@ export function AtlasApp({ token, user }: Props) {
                       className={`w-full rounded-xl border px-2.5 py-2 text-left transition ${
                         selected
                           ? "border-slate-300 bg-slate-50 shadow-sm"
-                          : "border-transparent hover:border-slate-200 hover:bg-white"
+                          : checked
+                            ? "border-slate-400 bg-slate-50/80"
+                            : "border-transparent hover:border-slate-200 hover:bg-white"
                       }`}
                     >
-                      <button type="button" onClick={() => openConversation(item.id)} className="w-full text-left">
-                        <div className="flex items-start gap-2">
-                          <div className="relative shrink-0">
-                            <CustomerAvatar
-                              name={item.customerName}
-                              phone={item.customerPhone}
-                              avatarUrl={getAvatarUrl(item.tags)}
-                              size="sm"
-                              accessToken={token}
-                            />
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          className="mt-2 h-3.5 w-3.5 shrink-0 rounded border-slate-300"
+                          checked={checked}
+                          onChange={() => toggleConversationSelection(item.id)}
+                          aria-label={`Selecionar conversa ${item.customerName}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <button type="button" onClick={() => openConversation(item.id)} className="w-full text-left">
+                            <div className="flex items-start gap-2">
+                              <div className="relative shrink-0">
+                                <CustomerAvatar
+                                  name={item.customerName}
+                                  phone={item.customerPhone}
+                                  avatarUrl={getAvatarUrl(item.tags)}
+                                  size="sm"
+                                  accessToken={token}
+                                />
+                                <span
+                                  className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white ${dotClass}`}
+                                  title={overdue ? "Fora do SLA" : unread ? "Não lida" : statusLabel(item.status)}
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{item.customerName}</p>
+                                  <span className="shrink-0 text-[10px] text-slate-400">{formatTime(item.lastMessageAt ?? last?.createdAt)}</span>
+                                </div>
+                                <p className="truncate text-[11px] leading-tight text-slate-500">{formatPhoneDisplay(item.customerPhone)}</p>
+                                <p className="mt-0.5 truncate text-[11px] leading-tight text-slate-600">{last?.text ?? "Sem mensagens"}</p>
+                              </div>
+                            </div>
+                          </button>
+                          <div className="mt-1 flex flex-wrap items-center gap-1 pl-10">
+                            <button
+                              type="button"
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-medium hover:ring-1 hover:ring-slate-300 ${statusToneClass(item.status)}`}
+                              title="Filtrar por status"
+                              onClick={() => applyChipFilter("status", item)}
+                            >
+                              {statusShortLabel(item.status)}
+                            </button>
+                            <button
+                              type="button"
+                              className="truncate rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
+                              title="Filtrar por atendente"
+                              onClick={() => applyChipFilter("assignee", item)}
+                            >
+                              {assigneeName}
+                            </button>
+                            <button
+                              type="button"
+                              className="truncate rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
+                              title="Filtrar por departamento"
+                              onClick={() => applyChipFilter("team", item)}
+                            >
+                              {teamName}
+                            </button>
+                            <button
+                              type="button"
+                              className="truncate rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
+                              title="Filtrar por número WhatsApp"
+                              onClick={() => applyChipFilter("instance", item)}
+                            >
+                              {instanceLabel}
+                            </button>
                             <span
-                              className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white ${dotClass}`}
-                              title={overdue ? "Aguardando +5m" : unread ? "Não lida" : statusLabel(item.status)}
-                            />
+                              className={`rounded border px-1.5 py-0.5 text-[10px] ${slaToneClass(slaState.tone)}`}
+                              title={slaState.detailLabel}
+                            >
+                              {slaState.summaryLabel}
+                            </span>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{item.customerName}</p>
-                              <span className="shrink-0 text-[10px] text-slate-400">{formatTime(item.lastMessageAt ?? last?.createdAt)}</span>
-                            </div>
-                            <p className="truncate text-[11px] leading-tight text-slate-500">{formatPhoneDisplay(item.customerPhone)}</p>
-                            <p className="mt-0.5 truncate text-[11px] leading-tight text-slate-600">{last?.text ?? "Sem mensagens"}</p>
-                            <div className="mt-1 flex flex-wrap items-center gap-1">
-                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusToneClass(item.status)}`}>
-                                {statusShortLabel(item.status)}
-                              </span>
-                              <span className="truncate text-[10px] text-slate-500" title={assigneeName}>
-                                {assigneeName}
-                              </span>
-                              <span className="text-[10px] text-slate-300">·</span>
-                              <span className="truncate text-[10px] text-slate-500" title={teamName}>
-                                {teamName}
-                              </span>
-                              <span className="text-[10px] text-slate-300">·</span>
-                              <span className="truncate text-[10px] text-slate-500" title={instanceLabel}>
-                                {instanceLabel}
-                              </span>
-                            </div>
-                            <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-1" />
-                          </div>
+                          <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-1 pl-10" />
                         </div>
-                      </button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
+              <InboxBulkBar
+                count={selectedConversationIds.length}
+                working={bulkWorking}
+                agents={agents}
+                teams={teams}
+                tagCatalog={tagCatalog}
+                onClear={clearConversationSelection}
+                onTransfer={(agentId, note) =>
+                  runBulkAction({ ids: selectedConversationIds, assignedToId: agentId, transferNote: note })
+                }
+                onAddTags={(tags) => runBulkAction({ ids: selectedConversationIds, addTags: tags })}
+                onStatus={(status) => runBulkAction({ ids: selectedConversationIds, status })}
+                onArchive={() => runBulkAction({ ids: selectedConversationIds, archive: true })}
+                onDepartment={(teamId) => runBulkAction({ ids: selectedConversationIds, teamId })}
+              />
             </Card>
 
             <Card className={`flex min-h-[320px] min-w-0 flex-col p-0 md:min-h-0 ${INBOX_PANEL_CLASS}`}>
@@ -1912,6 +2209,10 @@ export function AtlasApp({ token, user }: Props) {
                     accessToken={token}
                     onSetStatus={(status) => void setStatusQuick(status)}
                     onOpenDrawer={() => setDrawerOpen(true)}
+                    onFilterAssignee={() => applyChipFilter("assignee", active)}
+                    onFilterTeam={() => applyChipFilter("team", active)}
+                    onFilterInstance={() => applyChipFilter("instance", active)}
+                    onFilterStatus={() => applyChipFilter("status", active)}
                   />
                   <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-[#f7faff] px-3 py-4 sm:px-5 sm:py-5">
                     {activeThreadFlash ? (

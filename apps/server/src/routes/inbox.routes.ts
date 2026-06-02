@@ -7,6 +7,7 @@ import {
   deleteConversation,
   getConversation,
   listConversations,
+  bulkUpdateConversations,
   sendMediaMessage,
   sendMessage
 } from "../services/inbox.service";
@@ -97,6 +98,42 @@ export async function inboxRoutes(app: FastifyInstance) {
       return reply.send([]);
     }
   });
+
+  app.post(
+    "/conversations/bulk",
+    { preHandler: [requireAuth, requirePermission("conversation:update")] },
+    async (request, reply) => {
+      const user = requireUser(request);
+      const body = request.body as {
+        ids?: string[];
+        assignedToId?: string | null;
+        teamId?: string | null;
+        status?: string;
+        addTags?: string[];
+        archive?: boolean;
+        transferNote?: string;
+      };
+      try {
+        const result = await bulkUpdateConversations(user.tenantId, user, {
+          ids: Array.isArray(body.ids) ? body.ids : [],
+          assignedToId: body.assignedToId,
+          teamId: body.teamId,
+          status: body.status,
+          addTags: body.addTags,
+          archive: body.archive,
+          transferNote: body.transferNote
+        });
+        return reply.send(result);
+      } catch (error) {
+        return sendError(
+          reply,
+          400,
+          "Nao foi possivel atualizar conversas em lote",
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+  );
 
   app.post("/conversations", { preHandler: [requireAuth, requirePermission("conversation:create")] }, async (request, reply) => {
     const user = requireUser(request);
