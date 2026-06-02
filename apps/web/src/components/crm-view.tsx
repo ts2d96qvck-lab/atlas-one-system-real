@@ -255,8 +255,6 @@ export function CrmView({ token }: Props) {
   const leads = data?.leads ?? [];
 
   const total = leads.reduce((s, l) => s + Number(l.value), 0);
-  const averageTicket = leads.length ? total / leads.length : 0;
-  const leadsWithPhone = leads.filter((lead) => (lead.phone ?? "").trim().length > 0).length;
 
   function formatMoney(value: number) {
     return `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
@@ -276,7 +274,6 @@ export function CrmView({ token }: Props) {
           icon={Users}
           section="Comercial"
           title="CRM · Funil de vendas"
-          description="Arraste cards entre colunas ou use Editar em cada lead."
           actions={
             <>
               <Button onClick={() => setCreatingLead(true)}>
@@ -290,21 +287,6 @@ export function CrmView({ token }: Props) {
             </>
           }
         />
-
-        <div className="mb-4 grid gap-3 md:grid-cols-3">
-          <Card className="p-4">
-            <p className="text-xs text-slate-500">Leads no funil</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{leads.length}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-slate-500">Ticket médio</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{formatMoney(averageTicket)}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs text-slate-500">Leads com telefone</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{leadsWithPhone}</p>
-          </Card>
-        </div>
 
         {feedback ? (
           <p className={`mb-3 text-sm ${feedback.type === "error" ? "text-red-600" : "text-emerald-700"}`}>{feedback.text}</p>
@@ -373,10 +355,10 @@ export function CrmView({ token }: Props) {
                         Fechamento previsto: {lead.expectedCloseDate ? formatDate(lead.expectedCloseDate) : "Sem previsão"}
                       </p>
                       <p className="mt-2 text-sm font-semibold text-blue-700">{formatMoney(Number(lead.value))}</p>
-                      <div className="mt-3 flex gap-2">
+                      {stages.findIndex((s) => s.id === stage.id) < stages.length - 1 ? (
                         <Button
                           variant="glass"
-                          className="h-8 flex-1 text-xs"
+                          className="mt-3 h-8 w-full text-xs"
                           onClick={() => {
                             const idx = stages.findIndex((s) => s.id === stage.id);
                             const next = stages[idx + 1];
@@ -385,17 +367,7 @@ export function CrmView({ token }: Props) {
                         >
                           Avançar etapa
                         </Button>
-                        <Button
-                          variant="glass"
-                          className="h-8 w-8 px-0"
-                          disabled={deletingLeadId === lead.id}
-                          onClick={() => void removeLead(lead)}
-                          aria-label={`Excluir lead ${lead.company} permanentemente`}
-                          title="Excluir lead permanentemente"
-                        >
-                          {deletingLeadId === lead.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                        </Button>
-                      </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -482,14 +454,25 @@ export function CrmView({ token }: Props) {
                 />
               </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="glass" className="h-9 px-3 text-xs" onClick={() => setEditingLead(null)} disabled={savingLead}>
-                Cancelar
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+              <Button
+                variant="glass"
+                className="h-9 px-3 text-xs text-rose-700 hover:bg-rose-50"
+                disabled={savingLead || deletingLeadId === editingLead.id}
+                onClick={() => void removeLead(editingLead).then(() => setEditingLead(null))}
+              >
+                {deletingLeadId === editingLead.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Excluir lead
               </Button>
-              <Button className="h-9 px-3 text-xs" onClick={() => void saveLeadEdit()} disabled={savingLead}>
-                {savingLead ? <Loader2 size={14} className="animate-spin" /> : null}
-                Salvar alterações
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="glass" className="h-9 px-3 text-xs" onClick={() => setEditingLead(null)} disabled={savingLead}>
+                  Cancelar
+                </Button>
+                <Button className="h-9 px-3 text-xs" onClick={() => void saveLeadEdit()} disabled={savingLead}>
+                  {savingLead ? <Loader2 size={14} className="animate-spin" /> : null}
+                  Salvar alterações
+                </Button>
+              </div>
             </div>
           </div>
         </div>
