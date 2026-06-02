@@ -30,7 +30,7 @@ export const operationalResetSchema = z.object({
   ownerEmail: z.string().email(),
   ownerPassword: z.string().min(6),
   ownerPhone: z.string().min(8),
-  confirmation: z.literal("RESETAR")
+  confirmation: z.literal("DESTRUIR DADOS")
 });
 
 export const createTeamSchema = z.object({

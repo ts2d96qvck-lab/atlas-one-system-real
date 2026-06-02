@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { Loader2, Trash2, X } from "lucide-react";
 import { Button } from "@atlas-one/ui";
 import type { Conversation, TagCatalogItem, UserRow } from "../lib/api";
+import { listLeadAttachments, type LeadAttachment } from "../lib/api";
 import { ConversationActivityPanel } from "./conversation-activity-panel";
 import { ConversationTagEditor } from "./conversation-tags";
 import { INBOX_COPY } from "../lib/product-copy";
 import { AppCombobox } from "./ui/app-select";
+import { LeadAttachmentsPanel } from "./lead-attachments-panel";
 
 export type ConversationDrawerTab = "cliente" | "crm" | "tags" | "notas" | "historico";
 
@@ -68,12 +70,26 @@ export function ConversationDrawer({
 }: Props) {
   const [transferAgentId, setTransferAgentId] = useState("");
   const [transferNote, setTransferNote] = useState("");
+  const [leadAttachments, setLeadAttachments] = useState<LeadAttachment[]>([]);
+  const [leadAttachmentsLoading, setLeadAttachmentsLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setTransferAgentId(active?.assignedToId ?? "");
     setTransferNote("");
   }, [open, active?.assignedToId, active?.id]);
+
+  useEffect(() => {
+    if (!open || tab !== "crm" || !active?.lead?.id) {
+      setLeadAttachments([]);
+      return;
+    }
+    setLeadAttachmentsLoading(true);
+    void listLeadAttachments(token, active.lead.id)
+      .then(setLeadAttachments)
+      .catch(() => setLeadAttachments([]))
+      .finally(() => setLeadAttachmentsLoading(false));
+  }, [open, tab, active?.lead?.id, token]);
 
   if (!open) return null;
 
@@ -218,11 +234,24 @@ export function ConversationDrawer({
                 </Button>
               </div>
               {active.lead ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-sm">
-                  <p className="font-semibold text-slate-800">{active.lead.company}</p>
-                  <p className="mt-1 text-xs text-slate-600">Etapa: {active.lead.status}</p>
-                  <p className="text-xs text-slate-600">Valor: R$ {Number(active.lead.value).toLocaleString("pt-BR")}</p>
-                </div>
+                <>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-sm">
+                    <p className="font-semibold text-slate-800">{active.lead.company}</p>
+                    <p className="mt-1 text-xs text-slate-600">Etapa: {active.lead.status}</p>
+                    <p className="text-xs text-slate-600">Valor: R$ {Number(active.lead.value).toLocaleString("pt-BR")}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Anexos do lead</p>
+                    {leadAttachmentsLoading ? (
+                      <p className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                        <Loader2 size={14} className="animate-spin" />
+                        Carregando anexos…
+                      </p>
+                    ) : (
+                      <LeadAttachmentsPanel token={token} attachments={leadAttachments} compact showTimeline />
+                    )}
+                  </div>
+                </>
               ) : (
                 <p className="text-xs text-slate-500">Nenhum lead vinculado a esta conversa.</p>
               )}

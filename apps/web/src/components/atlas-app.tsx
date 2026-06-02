@@ -71,7 +71,7 @@ import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-d
 import { AppCombobox } from "./ui/app-select";
 import { apiUrl } from "../lib/config";
 import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
-import { mergeMessages, mediaSrc, messageDeliveryStatus, groupMessagesForThread } from "../lib/messages";
+import { mergeMessages, mediaSrc, messageDeliveryStatus, groupMessagesForThread, sanitizeMessageForViewer } from "../lib/messages";
 import { hasPermission } from "../lib/session-user";
 import {
   dispatchInboundNotification,
@@ -436,7 +436,7 @@ function MessageBubble({
     return (
       <div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}>
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs italic text-slate-500">
-          {hidden ? "Mensagem oculta pela supervisão" : "Mensagem apagada"}
+          {hidden ? "Mensagem oculta" : "Mensagem apagada"}
         </div>
       </div>
     );
@@ -1049,13 +1049,21 @@ export function AtlasApp({ token, user }: Props) {
     joinTenant(user.tenantId, token);
 
     const onMessage = (payload: { conversation: Conversation; message: Message }) => {
+      const viewerRole = user.role;
+      const message = sanitizeMessageForViewer(payload.message, viewerRole);
+      const conversation: Conversation = {
+        ...payload.conversation,
+        messages: (payload.conversation.messages ?? []).map((item) =>
+          item.id === message.id ? message : sanitizeMessageForViewer(item, viewerRole)
+        )
+      };
       const ctx = notifyCtxRef.current;
       const conversationForNotify: Conversation = {
-        ...payload.conversation,
-        messages: mergeMessages(payload.conversation.messages ?? [], payload.message)
+        ...conversation,
+        messages: mergeMessages(conversation.messages ?? [], message)
       };
       const decision = dispatchInboundNotification({
-        message: payload.message,
+        message,
         conversation: conversationForNotify,
         userId: ctx.userId,
         canMonitorQueue: ctx.canMonitorQueue,
@@ -1064,29 +1072,29 @@ export function AtlasApp({ token, user }: Props) {
         onOpenConversation: (id) => ctx.openConversation(id)
       });
       if (decision.action === "active-thread") {
-        setActiveThreadFlash(payload.message.id);
+        setActiveThreadFlash(message.id);
         window.setTimeout(() => setActiveThreadFlash(null), 2200);
       }
 
       setConversations((current) => {
-        const others = current.filter((item) => item.id !== payload.conversation.id);
-        return [payload.conversation, ...others].sort((a, b) => {
+        const others = current.filter((item) => item.id !== conversation.id);
+        return [conversation, ...others].sort((a, b) => {
           const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
           const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
           return bt - at;
         });
       });
 
-      if (activeIdRef.current === payload.conversation.id) {
+      if (activeIdRef.current === conversation.id) {
         setActiveConversation((current) => {
           if (!current) return current;
           return {
             ...current,
-            ...payload.conversation,
-            messages: mergeMessages(current.messages ?? [], payload.message)
+            ...conversation,
+            messages: mergeMessages(current.messages ?? [], message)
           };
         });
-        setLastSeenByConversation((current) => ({ ...current, [payload.conversation.id]: Date.now() }));
+        setLastSeenByConversation((current) => ({ ...current, [conversation.id]: Date.now() }));
       }
     };
 
@@ -1095,7 +1103,7 @@ export function AtlasApp({ token, user }: Props) {
       cancelled = true;
       socket.off("inbox:message", onMessage);
     };
-  }, [token, user.tenantId, openConversation, refreshConversations]);
+  }, [token, user.tenantId, user.role, openConversation, refreshConversations]);
 
   const roleIsAgent = user.role === "agent";
   const roleIsManager = user.role === "owner" || user.role === "admin" || user.role === "supervisor";

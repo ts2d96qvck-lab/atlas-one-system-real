@@ -8,7 +8,38 @@ export function mediaSrc(url: string | null | undefined, apiUrl: string, accessT
   const base = `${apiUrl.replace(/\/$/, "")}${url}`;
   if (!accessToken) return base;
   const separator = base.includes("?") ? "&" : "?";
-  return `${base}${separator}access_token=${encodeURIComponent(accessToken)}`;
+  return `${base}${separator}token=${encodeURIComponent(accessToken)}`;
+}
+
+function canViewHiddenMessages(role: string) {
+  return role === "owner" || role === "admin" || role === "supervisor";
+}
+
+export function sanitizeMessageForViewer<T extends Message>(message: T, role: string): T {
+  const raw =
+    message.raw && typeof message.raw === "object" ? ({ ...(message.raw as Record<string, unknown>) } as Record<string, unknown>) : {};
+  if (!raw.hiddenAt && message.status !== "hidden") return message;
+
+  if (canViewHiddenMessages(role)) {
+    const originalContent = typeof raw.originalContent === "string" ? raw.originalContent : message.text;
+    return {
+      ...message,
+      text: originalContent ?? message.text,
+      raw: {
+        ...raw,
+        hiddenVisibleToSupervisor: true
+      }
+    } as T;
+  }
+
+  return {
+    ...message,
+    text: "[Mensagem oculta]",
+    status: "hidden",
+    raw: {
+      hiddenAt: raw.hiddenAt
+    }
+  } as T;
 }
 
 export function mergeMessages(existing: Message[] = [], incoming: Message) {

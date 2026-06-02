@@ -587,7 +587,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.post(
     "/owner/operational-reset",
-    { preHandler: [requireAuth, requireRole("owner"), requirePermission("admin:user:update")] },
+    { preHandler: [requireAuth, requirePlatformAdmin()] },
     async (request, reply) => {
       const user = requireUser(request);
       try {

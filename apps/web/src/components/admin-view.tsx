@@ -1115,10 +1115,14 @@ export function AdminView({ token, user }: Props) {
   }
 
   async function runReset() {
-    if (resetForm.confirmation !== "RESETAR") {
-      setMessage("Digite RESETAR para confirmar o reset operacional.");
+    if (resetForm.confirmation !== "DESTRUIR DADOS") {
+      setMessage('Digite "DESTRUIR DADOS" para confirmar o reset destrutivo da empresa.');
       return;
     }
+    const confirmed = window.confirm(
+      "ATENÇÃO: esta ação apaga permanentemente usuários, números, conversas, CRM e automações desta empresa.\n\nSomente o novo dono informado abaixo permanecerá. Deseja continuar?"
+    );
+    if (!confirmed) return;
     setResetLoading(true);
     try {
       const result = await operationalReset(token, {
@@ -1126,7 +1130,7 @@ export function AdminView({ token, user }: Props) {
         ownerEmail: resetForm.ownerEmail.trim(),
         ownerPassword: resetForm.ownerPassword,
         ownerPhone: resetForm.ownerPhone.trim(),
-        confirmation: "RESETAR"
+        confirmation: "DESTRUIR DADOS"
       });
       setMessage(`${result.message} Você será desconectado para entrar com o novo owner.`);
       setTimeout(() => {
@@ -2456,10 +2460,14 @@ export function AdminView({ token, user }: Props) {
           </div>
         </Card>
 
-        {isOwner ? <Card className="p-5">
-          <p className="font-semibold">Reset operacional (owner)</p>
-          <p className="mt-1 text-xs text-atlas-muted">
-            Apaga usuários, números, conversas, CRM e automações. Mantém apenas um novo dono com 2FA obrigatório.
+        {isPlatformAdmin ? <Card className="border-rose-200 bg-rose-50/40 p-5">
+          <p className="font-semibold text-rose-900">Reset destrutivo da empresa</p>
+          <p className="mt-1 text-xs text-rose-800/90">
+            Ação irreversível para manutenção da plataforma. Apaga permanentemente usuários, números, conversas, CRM e
+            automações desta empresa. Mantém apenas um novo dono com 2FA obrigatório.
+          </p>
+          <p className="mt-2 text-xs font-medium text-rose-900">
+            Restrito a administradores da plataforma Atlas One. Donos e admins de empresa não devem usar esta função.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <input
@@ -2489,19 +2497,19 @@ export function AdminView({ token, user }: Props) {
             />
             <input
               className="rounded-xl bg-white/80 px-3 py-2 text-sm sm:col-span-2"
-              placeholder='Confirme digitando "RESETAR"'
+              placeholder='Confirme digitando "DESTRUIR DADOS"'
               value={resetForm.confirmation}
               onChange={(e) => setResetForm((s) => ({ ...s, confirmation: e.target.value.toUpperCase() }))}
             />
           </div>
           <Button
-            className="mt-4"
+            className="mt-4 border-rose-300 bg-rose-600 text-white hover:bg-rose-700"
             variant="glass"
             onClick={runReset}
-            disabled={resetLoading || !resetForm.ownerName || !resetForm.ownerEmail || !resetForm.ownerPassword || !resetForm.ownerPhone}
+            disabled={resetLoading || !resetForm.ownerName || !resetForm.ownerEmail || !resetForm.ownerPassword || !resetForm.ownerPhone || resetForm.confirmation !== "DESTRUIR DADOS"}
           >
             {resetLoading ? <Loader2 className="animate-spin" size={16} /> : <Shield size={16} />}
-            Executar reset total
+            Executar reset destrutivo
           </Button>
         </Card> : null}
 

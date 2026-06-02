@@ -841,7 +841,7 @@ export function listAuditLogs(token: string, filters: AuditLogFilters = {}) {
 
 export function operationalReset(
   token: string,
-  payload: { ownerName: string; ownerEmail: string; ownerPassword: string; ownerPhone: string; confirmation: "RESETAR" }
+  payload: { ownerName: string; ownerEmail: string; ownerPassword: string; ownerPhone: string; confirmation: "DESTRUIR DADOS" }
 ) {
   return request<{ ok: boolean; message: string }>(`/admin/owner/operational-reset`, token, {
     method: "POST",

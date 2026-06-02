@@ -8,6 +8,7 @@ import { createLead, deleteLead, deleteLeadAttachment, listLeadAttachments, list
 import { crmStageLabel } from "../lib/product-copy";
 import { EmptyState } from "./empty-state";
 import { AtlasViewHeader } from "./atlas-view-header";
+import { LeadAttachmentsPanel } from "./lead-attachments-panel";
 
 type Props = { token: string };
 
@@ -138,7 +139,9 @@ export function CrmView({ token }: Props) {
   }
 
   async function removeLead(lead: Lead) {
-    const ok = window.confirm(`Excluir lead ${lead.company}? Essa ação não pode ser desfeita.`);
+    const ok = window.confirm(
+      `Excluir lead "${lead.company}" permanentemente?\n\nEsta ação não pode ser desfeita e remove o lead do CRM (não apaga o histórico de conversas).`
+    );
     if (!ok) return;
     setDeletingLeadId(lead.id);
     try {
@@ -387,8 +390,8 @@ export function CrmView({ token }: Props) {
                           className="h-8 w-8 px-0"
                           disabled={deletingLeadId === lead.id}
                           onClick={() => void removeLead(lead)}
-                          aria-label={`Excluir lead ${lead.company}`}
-                          title="Excluir lead"
+                          aria-label={`Excluir lead ${lead.company} permanentemente`}
+                          title="Excluir lead permanentemente"
                         >
                           {deletingLeadId === lead.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                         </Button>
@@ -458,46 +461,25 @@ export function CrmView({ token }: Props) {
               </label>
               <div className="block sm:col-span-2">
                 <span className="atlas-label mb-1.5">Anexos do lead</span>
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                  {leadAttachments.length ? (
-                    <ul className="space-y-2">
-                      {leadAttachments.map((item) => (
-                        <li key={item.id} className="flex items-center justify-between gap-2 text-xs text-slate-700">
-                          <span className="truncate">{item.fileName}</span>
-                          <div className="flex items-center gap-2">
-                            <Badge className="h-5 px-2 text-[10px]">{item.category}</Badge>
-                            <button type="button" className="text-rose-600 hover:underline" onClick={() => void deleteLeadAttachment(token, editingLead.id, item.id).then(() => openEditor(editingLead))}>
-                              Remover
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-slate-500">Nenhum anexo ainda. Envie PDF, imagem, áudio ou proposta.</p>
-                  )}
-                  <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                    {attachmentUploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                    Adicionar arquivo
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,image/*,audio/*,.doc,.docx"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file || !editingLead) return;
-                        setAttachmentUploading(true);
-                        void uploadLeadAttachment(token, editingLead.id, file)
-                          .then(() => openEditor(editingLead))
-                          .catch((err) => setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao anexar arquivo" }))
-                          .finally(() => {
-                            setAttachmentUploading(false);
-                            e.target.value = "";
-                          });
-                      }}
-                    />
-                  </label>
-                </div>
+                <LeadAttachmentsPanel
+                  token={token}
+                  attachments={leadAttachments}
+                  uploading={attachmentUploading}
+                  showTimeline
+                  onUpload={(file) => {
+                    if (!editingLead) return Promise.resolve();
+                    setAttachmentUploading(true);
+                    return uploadLeadAttachment(token, editingLead.id, file)
+                      .then(() => openEditor(editingLead))
+                      .catch((err) =>
+                        setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao anexar arquivo" })
+                      )
+                      .finally(() => setAttachmentUploading(false));
+                  }}
+                  onRemove={(attachmentId) =>
+                    deleteLeadAttachment(token, editingLead.id, attachmentId).then(() => openEditor(editingLead))
+                  }
+                />
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
