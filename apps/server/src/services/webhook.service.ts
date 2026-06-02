@@ -755,7 +755,8 @@ export async function handleEvolutionWebhook(body: unknown, tenantSlug?: string)
   }
 
   if (!parsed.fromMe) {
-    if (conversation.status === "closed") {
+    const reopenStatuses = new Set(["closed", "resolved", "archived"]);
+    if (reopenStatuses.has(conversation.status)) {
       const priorTags = Array.isArray(conversation.tags) ? (conversation.tags as string[]) : [];
       reopenedToInbound = true;
       const inboundTeam = await ensureInboundTeam(instance.tenantId);

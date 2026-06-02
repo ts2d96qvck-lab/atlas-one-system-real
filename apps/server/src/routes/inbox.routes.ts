@@ -10,7 +10,7 @@ import {
   sendMediaMessage,
   sendMessage
 } from "../services/inbox.service";
-import { editMessageInternal, softDeleteMessage } from "../services/messaging/message-actions.service";
+import { editMessageInternal, hideMessage, sanitizeMessageForActor } from "../services/messaging/message-actions.service";
 import { transcribeInboundAudio } from "../services/transcription/transcription.service";
 import { runConversationAutomations } from "../services/automation.service";
 import { auditLog } from "../services/audit.service";
@@ -88,7 +88,10 @@ export async function inboxRoutes(app: FastifyInstance) {
   app.get("/conversations", { preHandler: [requireAuth, requirePermission("conversation:read")] }, async (request, reply) => {
     const user = requireUser(request);
     try {
-      const scope = canViewAll(user) ? undefined : { assignedToId: user.id };
+      const query = request.query as { bucket?: string };
+      const bucket: "active" | "history" | "all" =
+        query.bucket === "active" || query.bucket === "history" || query.bucket === "all" ? query.bucket : "all";
+      const scope = canViewAll(user) ? { bucket } : { assignedToId: user.id, bucket };
       return reply.send(await listConversations(user.tenantId, scope));
     } catch {
       return reply.send([]);
@@ -128,7 +131,11 @@ export async function inboxRoutes(app: FastifyInstance) {
       const scope = canViewAll(user) ? undefined : { assignedToId: user.id };
       const conversation = await getConversation(user.tenantId, id, scope);
       if (!conversation) return sendError(reply, 404, "Conversa nao encontrada");
-      return reply.send(conversation);
+      const actor = { id: user.id, name: user.name, role: user.role };
+      return reply.send({
+        ...conversation,
+        messages: conversation.messages.map((message) => sanitizeMessageForActor(message, actor))
+      });
     } catch {
       return sendError(reply, 503, "Inbox temporariamente indisponivel");
     }
@@ -294,17 +301,17 @@ export async function inboxRoutes(app: FastifyInstance) {
     const user = requireUser(request);
     const { id } = request.params as { id: string };
     try {
-      const removed = await deleteConversation(user.tenantId, id);
+      const archived = await deleteConversation(user.tenantId, id);
       await auditLog({
         tenantId: user.tenantId,
         actorId: user.id,
         entity: "Conversation",
         entityId: id,
-        action: "deleted"
+        action: "archived"
       });
-      return reply.send(removed);
+      return reply.send(archived);
     } catch (error) {
-      return sendError(reply, 400, "Nao foi possivel excluir contato", error instanceof Error ? error.message : error);
+      return sendError(reply, 400, "Nao foi possivel arquivar conversa", error instanceof Error ? error.message : error);
     }
   });
 
@@ -412,27 +419,34 @@ export async function inboxRoutes(app: FastifyInstance) {
 
   app.delete(
     "/conversations/:conversationId/messages/:messageId",
-    { preHandler: [requireAuth, requirePermission("conversation:reply")] },
+    {
+      preHandler: [
+        requireAuth,
+        requirePermission("conversation:update"),
+        requireRole("owner", "admin", "supervisor")
+      ]
+    },
     async (request, reply) => {
       const user = requireUser(request);
       const { conversationId, messageId } = request.params as { conversationId: string; messageId: string };
+      const body = (request.body ?? {}) as { reason?: string };
       try {
-        const updated = await softDeleteMessage(user.tenantId, conversationId, messageId, {
+        const updated = await hideMessage(user.tenantId, conversationId, messageId, {
           id: user.id,
           name: user.name,
           role: user.role
-        });
+        }, body.reason);
         await auditLog({
           tenantId: user.tenantId,
           actorId: user.id,
           entity: "Message",
           entityId: messageId,
-          action: "deleted",
-          metadata: { mode: "whatsapp_sync" }
+          action: "hidden",
+          metadata: { reason: body.reason ?? null }
         });
         return reply.send(updated);
       } catch (error) {
-        return sendError(reply, 400, "Nao foi possivel apagar mensagem", error instanceof Error ? error.message : error);
+        return sendError(reply, 400, "Nao foi possivel ocultar mensagem", error instanceof Error ? error.message : error);
       }
     }
   );

@@ -127,10 +127,21 @@ export const sendMessageSchema = z.object({
   fileName: z.string().optional()
 });
 
-export async function listConversations(tenantId: string, scope?: { assignedToId?: string }) {
+const ACTIVE_CONVERSATION_STATUSES = ["open", "waiting_customer", "waiting_internal"];
+const HISTORY_CONVERSATION_STATUSES = ["resolved", "closed", "archived"];
+
+export async function listConversations(
+  tenantId: string,
+  scope?: { assignedToId?: string; bucket?: "active" | "history" | "all" }
+) {
+  let statusFilter: { status?: { in: string[] } } = {};
+  if (scope?.bucket === "active") statusFilter = { status: { in: ACTIVE_CONVERSATION_STATUSES } };
+  else if (scope?.bucket === "history") statusFilter = { status: { in: HISTORY_CONVERSATION_STATUSES } };
+
   return prisma.conversation.findMany({
     where: {
       tenantId,
+      ...statusFilter,
       ...(scope?.assignedToId ? { assignedToId: scope.assignedToId } : {})
     },
     include: {
@@ -215,20 +226,25 @@ export async function createConversation(
   });
 }
 
-export async function deleteConversation(tenantId: string, id: string) {
+export async function archiveConversation(tenantId: string, id: string) {
   const conversation = await prisma.conversation.findFirst({
     where: { tenantId, id },
     select: { id: true }
   });
   if (!conversation) throw new Error("Conversa nao encontrada");
 
-  await prisma.$transaction(async (tx) => {
-    await tx.message.deleteMany({ where: { conversationId: id } });
-    await tx.lead.deleteMany({ where: { conversationId: id } });
-    await tx.conversation.delete({ where: { id } });
+  return prisma.conversation.update({
+    where: { id },
+    data: {
+      status: "archived",
+      assignedToId: null
+    }
   });
+}
 
-  return { id };
+/** Permanent archive — conversations are never hard-deleted. */
+export async function deleteConversation(tenantId: string, id: string) {
+  return archiveConversation(tenantId, id);
 }
 
 export async function sendMessage(tenantId: string, conversationId: string, input: unknown, actor?: MessageActor) {

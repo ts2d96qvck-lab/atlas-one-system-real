@@ -212,9 +212,26 @@ model Lead {
   team         Team?         @relation(fields: [teamId], references: [id])
   conversation Conversation? @relation(fields: [conversationId], references: [id])
   assignedTo   User?         @relation(fields: [assignedToId], references: [id])
+  attachments  LeadAttachment[]
 
   @@index([tenantId, status])
   @@index([tenantId, phone])
+}
+
+model LeadAttachment {
+  id           String   @id @default(cuid())
+  tenantId     String
+  leadId       String
+  uploadedById String?
+  fileName     String
+  mimeType     String
+  fileUrl      String
+  category     String   @default("other")
+  createdAt    DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, leadId, createdAt])
 }
 
 model Team {
