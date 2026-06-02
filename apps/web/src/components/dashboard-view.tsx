@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, BarChart3, Download, Gauge, Loader2, Target, Timer, TrendingUp, Zap } from "lucide-react";
+import { Activity, BarChart3, ChevronDown, Download, Gauge, Loader2, Target, Timer, TrendingUp, Zap } from "lucide-react";
 import { Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { downloadOpsExport } from "../lib/api";
@@ -13,6 +13,7 @@ export function DashboardView({ token }: Props) {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [projectionInput, setProjectionInput] = useState({
     meetingsPlanned: "20",
     closeRatePercent: "30",
@@ -182,16 +183,6 @@ export function DashboardView({ token }: Props) {
     return state === "connected" || state === "open";
   }).length;
 
-  const projectionRows = [
-    { label: "Real fechado", value: closedRevenue, tone: "bg-slate-300" },
-    { label: "Equipe (simulação)", value: projectedRevenueByTeamInput, tone: "bg-cyan-400" },
-    { label: "Conservador", value: Number(salesForecast.conservative ?? 0), tone: "bg-amber-300" },
-    { label: "Realista", value: Number(salesForecast.realistic ?? 0), tone: "bg-blue-400" },
-    { label: "Otimista", value: Number(salesForecast.optimistic ?? 0), tone: "bg-emerald-400" },
-    { label: "Meta", value: targetRevenue, tone: "bg-fuchsia-300" }
-  ];
-  const projectionMax = Math.max(...projectionRows.map((row) => row.value), 1);
-
   const lineSeries = [
     Math.max(closedRevenue * 0.32, 0),
     Math.max(closedRevenue * 0.55, 0),
@@ -230,39 +221,49 @@ export function DashboardView({ token }: Props) {
           section="Operação e vendas"
           title="Painel de performance"
           actions={
-            <>
-              <div className="glass-panel rounded-atlas px-3 py-2 text-right">
-                <p className="text-[11px] font-medium text-slate-500">Confiança da previsão</p>
-                <p className="text-xl font-semibold text-slate-900">{toPercent(Number(metrics.confidenceLevel ?? 0))}</p>
-              </div>
+            <div className="relative">
               <Button
                 variant="glass"
                 className="h-10 gap-2 text-xs"
                 disabled={!!exporting}
-                onClick={() => void handleExport("leads")}
+                onClick={() => setExportMenuOpen((open) => !open)}
+                aria-expanded={exportMenuOpen}
+                aria-haspopup="menu"
               >
-                {exporting === "leads" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-                Leads CSV
+                {exporting ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                Exportar
+                <ChevronDown size={14} className={exportMenuOpen ? "rotate-180" : ""} />
               </Button>
-              <Button
-                variant="glass"
-                className="h-10 gap-2 text-xs"
-                disabled={!!exporting}
-                onClick={() => void handleExport("conversations")}
-              >
-                {exporting === "conversations" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-                Conversas CSV
-              </Button>
-              <Button
-                variant="glass"
-                className="h-10 gap-2 text-xs"
-                disabled={!!exporting}
-                onClick={() => void handleExport("messages")}
-              >
-                {exporting === "messages" ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-                Mensagens CSV
-              </Button>
-            </>
+              {exportMenuOpen ? (
+                <div
+                  className="absolute right-0 top-full z-20 mt-1 min-w-[11rem] rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+                  role="menu"
+                >
+                  {(
+                    [
+                      ["leads", "Leads CSV"],
+                      ["conversations", "Conversas CSV"],
+                      ["messages", "Mensagens CSV"]
+                    ] as const
+                  ).map(([kind, label]) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      disabled={!!exporting}
+                      onClick={() => {
+                        setExportMenuOpen(false);
+                        void handleExport(kind);
+                      }}
+                    >
+                      {exporting === kind ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           }
         />
         {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
@@ -305,6 +306,20 @@ export function DashboardView({ token }: Props) {
                 <p className="text-2xl font-semibold text-rose-700">{Number(sla.openOverSlaCount ?? 0)}</p>
               </div>
             </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-cyan-100 bg-cyan-50/50 p-3">
+                <p className="text-xs text-slate-500">Receita fechada (mês)</p>
+                <p className="text-xl font-semibold text-slate-900">{toMoney(closedRevenue)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white/90 p-3">
+                <p className="text-xs text-slate-500">Conversas abertas</p>
+                <p className="text-xl font-semibold text-slate-900">{Number(metrics.openConversations ?? 0)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white/90 p-3">
+                <p className="text-xs text-slate-500">Gap para meta</p>
+                <p className="text-xl font-semibold text-slate-900">{toMoney(Number(metrics.gapToTarget ?? 0))}</p>
+              </div>
+            </div>
             {(sla.agentPerformance ?? []).length ? (
               <div className="mt-3 space-y-2">
                 {(sla.agentPerformance ?? []).slice(0, 5).map((agent) => (
@@ -318,33 +333,6 @@ export function DashboardView({ token }: Props) {
                 ))}
               </div>
             ) : null}
-          </Card>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Receita fechada</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{toMoney(closedRevenue)}</p>
-          </Card>
-          <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Negócios fechados</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{Number(metrics.closedDealsMonth ?? 0)}</p>
-          </Card>
-          <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Conversas abertas</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{Number(metrics.openConversations ?? 0)}</p>
-          </Card>
-          <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Meta do mês</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{toMoney(targetRevenue)}</p>
-          </Card>
-          <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Gap para meta</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{toMoney(Number(metrics.gapToTarget ?? 0))}</p>
-          </Card>
-          <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Ritmo mensal</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{toMoney(Number(salesForecast.runRateRevenue ?? 0))}</p>
           </Card>
         </div>
 
@@ -386,22 +374,10 @@ export function DashboardView({ token }: Props) {
                 ))}
               </svg>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {projectionRows.map((row) => (
-                <div key={row.label} className="rounded-xl border border-white/80 bg-white/80 p-2.5">
-                  <div className="mb-2 flex items-center justify-between text-[11px] text-slate-600">
-                    <span>{row.label}</span>
-                    <span>{toMoney(row.value)}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-100">
-                    <div
-                      className={`h-2 rounded-full ${row.tone}`}
-                      style={{ width: `${Math.max(6, (row.value / projectionMax) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              Real fechado {toMoney(closedRevenue)} · Meta {toMoney(targetRevenue)} · Previsão realista{" "}
+              {toMoney(Number(salesForecast.realistic ?? 0))}
+            </p>
           </Card>
 
           <Card className="min-w-0 border border-white/70 bg-white/70 p-4 backdrop-blur-xl lg:col-span-4">
@@ -439,68 +415,56 @@ export function DashboardView({ token }: Props) {
                 <strong className="text-slate-900">{projectedClosedByTeamInput}</strong>
               </div>
             </div>
-            <div className="mt-3 grid gap-2">
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-                <strong>Simulador (não altera a meta oficial).</strong> Use estes campos apenas para projetar cenários:
-                reuniões × taxa de fechamento = negócios previstos; negócios × ticket + extra = receita simulada.
-              </p>
-              <label className="text-[11px] font-medium text-slate-600">
-                Reuniões planejadas no mês
-                <input
-                  className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
-                  type="number"
-                  min={0}
-                  value={projectionInput.meetingsPlanned}
-                  onChange={(e) => setProjectionInput((s) => ({ ...s, meetingsPlanned: e.target.value }))}
-                />
-                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Quantas reuniões comerciais você espera realizar.</span>
-              </label>
-              <label className="text-[11px] font-medium text-slate-600">
-                Taxa de fechamento (%)
-                <input
-                  className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={projectionInput.closeRatePercent}
-                  onChange={(e) => setProjectionInput((s) => ({ ...s, closeRatePercent: e.target.value }))}
-                />
-                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
-                  Percentual de reuniões que viram venda. Ex.: 30 = 30% das reuniões fecham.
-                </span>
-              </label>
-              <label className="text-[11px] font-medium text-slate-600">
-                Ticket médio esperado (R$)
-                <input
-                  className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
-                  type="number"
-                  min={0}
-                  value={projectionInput.averageTicket}
-                  onChange={(e) => setProjectionInput((s) => ({ ...s, averageTicket: e.target.value }))}
-                />
-                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Valor médio de cada negócio fechado na simulação.</span>
-              </label>
-              <label className="text-[11px] font-medium text-slate-600">
-                Receita extra prevista (R$)
-                <input
-                  className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
-                  type="number"
-                  min={0}
-                  value={projectionInput.extraRevenue}
-                  onChange={(e) => setProjectionInput((s) => ({ ...s, extraRevenue: e.target.value }))}
-                />
-                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Renovações, upsell ou receitas fora do funil de reuniões.</span>
-              </label>
-            </div>
-            <div className="mt-3 rounded-lg bg-cyan-50 px-3 py-2 text-[11px] text-cyan-950">
-              Resultado da simulação: <strong>{projectedClosedByTeamInput} fechamentos</strong> ·{" "}
-              <strong>{toMoney(projectedRevenueByTeamInput)}</strong> de receita projetada.
-            </div>
-            <div className="mt-3 rounded-lg bg-white/90 px-3 py-2 text-xs">
-              <p className="text-slate-500">Meta oficial do mes (CRM / Admin)</p>
-              <p className="mt-1 text-base font-semibold text-slate-900">{toMoney(targetRevenue)}</p>
-              <p className="mt-1 text-[10px] text-slate-500">Defina em Admin → Metas comerciais. O gauge usa esta meta, não a simulação.</p>
-            </div>
+            <details className="mt-3 rounded-lg border border-slate-200/80 bg-white/80">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700">Simulador de cenários (opcional)</summary>
+              <div className="space-y-2 border-t border-slate-100 px-3 py-3">
+                <label className="block text-[11px] font-medium text-slate-600">
+                  Reuniões planejadas no mês
+                  <input
+                    className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
+                    type="number"
+                    min={0}
+                    value={projectionInput.meetingsPlanned}
+                    onChange={(e) => setProjectionInput((s) => ({ ...s, meetingsPlanned: e.target.value }))}
+                  />
+                </label>
+                <label className="block text-[11px] font-medium text-slate-600">
+                  Taxa de fechamento (%)
+                  <input
+                    className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={projectionInput.closeRatePercent}
+                    onChange={(e) => setProjectionInput((s) => ({ ...s, closeRatePercent: e.target.value }))}
+                  />
+                </label>
+                <label className="block text-[11px] font-medium text-slate-600">
+                  Ticket médio esperado (R$)
+                  <input
+                    className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
+                    type="number"
+                    min={0}
+                    value={projectionInput.averageTicket}
+                    onChange={(e) => setProjectionInput((s) => ({ ...s, averageTicket: e.target.value }))}
+                  />
+                </label>
+                <label className="block text-[11px] font-medium text-slate-600">
+                  Receita extra prevista (R$)
+                  <input
+                    className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
+                    type="number"
+                    min={0}
+                    value={projectionInput.extraRevenue}
+                    onChange={(e) => setProjectionInput((s) => ({ ...s, extraRevenue: e.target.value }))}
+                  />
+                </label>
+                <p className="text-[11px] text-cyan-950">
+                  Resultado: <strong>{projectedClosedByTeamInput} fechamentos</strong> ·{" "}
+                  <strong>{toMoney(projectedRevenueByTeamInput)}</strong>
+                </p>
+              </div>
+            </details>
             </Card>
 
           <Card className="lg:col-span-7 border border-white/70 bg-white/75 p-4 backdrop-blur">
