@@ -5,6 +5,12 @@ import { Loader2, Megaphone, Pause, Play, Plus, Trash2, XCircle } from "lucide-r
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { AtlasViewHeader } from "./atlas-view-header";
+import { EmptyState } from "./empty-state";
+
+const MESSAGE_KIND_LABEL: Record<string, string> = {
+  session: "Mensagem livre",
+  template: "Template Meta"
+};
 
 type Props = { token: string };
 
@@ -209,18 +215,24 @@ export function CampaignsView({ token }: Props) {
             </label>
             {form.messageKind === "template" ? (
               <>
-                <input
-                  className="atlas-field w-full px-3 py-2 text-sm outline-none"
-                  placeholder="Nome do template Meta (ex: hello_world)"
-                  value={form.templateName}
-                  onChange={(e) => setForm({ ...form, templateName: e.target.value })}
-                />
-                <input
-                  className="atlas-field w-full px-3 py-2 text-sm outline-none"
-                  placeholder="Idioma (ex: pt_BR)"
-                  value={form.templateLanguage}
-                  onChange={(e) => setForm({ ...form, templateLanguage: e.target.value })}
-                />
+                <label className="block">
+                  <span className="atlas-label mb-1.5">Nome do template Meta</span>
+                  <input
+                    className="atlas-field w-full px-3 py-2 text-sm outline-none"
+                    placeholder="ex: hello_world"
+                    value={form.templateName}
+                    onChange={(e) => setForm({ ...form, templateName: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="atlas-label mb-1.5">Idioma do template</span>
+                  <input
+                    className="atlas-field w-full px-3 py-2 text-sm outline-none"
+                    placeholder="pt_BR"
+                    value={form.templateLanguage}
+                    onChange={(e) => setForm({ ...form, templateLanguage: e.target.value })}
+                  />
+                </label>
               </>
             ) : null}
             <label className="block">
@@ -241,8 +253,17 @@ export function CampaignsView({ token }: Props) {
               onChange={(e) => setForm({ ...form, recipientsText: e.target.value })}
               />
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/80">
+              <input
+                type="checkbox"
+                checked={form.onlyBusinessHours}
+                onChange={(e) => setForm({ ...form, onlyBusinessHours: e.target.checked })}
+              />
+              Enviar apenas em horário comercial
+            </label>
+            <details className="rounded-xl border border-slate-200 bg-slate-50/80">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700">Limites de envio</summary>
+              <label className="block border-t border-slate-200 px-3 py-3">
                 <span className="atlas-label mb-1.5">Mensagens por minuto</span>
                 <input
                   className="atlas-field w-full px-3 py-2 text-sm outline-none"
@@ -254,15 +275,7 @@ export function CampaignsView({ token }: Props) {
                   onChange={(e) => setForm({ ...form, messagesPerMinute: e.target.value })}
                 />
               </label>
-              <label className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/80">
-                <input
-                  type="checkbox"
-                  checked={form.onlyBusinessHours}
-                  onChange={(e) => setForm({ ...form, onlyBusinessHours: e.target.checked })}
-                />
-                Horário comercial
-              </label>
-            </div>
+            </details>
           </div>
           <Button className="mt-4" onClick={create}>
             <Plus size={16} /> Criar campanha
@@ -276,7 +289,15 @@ export function CampaignsView({ token }: Props) {
         ) : (
           <div className="space-y-3">
             {items.length === 0 ? (
-              <Card className="p-4 text-sm text-atlas-muted">Nenhuma campanha ainda.</Card>
+              <EmptyState
+                title="Nenhuma campanha"
+                description="Crie uma campanha para disparar mensagens em massa pelo WhatsApp."
+                actionLabel="Nova campanha"
+                onAction={() => {
+                  const first = document.querySelector<HTMLInputElement>('input[placeholder="Ex.: Promoção março"]');
+                  first?.focus();
+                }}
+              />
             ) : null}
             {items.map((item) => (
               <Card key={item.id} className="p-4">
@@ -284,7 +305,8 @@ export function CampaignsView({ token }: Props) {
                   <div>
                     <p className="font-semibold">{item.name}</p>
                     <p className="text-sm text-atlas-muted">
-                      {item.instance?.label ?? item.instance?.name ?? "WhatsApp"} · {item.messageKind}
+                      {item.instance?.label ?? item.instance?.name ?? "WhatsApp"} ·{" "}
+                      {MESSAGE_KIND_LABEL[item.messageKind] ?? item.messageKind}
                     </p>
                     <p className="mt-1 text-xs text-atlas-muted">
                       Enviados {item.stats?.sent ?? 0}/{item.stats?.total ?? 0} · Falhas {item.stats?.failed ?? 0} ·

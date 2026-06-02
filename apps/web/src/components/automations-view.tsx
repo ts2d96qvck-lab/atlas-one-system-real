@@ -5,6 +5,25 @@ import { Bot, Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { AtlasViewHeader } from "./atlas-view-header";
+import { EmptyState } from "./empty-state";
+
+const TRIGGER_LABEL: Record<string, string> = {
+  "lead.stage.changed": "Lead mudou de etapa",
+  "lead.created": "Lead criado",
+  "lead.closed": "Lead fechado",
+  "lead.lost": "Lead perdido",
+  "conversation.created": "Conversa criada",
+  "conversation.unassigned": "Conversa sem atendente"
+};
+
+const SEND_TYPE_LABEL: Record<string, string> = {
+  text: "Enviar texto no WhatsApp",
+  audit: "Somente auditoria (sem envio)"
+};
+
+function triggerLabel(key: string) {
+  return TRIGGER_LABEL[key] ?? key;
+}
 
 type Props = { token: string };
 
@@ -183,14 +202,6 @@ export function AutomationsView({ token }: Props) {
               <option value="text">Enviar texto</option>
               <option value="audit">Somente auditoria (não envia mensagem)</option>
             </select>
-            <input
-              className="atlas-field w-full px-3 py-2 text-sm outline-none"
-              type="number"
-              min={0}
-              placeholder="Valor mínimo do lead para disparar (opcional)"
-              value={form.minLeadValue}
-              onChange={(e) => setForm({ ...form, minLeadValue: e.target.value })}
-            />
             <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
               <input
                 type="checkbox"
@@ -199,18 +210,40 @@ export function AutomationsView({ token }: Props) {
               />
               Rodar apenas em horário comercial (seg–sex, 08h–18h)
             </label>
-            <input
-              className="atlas-field w-full px-3 py-2 text-sm outline-none"
-              type="datetime-local"
-              value={form.scheduleAt}
-              onChange={(e) => setForm({ ...form, scheduleAt: e.target.value })}
-            />
-            <input
-              className="atlas-field w-full px-3 py-2 text-sm outline-none"
-              type="time"
-              value={form.scheduleTime}
-              onChange={(e) => setForm({ ...form, scheduleTime: e.target.value })}
-            />
+            <details className="rounded-xl border border-slate-200 bg-slate-50/80">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700">Opções avançadas</summary>
+              <div className="space-y-3 border-t border-slate-200 px-3 py-3">
+                <label className="block text-xs font-medium text-slate-600">
+                  Valor mínimo do lead (R$)
+                  <input
+                    className="atlas-field mt-1 w-full px-3 py-2 text-sm outline-none"
+                    type="number"
+                    min={0}
+                    placeholder="Opcional"
+                    value={form.minLeadValue}
+                    onChange={(e) => setForm({ ...form, minLeadValue: e.target.value })}
+                  />
+                </label>
+                <label className="block text-xs font-medium text-slate-600">
+                  Agendar data e hora
+                  <input
+                    className="atlas-field mt-1 w-full px-3 py-2 text-sm outline-none"
+                    type="datetime-local"
+                    value={form.scheduleAt}
+                    onChange={(e) => setForm({ ...form, scheduleAt: e.target.value })}
+                  />
+                </label>
+                <label className="block text-xs font-medium text-slate-600">
+                  Horário fixo diário
+                  <input
+                    className="atlas-field mt-1 w-full px-3 py-2 text-sm outline-none"
+                    type="time"
+                    value={form.scheduleTime}
+                    onChange={(e) => setForm({ ...form, scheduleTime: e.target.value })}
+                  />
+                </label>
+              </div>
+            </details>
           </div>
           <Button className="mt-4" onClick={create}>
             <Plus size={16} /> Criar
@@ -221,15 +254,25 @@ export function AutomationsView({ token }: Props) {
 
         {loading ? (
           <Loader2 className="animate-spin" />
+        ) : !items.length ? (
+          <EmptyState
+            title="Nenhuma automação"
+            description="Crie regras para disparar mensagens ou auditoria quando leads ou conversas mudarem."
+            actionLabel="Nova automação"
+            onAction={() => {
+              const first = document.querySelector<HTMLInputElement>('input[placeholder="Nome da automação"]');
+              first?.focus();
+            }}
+          />
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
               <Card key={item.id} className="flex items-center justify-between p-4">
                 <div>
                   <p className="font-semibold">{item.name}</p>
-                  <p className="text-sm text-atlas-muted">{item.trigger}</p>
+                  <p className="text-sm text-atlas-muted">{triggerLabel(item.trigger)}</p>
                   <p className="mt-1 text-xs text-atlas-muted">
-                    Ação: {String(item.config?.sendType ?? "text")} · Horario comercial:{" "}
+                    {SEND_TYPE_LABEL[String(item.config?.sendType ?? "text")] ?? "Ação"} · Horário comercial:{" "}
                     {item.config?.onlyBusinessHours ? "sim" : "não"}
                   </p>
                 </div>
@@ -245,14 +288,6 @@ export function AutomationsView({ token }: Props) {
             ))}
           </div>
         )}
-
-        <Card className="p-4 text-sm text-atlas-muted">
-          Webhook Atlas One (pagamentos):
-          <code className="mt-2 block break-all rounded bg-white/70 p-2 text-xs">
-            POST {apiUrl()}/payments/webhook/atlas-one
-          </code>
-          <p className="mt-2 text-xs">Body exemplo: {`{"event":"payment.paid","customerPhone":"5517999999999","amount":1200}`}</p>
-        </Card>
       </div>
     </main>
   );
