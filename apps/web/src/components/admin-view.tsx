@@ -1688,75 +1688,6 @@ export function AdminView({ token, user }: Props) {
         </Card>
 
         <Card className="p-5">
-          <p className="text-sm font-semibold">Visão executiva da operação</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-atlas-muted">Usuários do meu time</p>
-                <Users size={16} className="text-atlas-blue" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold">{users.length}</p>
-              <p className="text-xs text-atlas-muted">
-                {activeUsers.length} ativos · {inactiveUsers} inativos
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-atlas-muted">Departamentos</p>
-                <Building2 size={16} className="text-atlas-blue" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold">{departments.length}</p>
-              <p className="truncate text-xs text-atlas-muted">{departments.join(" · ") || "Sem departamentos"}</p>
-            </div>
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-atlas-muted">Números WhatsApp</p>
-                <Smartphone size={16} className="text-atlas-blue" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold">{instances.length}</p>
-              <p className="text-xs text-atlas-muted">
-                {connectedInstances.length} conectados · {disconnectedInstances} desconectados
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-atlas-muted">Clientes SaaS ativos</p>
-                <Shield size={16} className="text-atlas-blue" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold">{tenantsCount || 1}</p>
-              <p className="text-xs text-atlas-muted">
-                {tenantUsersTotal || users.length} usuários · {tenantInstancesTotal || instances.length} números
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <p className="font-semibold">Playbook comercial padrão</p>
-          <p className="mt-1 text-xs text-atlas-muted">
-            Fluxo recomendado para equipes de vendas e atendimento em todos os clientes.
-          </p>
-          <div className="mt-3 grid gap-2 text-xs">
-            <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
-              <p className="font-semibold">1) Qualificação inicial (ate 10 min)</p>
-              <p className="text-atlas-muted">Confirmar nome, necessidade, orçamento e responsável pela decisão.</p>
-            </div>
-            <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
-              <p className="font-semibold">2) Registro no CRM</p>
-              <p className="text-atlas-muted">Garantir contato com telefone, etapa correta e valor estimado.</p>
-            </div>
-            <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
-              <p className="font-semibold">3) Transferência por departamento</p>
-              <p className="text-atlas-muted">Mover para Comercial, Suporte ou Financeiro conforme demanda.</p>
-            </div>
-            <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
-              <p className="font-semibold">4) Follow-up e fechamento</p>
-              <p className="text-atlas-muted">Usar automações para follow-up e atualizar etapa para Fechado/Perdido.</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-5">
           <div className="flex items-center gap-2">
             <Hash size={15} className="text-atlas-blue" />
             <p className="font-semibold">Atalhos por hashtag (respostas rápidas)</p>
@@ -2345,7 +2276,6 @@ export function AdminView({ token, user }: Props) {
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedUser(u)}>
                     <p className="font-medium">{u.name}</p>
                     <p className="truncate text-sm text-atlas-muted">{u.email}</p>
-                    <p className="text-[10px] text-atlas-muted">clique para selecionar · duplo clique para ações rápidas</p>
                   </button>
                   <div className="flex items-center gap-2">
                     <Badge>{ROLE_LABEL[u.role] ?? u.role}</Badge>
@@ -2460,8 +2390,10 @@ export function AdminView({ token, user }: Props) {
           </div>
         </Card>
 
-        {isPlatformAdmin ? <Card className="border-rose-200 bg-rose-50/40 p-5">
-          <p className="font-semibold text-rose-900">Reset destrutivo da empresa</p>
+        {isPlatformAdmin ? (
+          <Card className="scroll-mt-24 border-2 border-rose-300 bg-rose-50/60 p-5 shadow-sm ring-1 ring-rose-200/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">Zona de risco · plataforma</p>
+          <p className="mt-1 font-semibold text-rose-900">Reset destrutivo da empresa</p>
           <p className="mt-1 text-xs text-rose-800/90">
             Ação irreversível para manutenção da plataforma. Apaga permanentemente usuários, números, conversas, CRM e
             automações desta empresa. Mantém apenas um novo dono com 2FA obrigatório.
@@ -2511,7 +2443,8 @@ export function AdminView({ token, user }: Props) {
             {resetLoading ? <Loader2 className="animate-spin" size={16} /> : <Shield size={16} />}
             Executar reset destrutivo
           </Button>
-        </Card> : null}
+        </Card>
+        ) : null}
 
         {isOwner ? <Card className="p-5">
           <p className="font-semibold">Revenda multiempresa (onboarding)</p>
