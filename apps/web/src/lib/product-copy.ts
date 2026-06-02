@@ -38,6 +38,29 @@ export function conversationStatusLabel(status: string) {
   return CONVERSATION_STATUS[status] ?? status;
 }
 
+/** Rótulos do inbox e compositor. */
+export const INBOX_COPY = {
+  transcribeAudio: "Transcrever áudio",
+  messageActions: "Ações da mensagem",
+  quickReplies: "Respostas rápidas",
+  quickRepliesHint: "Respostas rápidas (Ctrl+K)",
+  noQuickReply: "Nenhuma resposta rápida encontrada.",
+  transferNotePlaceholder: "Nota da transferência (opcional)",
+  saveCadence: "Salvar cadência",
+  cadenceLabel: "Cadência comercial"
+} as const;
+
+/** Normaliza nomes de etapa do CRM exibidos na UI. */
+const CRM_STAGE_LABELS: Record<string, string> = {
+  "Reuniao marcada": "Reunião marcada",
+  Negociacao: "Negociação",
+  "Recuperação de Credito": "Recuperação de Crédito"
+};
+
+export function crmStageLabel(name: string) {
+  return CRM_STAGE_LABELS[name] ?? name;
+}
+
 export const CONVERSATION_STATUS_SHORT: Record<string, string> = {
   open: "Aberto",
   waiting_customer: "Ag. cliente",

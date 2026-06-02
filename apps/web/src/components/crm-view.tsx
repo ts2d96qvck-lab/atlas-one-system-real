@@ -5,6 +5,7 @@ import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { createLead, deleteLead, listUsers, updateLead, type Lead, type UserRow } from "../lib/api";
+import { crmStageLabel } from "../lib/product-copy";
 import { EmptyState } from "./empty-state";
 
 type Props = { token: string };
@@ -261,7 +262,7 @@ export function CrmView({ token }: Props) {
 
   return (
     <main className="atlas-page">
-      <div className="atlas-page-inner max-w-[1500px]">
+      <div className="atlas-page-inner w-full max-w-[1400px]">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="atlas-section-title">Comercial</p>
@@ -299,14 +300,14 @@ export function CrmView({ token }: Props) {
           <p className={`mb-3 text-sm ${feedback.type === "error" ? "text-red-600" : "text-emerald-700"}`}>{feedback.text}</p>
         ) : null}
 
-        <div className="flex gap-4 overflow-x-auto pb-8">
+        <div className="flex gap-3 overflow-x-auto pb-10 pt-1">
           {stages.map((stage) => {
             const column = leads.filter((l) => l.status === stage.name);
             const columnValue = column.reduce((s, l) => s + Number(l.value), 0);
             return (
               <Card
                 key={stage.id}
-                className="flex min-h-[420px] min-w-[280px] flex-shrink-0 flex-col p-3"
+                className="flex min-h-[420px] min-w-[272px] flex-shrink-0 flex-col p-3"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
                   if (dragId) moveLead(dragId, stage.name);
@@ -315,7 +316,7 @@ export function CrmView({ token }: Props) {
               >
                 <div className="mb-3 border-b border-slate-100 pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{stage.name}</p>
+                    <p className="text-sm font-semibold text-slate-900">{crmStageLabel(stage.name)}</p>
                     <Badge className="h-5 px-2 text-[10px]">{column.length}</Badge>
                   </div>
                   <p className="mt-1 text-xs text-slate-500">{formatMoney(columnValue)}</p>
@@ -431,7 +432,7 @@ export function CrmView({ token }: Props) {
                 <select className="atlas-field w-full px-3 py-2 text-sm outline-none" value={editForm.status} onChange={(e) => setEditForm((s) => ({ ...s, status: e.target.value }))}>
                   {stages.map((stage) => (
                     <option key={stage.id} value={stage.name}>
-                      {stage.name}
+                      {crmStageLabel(stage.name)}
                     </option>
                   ))}
                 </select>

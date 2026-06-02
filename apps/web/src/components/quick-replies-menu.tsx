@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Hash, Search } from "lucide-react";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
 import type { ShortcutItem } from "../lib/api";
+import { INBOX_COPY } from "../lib/product-copy";
 
 type QuickRepliesMenuProps = {
   shortcuts: ShortcutItem[];
@@ -84,8 +85,8 @@ export function QuickRepliesMenu({ shortcuts, disabled, open, onOpenChange, onSe
           variant="glass"
           size="icon"
           disabled={disabled}
-          aria-label="Respostas rapidas"
-          title="Respostas rapidas (Ctrl+K)"
+          aria-label={INBOX_COPY.quickReplies}
+          title={INBOX_COPY.quickRepliesHint}
         >
           <Hash size={18} />
         </Button>
@@ -123,7 +124,7 @@ export function QuickRepliesMenu({ shortcuts, disabled, open, onOpenChange, onSe
             </button>
           ))}
           {!filtered.length ? (
-            <p className="px-2 py-3 text-xs text-slate-500">Nenhuma resposta rapida encontrada.</p>
+            <p className="px-2 py-3 text-xs text-slate-500">{INBOX_COPY.noQuickReply}</p>
           ) : null}
         </div>
         <p className="mt-2 px-1 text-[10px] text-slate-400">Setas para navegar · Enter para inserir · Esc para fechar</p>

@@ -82,7 +82,7 @@ export function CampaignsView({ token }: Props) {
       return;
     }
     if (!form.instanceId) {
-      setError("Selecione a instancia WhatsApp.");
+      setError("Selecione a instância WhatsApp.");
       return;
     }
     if (!form.recipientsText.trim()) {
@@ -183,26 +183,32 @@ export function CampaignsView({ token }: Props) {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </label>
-            <select
-              className="atlas-field w-full px-3 py-2 text-sm outline-none"
-              value={form.instanceId}
-              onChange={(e) => setForm({ ...form, instanceId: e.target.value })}
-            >
-              <option value="">Instancia WhatsApp</option>
+            <label className="block">
+              <span className="atlas-label mb-1.5">Instância WhatsApp</span>
+              <select
+                className="atlas-field w-full px-3 py-2 text-sm outline-none"
+                value={form.instanceId}
+                onChange={(e) => setForm({ ...form, instanceId: e.target.value })}
+              >
+                <option value="">Selecione a instância</option>
               {instances.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.label || item.name} ({item.status})
                 </option>
               ))}
-            </select>
-            <select
+              </select>
+            </label>
+            <label className="block">
+              <span className="atlas-label mb-1.5">Tipo de mensagem</span>
+              <select
               className="atlas-field w-full px-3 py-2 text-sm outline-none"
               value={form.messageKind}
               onChange={(e) => setForm({ ...form, messageKind: e.target.value as "session" | "template" })}
             >
               <option value="session">Mensagem livre (Evolution / janela 24h Meta)</option>
               <option value="template">Template Meta (API oficial)</option>
-            </select>
+              </select>
+            </label>
             {form.messageKind === "template" ? (
               <>
                 <input
@@ -219,35 +225,44 @@ export function CampaignsView({ token }: Props) {
                 />
               </>
             ) : null}
-            <textarea
-              className="min-h-[100px] w-full rounded-xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-900/80"
-              placeholder="Mensagem da campanha"
-              value={form.message}
-              onChange={(e) => setForm({ ...form, message: e.target.value })}
-            />
-            <textarea
-              className="min-h-[120px] w-full rounded-xl bg-white/80 px-3 py-2 text-sm font-mono dark:bg-slate-900/80"
+            <label className="block">
+              <span className="atlas-label mb-1.5">Mensagem da campanha</span>
+              <textarea
+                className="atlas-field min-h-[100px] w-full px-3 py-2 text-sm outline-none"
+                placeholder="Texto enviado aos destinatários"
+                value={form.message}
+                onChange={(e) => setForm({ ...form, message: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="atlas-label mb-1.5">Destinatários</span>
+              <textarea
+                className="atlas-field min-h-[120px] w-full px-3 py-2 font-mono text-sm outline-none"
               placeholder={"5517999999999,Joao\n5517988888888,Maria"}
               value={form.recipientsText}
               onChange={(e) => setForm({ ...form, recipientsText: e.target.value })}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                className="atlas-field w-full px-3 py-2 text-sm outline-none"
-                type="number"
-                min={1}
-                max={60}
-                placeholder="Msgs/min"
-                value={form.messagesPerMinute}
-                onChange={(e) => setForm({ ...form, messagesPerMinute: e.target.value })}
               />
-              <label className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-900/80">
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="atlas-label mb-1.5">Mensagens por minuto</span>
+                <input
+                  className="atlas-field w-full px-3 py-2 text-sm outline-none"
+                  type="number"
+                  min={1}
+                  max={60}
+                  placeholder="15"
+                  value={form.messagesPerMinute}
+                  onChange={(e) => setForm({ ...form, messagesPerMinute: e.target.value })}
+                />
+              </label>
+              <label className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/80">
                 <input
                   type="checkbox"
                   checked={form.onlyBusinessHours}
                   onChange={(e) => setForm({ ...form, onlyBusinessHours: e.target.checked })}
                 />
-                Horario comercial
+                Horário comercial
               </label>
             </div>
           </div>

@@ -104,7 +104,7 @@ export function SecureMedia({ path, token, type, alt, fileName }: Props) {
   if (type === "audio") {
     return (
       <audio controls preload="metadata" src={src} className="w-full min-w-[220px] max-w-sm">
-        Seu navegador não suporta reproducao de audio.
+        Seu navegador não suporta reprodução de áudio.
       </audio>
     );
   }

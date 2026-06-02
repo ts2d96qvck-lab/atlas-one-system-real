@@ -101,7 +101,7 @@ const STATUS_LABEL: Record<string, string> = {
 const AUDIT_ACTION_LABEL: Record<string, string> = {
   created: "Criação",
   updated: "Atualização",
-  deleted: "Exclusao",
+  deleted: "Exclusão",
   sent_text: "Mensagem de texto enviada",
   sent_media: "Mídia enviada",
   auth_login_success: "Login bem-sucedido",
@@ -111,7 +111,7 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   password_reset_requested: "Recuperação de senha solicitada",
   password_reset_confirmed: "Senha redefinida",
   password_changed: "Senha alterada",
-  permissions_updated: "Permissoes alteradas",
+  permissions_updated: "Permissões alteradas",
   data_export: "Exportação de dados",
   api_key_created: "Chave API criada",
   api_key_revoked: "Chave API revogada",
@@ -119,7 +119,7 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   webhook_updated: "Webhook atualizado",
   webhook_deleted: "Webhook removido",
   commercial_event: "Evento comercial (API)",
-  settings_updated: "Configuracoes alteradas"
+  settings_updated: "Configurações alteradas"
 };
 
 function describeAuditLog(log: AuditLogRow) {
@@ -580,9 +580,9 @@ export function AdminView({ token, user }: Props) {
         setMessage(`QR pronto para ${selectedInstance}. Escaneie no WhatsApp do celular.`);
       } else if (isInstanceConnected(connectionState)) {
         setQrSrc(null);
-        setMessage(`Numero ${selectedInstance} conectado com sucesso.`);
+        setMessage(`Número ${selectedInstance} conectado com sucesso.`);
       } else {
-        setMessage(`Numero ${selectedInstance} em ${connectionState || "connecting"}.`);
+        setMessage(`Número ${selectedInstance} em ${connectionState || "connecting"}.`);
       }
       try {
         await syncWebhook(token, selectedInstance);
@@ -608,7 +608,7 @@ export function AdminView({ token, user }: Props) {
     setQrSrc(null);
     try {
       await disconnectInstance(token, selectedInstance);
-      setMessage("Numero desconectado com sucesso.");
+      setMessage("Número desconectado com sucesso.");
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Falha ao desconectar");
@@ -656,7 +656,7 @@ export function AdminView({ token, user }: Props) {
     }
     setForm({ name: "", email: "", password: "", role: "agent", teamId: "" });
     await refreshSnapshot();
-    setMessage("Usuario criado.");
+      setMessage("Usuário criado.");
   }
 
   async function inviteUserByLink() {
@@ -723,10 +723,10 @@ export function AdminView({ token, user }: Props) {
           }
         }
       });
-      setMessage("Configuracoes da empresa salvas.");
+      setMessage("Configurações da empresa salvas.");
       await refreshSnapshot();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao salvar configuracoes");
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar configurações");
     } finally {
       setSettingsSaving(false);
     }
@@ -755,9 +755,9 @@ export function AdminView({ token, user }: Props) {
         invalidReply: saved.invalidReply,
         options: saved.options
       });
-      setMessage("Robo de atendimento salvo.");
+      setMessage("Robô de atendimento salvo.");
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erro ao salvar robo de atendimento");
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar robô de atendimento");
     } finally {
       setMenuBotSaving(false);
     }
@@ -793,7 +793,7 @@ export function AdminView({ token, user }: Props) {
         providers: ssoSettings.providers,
         jitProvisioning: ssoSettings.jitProvisioning
       });
-      setMessage("Configuracoes SSO salvas.");
+      setMessage("Configurações SSO salvas.");
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao salvar SSO");
@@ -829,7 +829,7 @@ export function AdminView({ token, user }: Props) {
       const created = await createApiKey(token, { name: apiKeyForm.name.trim() });
       setLastCreatedApiKey(created.key);
       setApiKeyForm({ name: "" });
-      setMessage(`Chave API criada. Copie agora — não sera exibida novamente.`);
+      setMessage(`Chave API criada. Copie agora — não será exibida novamente.`);
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao criar chave API");
@@ -1007,7 +1007,7 @@ export function AdminView({ token, user }: Props) {
         phone: instanceForm.phone.trim() || undefined
       });
       setInstanceForm({ name: "", label: "", phone: "" });
-      setMessage("Numero criado. Agora clique Conectar QR.");
+      setMessage("Número criado. Agora clique Conectar QR.");
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao criar número");
@@ -1022,7 +1022,7 @@ export function AdminView({ token, user }: Props) {
       !tenantForm.ownerEmail.trim() ||
       !tenantForm.ownerPassword.trim()
     ) {
-      setMessage("Preencha todos os campos obrigatorios para liberar acesso do cliente.");
+      setMessage("Preencha todos os campos obrigatórios para liberar acesso do cliente.");
       return;
     }
     try {
@@ -1057,7 +1057,7 @@ export function AdminView({ token, user }: Props) {
     }
     try {
       await deleteUser(token, selectedUser.id);
-      setMessage(`Usuario ${selectedUser.name} excluído.`);
+      setMessage(`Usuário ${selectedUser.name} excluído.`);
       setSelectedUser(null);
       await refreshSnapshot();
     } catch (err) {
@@ -1074,7 +1074,7 @@ export function AdminView({ token, user }: Props) {
     if (!ok) return;
     try {
       await deleteUser(token, user.id);
-      setMessage(`Usuario ${user.name} excluído.`);
+      setMessage(`Usuário ${user.name} excluído.`);
       if (selectedUser?.id === user.id) setSelectedUser(null);
       await refreshSnapshot();
     } catch (err) {
@@ -1106,7 +1106,7 @@ export function AdminView({ token, user }: Props) {
     try {
       await deleteInstance(token, name);
       if (selectedInstance === name) setSelectedInstance("");
-      setMessage(`Numero ${name} removido.`);
+      setMessage(`Número ${name} removido.`);
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao remover número");
@@ -1127,7 +1127,7 @@ export function AdminView({ token, user }: Props) {
         ownerPhone: resetForm.ownerPhone.trim(),
         confirmation: "RESETAR"
       });
-      setMessage(`${result.message} Você sera desconectado para entrar com o novo owner.`);
+      setMessage(`${result.message} Você será desconectado para entrar com o novo owner.`);
       setTimeout(() => {
         localStorage.removeItem("atlas:token");
         localStorage.removeItem("atlas-one-session");
@@ -1191,14 +1191,14 @@ export function AdminView({ token, user }: Props) {
           <nav className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
             {[
               { id: "admin-config", label: "Empresa" },
-              { id: "admin-integracoes", label: "API / Webhooks" },
+              { id: "admin-integrações", label: "API / Webhooks" },
               { id: "admin-billing", label: "Plano e vendas" },
               { id: "admin-metas", label: "Metas" },
               { id: "admin-convite", label: "Links de acesso" },
               { id: "admin-whatsapp", label: "WhatsApp" },
               { id: "admin-usuários", label: "Usuários" },
               { id: "admin-departamentos", label: "Departamentos" },
-              { id: "admin-robo", label: "Robô URA" },
+              { id: "admin-robô", label: "Robô URA" },
               { id: "admin-aprovação", label: "Aprovação" },
               { id: "admin-auditoria", label: "Auditoria" }
             ].map((item) => (
@@ -1216,10 +1216,10 @@ export function AdminView({ token, user }: Props) {
         <Card id="admin-config" className="scroll-mt-24 p-5">
           <div className="flex items-center gap-2">
             <Settings size={18} className="text-atlas-blue" />
-            <p className="font-semibold">Configuracoes da empresa</p>
+            <p className="font-semibold">Configurações da empresa</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            Nome, fuso horario e horario comercial usados na operação do time.
+            Nome, fuso horário e horário comercial usados na operação do time.
             {companySettings ? ` · ID: ${companySettings.slug}` : null}
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1270,13 +1270,13 @@ export function AdminView({ token, user }: Props) {
               type="number"
               min={1}
               max={168}
-              placeholder="SLA resolucao (horas)"
+              placeholder="SLA resolução (horas)"
               value={settingsForm.slaResolutionHours}
               onChange={(e) => setSettingsForm((s) => ({ ...s, slaResolutionHours: e.target.value }))}
             />
           </div>
           <div className="mt-4 rounded-2xl border border-white/70 bg-white/60 p-4">
-            <p className="text-sm font-semibold">Assinatura visivel ao cliente (WhatsApp)</p>
+            <p className="text-sm font-semibold">Assinatura visível ao cliente (WhatsApp)</p>
             <p className="mt-1 text-xs text-atlas-muted">
               Para o cliente ver o nome do atendente, o Atlas adiciona a assinatura no texto enviado ao WhatsApp.
             </p>
@@ -1294,7 +1294,7 @@ export function AdminView({ token, user }: Props) {
                 checked={settingsForm.showBotNameToCustomer}
                 onChange={(e) => setSettingsForm((s) => ({ ...s, showBotNameToCustomer: e.target.checked }))}
               />
-              Mostrar nome do robo
+              Mostrar nome do robô
             </label>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <input
@@ -1320,7 +1320,7 @@ export function AdminView({ token, user }: Props) {
             </div>
           </div>
           <Button className="mt-4" onClick={() => void saveCompanySettings()} disabled={settingsSaving}>
-            {settingsSaving ? <Loader2 className="animate-spin" size={16} /> : "Salvar configuracoes"}
+            {settingsSaving ? <Loader2 className="animate-spin" size={16} /> : "Salvar configurações"}
           </Button>
         </Card>
 
@@ -1375,13 +1375,13 @@ export function AdminView({ token, user }: Props) {
           </Card>
         ) : null}
 
-        <Card id="admin-integracoes" className="scroll-mt-24 p-5">
+        <Card id="admin-integrações" className="scroll-mt-24 p-5">
           <div className="flex items-center gap-2">
             <Plug size={18} className="text-atlas-blue" />
-            <p className="font-semibold">Integracoes (API e Webhooks)</p>
+            <p className="font-semibold">Integrações (API e Webhooks)</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            Conecte CRM externo, Zapier, Make ou sistemas proprios. Documentação em API.md e WEBHOOKS.md.
+            Conecte CRM externo, Zapier, Make ou sistemas próprios. Documentação em API.md e WEBHOOKS.md.
           </p>
 
           {lastCreatedApiKey ? (
@@ -1508,7 +1508,7 @@ export function AdminView({ token, user }: Props) {
           ) : null}
 
           <p className="mt-4 text-xs text-atlas-muted">
-            OpenAPI: <code>/v1/openapi.json</code> · Base URL publica: <code>/v1</code>
+            OpenAPI: <code>/v1/openapi.json</code> · Base URL pública: <code>/v1</code>
           </p>
         </Card>
 
@@ -1534,17 +1534,17 @@ export function AdminView({ token, user }: Props) {
                   <p className="mt-1 text-2xl font-semibold">
                     {billingOverview.seats.used}/{billingOverview.seats.limit}
                   </p>
-                  <p className="text-xs text-atlas-muted">{billingOverview.seats.available} disponiveis</p>
+                  <p className="text-xs text-atlas-muted">{billingOverview.seats.available} disponíveis</p>
                 </div>
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
                   <p className="text-xs text-atlas-muted">Canais WhatsApp</p>
                   <p className="mt-1 text-2xl font-semibold">
                     {billingOverview.channels.used}/{billingOverview.channels.limit}
                   </p>
-                  <p className="text-xs text-atlas-muted">{billingOverview.channels.available} disponiveis</p>
+                  <p className="text-xs text-atlas-muted">{billingOverview.channels.available} disponíveis</p>
                 </div>
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-                  <p className="text-xs text-atlas-muted">Conversas no mes</p>
+                  <p className="text-xs text-atlas-muted">Conversas no mês</p>
                   <p className="mt-1 text-2xl font-semibold">{billingOverview.usage.conversationsThisMonth}</p>
                   <p className="text-xs text-atlas-muted">
                     {billingOverview.limits.maxConversationsPerMonth
@@ -1607,7 +1607,7 @@ export function AdminView({ token, user }: Props) {
                   Marque pagamento recebido, atraso ou bloqueio. Ideal enquanto o Asaas producao não estiver ativo.
                 </p>
                 <p className="mt-2 rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-[11px] text-blue-900">
-                  Transcrição de audio: configure <code>OPENAI_API_KEY</code> ou <code>GROQ_API_KEY</code> no servidor e reinicie a API
+                  Transcrição de áudio: configure <code>OPENAI_API_KEY</code> ou <code>GROQ_API_KEY</code> no servidor e reinicie a API
                   (<code>pm2 restart atlas-api</code>). Groq tem tier gratuito com Whisper.
                 </p>
                 <textarea
@@ -1675,12 +1675,12 @@ export function AdminView({ token, user }: Props) {
               ) : null}
             </>
           ) : (
-            <p className="mt-3 text-xs text-atlas-muted">Carregando informacoes do plano...</p>
+            <p className="mt-3 text-xs text-atlas-muted">Carregando informações do plano...</p>
           )}
         </Card>
 
         <Card className="p-5">
-          <p className="text-sm font-semibold">Visao executiva da operação</p>
+          <p className="text-sm font-semibold">Visão executiva da operação</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
               <div className="flex items-center justify-between">
@@ -1724,26 +1724,26 @@ export function AdminView({ token, user }: Props) {
         </Card>
 
         <Card className="p-5">
-          <p className="font-semibold">Playbook comercial padrao</p>
+          <p className="font-semibold">Playbook comercial padrão</p>
           <p className="mt-1 text-xs text-atlas-muted">
             Fluxo recomendado para equipes de vendas e atendimento em todos os clientes.
           </p>
           <div className="mt-3 grid gap-2 text-xs">
             <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
               <p className="font-semibold">1) Qualificação inicial (ate 10 min)</p>
-              <p className="text-atlas-muted">Confirmar nome, necessidade, orçamento e responsável pela decisao.</p>
+              <p className="text-atlas-muted">Confirmar nome, necessidade, orçamento e responsável pela decisão.</p>
             </div>
             <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
               <p className="font-semibold">2) Registro no CRM</p>
               <p className="text-atlas-muted">Garantir contato com telefone, etapa correta e valor estimado.</p>
             </div>
             <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
-              <p className="font-semibold">3) Transferencia por departamento</p>
+              <p className="font-semibold">3) Transferência por departamento</p>
               <p className="text-atlas-muted">Mover para Comercial, Suporte ou Financeiro conforme demanda.</p>
             </div>
             <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2">
               <p className="font-semibold">4) Follow-up e fechamento</p>
-              <p className="text-atlas-muted">Usar automacoes para follow-up e atualizar etapa para Fechado/Perdido.</p>
+              <p className="text-atlas-muted">Usar automações para follow-up e atualizar etapa para Fechado/Perdido.</p>
             </div>
           </div>
         </Card>
@@ -1751,7 +1751,7 @@ export function AdminView({ token, user }: Props) {
         <Card className="p-5">
           <div className="flex items-center gap-2">
             <Hash size={15} className="text-atlas-blue" />
-            <p className="font-semibold">Atalhos por hashtag (respostas rapidas)</p>
+            <p className="font-semibold">Atalhos por hashtag (respostas rápidas)</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
             Exemplo: <strong>#boasvindas</strong>. No Inbox, digite a hashtag e clique em aplicar.
@@ -1765,7 +1765,7 @@ export function AdminView({ token, user }: Props) {
             />
             <input
               className="rounded-xl bg-white/80 px-3 py-2 text-sm sm:col-span-2"
-              placeholder="Texto da resposta rapida"
+              placeholder="Texto da resposta rápida"
               value={shortcutForm.text}
               onChange={(e) => setShortcutForm((s) => ({ ...s, text: e.target.value }))}
             />
@@ -1797,10 +1797,10 @@ export function AdminView({ token, user }: Props) {
         <Card className="p-5">
           <div className="flex items-center gap-2">
             <Hash size={15} className="text-atlas-blue" />
-            <p className="font-semibold">Catalogo de tags do inbox</p>
+            <p className="font-semibold">Catálogo de tags do inbox</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            Tags disponiveis para classificar conversas no inbox. Agentes aplicam tags; supervisores gerenciam o catalogo.
+            Tags disponíveis para classificar conversas no inbox. Agentes aplicam tags; supervisores gerenciam o catalogo.
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <input
@@ -1861,17 +1861,17 @@ export function AdminView({ token, user }: Props) {
         <Card id="admin-metas" className="scroll-mt-24 p-5">
           <div className="flex items-center gap-2">
             <CreditCard size={18} className="text-atlas-blue" />
-            <p className="font-semibold">Metas comerciais do mes</p>
+            <p className="font-semibold">Metas comerciais do mês</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            Este valor alimenta o gauge <strong>Execucao da meta</strong> no Dashboard. E diferente do simulador (20/30/3500).
+            Este valor alimenta o gauge <strong>Execução da meta</strong> no Dashboard. E diferente do simulador (20/30/3500).
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
             <input
               className="rounded-xl bg-white/80 px-3 py-2 text-sm"
               type="number"
               min={0}
-              placeholder="Meta de receita do mes (R$)"
+              placeholder="Meta de receita do mês (R$)"
               value={monthlyTargetValue}
               onChange={(e) => setMonthlyTargetValue(e.target.value)}
             />
@@ -1893,11 +1893,11 @@ export function AdminView({ token, user }: Props) {
             <p className="font-semibold">Links para teste e cadastro</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            Envie estes links para a pessoa testar o Atlas One no computador dela. Solicitacoes de equipe aparecem em Aprovação.
+            Envie estes links para a pessoa testar o Atlas One no computador dela. Solicitações de equipe aparecem em Aprovação.
           </p>
           <div className="mt-4 space-y-3">
             <div className="rounded-2xl border border-white/70 bg-white/75 p-3">
-              <p className="text-xs font-semibold text-slate-700">Pagina de demonstração</p>
+              <p className="text-xs font-semibold text-slate-700">Página de demonstração</p>
               <p className="mt-1 break-all text-xs text-slate-500">
                 {typeof window !== "undefined" ? `${window.location.origin}/teste` : "/teste"}
               </p>
@@ -1943,7 +1943,7 @@ export function AdminView({ token, user }: Props) {
                 <p className="font-semibold">{activeInstance?.label ?? "Nenhum número selecionado"}</p>
                 <p className="text-xs text-atlas-muted">
                   {activeInstance
-                    ? `Instancia: ${activeInstance.name}${activeInstance.phone ? ` · Telefone: ${activeInstance.phone}` : ""}`
+                    ? `Instância: ${activeInstance.name}${activeInstance.phone ? ` · Telefone: ${activeInstance.phone}` : ""}`
                     : "Crie ou selecione uma instancia"}
                 </p>
                 <span className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${statusTone}`}>
@@ -1985,11 +1985,11 @@ export function AdminView({ token, user }: Props) {
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-              <p className="text-[11px] font-semibold text-atlas-muted">Proxima ação recomendada</p>
+              <p className="text-[11px] font-semibold text-atlas-muted">Próxima ação recomendada</p>
               <p className="mt-1 text-xs text-slate-700">{recommendedAction}</p>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
-              <p className="text-[11px] font-semibold text-atlas-muted">Ultima sincronização webhook</p>
+              <p className="text-[11px] font-semibold text-atlas-muted">Última sincronização webhook</p>
               <p className="mt-1 text-xs text-slate-700">{formatDateTime(activeInstance?.lastSyncAt)}</p>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
@@ -2001,7 +2001,7 @@ export function AdminView({ token, user }: Props) {
           </div>
           <p className="mt-2 text-xs text-atlas-muted">
             {activeInstance
-              ? `Numero selecionado: ${activeInstance.label} (${activeInstance.name}). ${
+              ? `Número selecionado: ${activeInstance.label} (${activeInstance.name}). ${
                   isConnected ? "Já conectado." : "Ainda não conectado."
                 }`
               : "Selecione um número para iniciar conexão via QR."}{" "}
@@ -2043,7 +2043,7 @@ export function AdminView({ token, user }: Props) {
         <Card id="admin-usuários" className="scroll-mt-24 p-5">
           <p className="font-semibold">Novo usuário</p>
           <p className="mt-1 text-xs text-atlas-muted">
-            Crie com senha imediata ou envie um link de convite valido por 7 dias.
+            Crie com senha imediata ou envie um link de convite válido por 7 dias.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <input
@@ -2079,7 +2079,7 @@ export function AdminView({ token, user }: Props) {
               value={form.teamId}
               onChange={(e) => setForm({ ...form, teamId: e.target.value })}
             >
-              <option value="">{form.role === "agent" || form.role === "supervisor" ? "Departamento (obrigatorio)" : "Departamento (opcional)"}</option>
+              <option value="">{form.role === "agent" || form.role === "supervisor" ? "Departamento (obrigatório)" : "Departamento (opcional)"}</option>
               {teams.map((team) => (
                 <option key={team.id} value={team.id}>
                   {team.name}
@@ -2165,13 +2165,13 @@ export function AdminView({ token, user }: Props) {
           </div>
         </Card>
 
-        <Card id="admin-robo" className="scroll-mt-24 p-5">
+        <Card id="admin-robô" className="scroll-mt-24 p-5">
           <div className="flex items-center gap-2">
             <MessageCircle size={18} className="text-atlas-blue" />
             <p className="font-semibold">Robo de atendimento (URA)</p>
           </div>
           <p className="mt-1 text-xs text-atlas-muted">
-            O robo envia o menu apenas no <strong>primeiro contato</strong> ou quando o cliente volta a falar depois de voce
+            O robô envia o menu apenas no <strong>primeiro contato</strong> ou quando o cliente volta a falar depois de voce
             <strong> fechar</strong> o atendimento. Durante a conversa aberta, o atendente humano responde normalmente.
           </p>
           <label className="mt-4 flex items-center gap-2 text-sm">
@@ -2180,7 +2180,7 @@ export function AdminView({ token, user }: Props) {
               checked={menuBotForm.enabled}
               onChange={(e) => setMenuBotForm((s) => ({ ...s, enabled: e.target.checked }))}
             />
-            Ativar robo automatico no WhatsApp
+            Ativar robô automatico no WhatsApp
           </label>
           <div className="mt-3 grid gap-3">
             <textarea
@@ -2198,7 +2198,7 @@ export function AdminView({ token, user }: Props) {
           </div>
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-slate-600">Opcoes do menu</p>
+              <p className="text-xs font-semibold text-slate-600">Opções do menu</p>
               <Button
                 variant="glass"
                 className="h-7 px-2 text-xs"
@@ -2217,7 +2217,7 @@ export function AdminView({ token, user }: Props) {
               <div key={`${option.digit}-${index}`} className="grid gap-2 rounded-xl border border-white/70 bg-white/70 p-3 sm:grid-cols-[72px_1fr_1fr_auto]">
                 <input
                   className="rounded-lg bg-white px-2 py-1.5 text-sm"
-                  placeholder="Numero"
+                  placeholder="Número"
                   value={option.digit}
                   onChange={(e) =>
                     setMenuBotForm((s) => ({
@@ -2280,13 +2280,13 @@ export function AdminView({ token, user }: Props) {
             ) : null}
           </div>
           <Button className="mt-4" onClick={() => void saveMenuBotSettings()} disabled={menuBotSaving}>
-            {menuBotSaving ? <Loader2 className="animate-spin" size={16} /> : "Salvar robo de atendimento"}
+            {menuBotSaving ? <Loader2 className="animate-spin" size={16} /> : "Salvar robô de atendimento"}
           </Button>
         </Card>
 
         <Card id="admin-aprovação" className="scroll-mt-24 p-5">
           <p className="font-semibold">Aprovação de acessos pendentes</p>
-          <p className="mt-1 text-xs text-atlas-muted">Solicitacoes de equipe aguardando autorização do dono.</p>
+          <p className="mt-1 text-xs text-atlas-muted">Solicitações de equipe aguardando autorização do dono.</p>
           <div className="mt-3 space-y-2">
             {accessRequests.map((req) => (
               <div key={req.id} className="rounded-2xl border border-white/70 bg-white/70 px-3 py-3">
@@ -2337,7 +2337,7 @@ export function AdminView({ token, user }: Props) {
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedUser(u)}>
                     <p className="font-medium">{u.name}</p>
                     <p className="truncate text-sm text-atlas-muted">{u.email}</p>
-                    <p className="text-[10px] text-atlas-muted">clique para selecionar · duplo clique para acoes rapidas</p>
+                    <p className="text-[10px] text-atlas-muted">clique para selecionar · duplo clique para ações rápidas</p>
                   </button>
                   <div className="flex items-center gap-2">
                     <Badge>{ROLE_LABEL[u.role] ?? u.role}</Badge>
@@ -2361,7 +2361,7 @@ export function AdminView({ token, user }: Props) {
           )}
           {selectedUser && selectedUser.role !== "owner" ? (
             <div className="mt-3 rounded-2xl border border-white/70 bg-white/70 p-3">
-              <p className="text-sm font-semibold">Acoes rapidas · {selectedUser.name}</p>
+              <p className="text-sm font-semibold">Ações rápidas · {selectedUser.name}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button variant="glass" onClick={removeSelectedUser}>
                   <Trash2 size={14} /> Excluir usuário
@@ -2413,7 +2413,7 @@ export function AdminView({ token, user }: Props) {
         <Card id="admin-auditoria" className="scroll-mt-24 p-5">
           <p className="font-semibold">Monitor de acessos</p>
           <p className="mt-1 text-xs text-atlas-muted">
-            Trilha de auditoria: login, permissoes, exportacoes, integracoes e alteracoes criticas.
+            Trilha de auditoria: login, permissões, exportações, integrações e alteracoes criticas.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <select
@@ -2455,7 +2455,7 @@ export function AdminView({ token, user }: Props) {
         {isOwner ? <Card className="p-5">
           <p className="font-semibold">Reset operacional (owner)</p>
           <p className="mt-1 text-xs text-atlas-muted">
-            Apaga usuários, números, conversas, CRM e automacoes. Mantem apenas um novo dono com 2FA obrigatorio.
+            Apaga usuários, números, conversas, CRM e automações. Mantém apenas um novo dono com 2FA obrigatório.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <input

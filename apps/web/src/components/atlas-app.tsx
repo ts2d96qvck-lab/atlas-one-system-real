@@ -57,7 +57,7 @@ import {
 import { connectRealtime, joinTenant } from "../lib/socket";
 import { SecureMedia } from "./secure-media";
 import { QuickRepliesMenu } from "./quick-replies-menu";
-import { conversationStatusLabel, CONVERSATION_STATUS_SHORT, roleLabel as productRoleLabel } from "../lib/product-copy";
+import { conversationStatusLabel, CONVERSATION_STATUS_SHORT, INBOX_COPY, roleLabel as productRoleLabel } from "../lib/product-copy";
 import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { AppCombobox } from "./ui/app-select";
@@ -444,7 +444,7 @@ function MessageBubble({
                 type="button"
                 className="rounded-md p-0.5 text-slate-400 opacity-70 transition hover:bg-white/70 hover:text-slate-600 group-hover:opacity-100"
                 onClick={() => setMenuOpen((v) => !v)}
-                aria-label="Acoes da mensagem"
+                aria-label={INBOX_COPY.messageActions}
               >
                 <MoreVertical size={12} />
               </button>
@@ -481,14 +481,14 @@ function MessageBubble({
         {message.type === "audio" ? (
           <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2">
             {transcriptionStatus === "processing" ? (
-              <p className="text-[11px] text-slate-500">Transcrevendo audio...</p>
+              <p className="text-[11px] text-slate-500">Transcrevendo áudio...</p>
             ) : transcription ? (
               <p className="whitespace-pre-wrap text-[11px] text-slate-700">{transcription}</p>
             ) : transcriptionError ? (
               <p className="text-[11px] text-rose-600">{transcriptionError}</p>
             ) : onTranscribe ? (
               <button type="button" className="text-[11px] font-medium text-blue-700 hover:underline" onClick={() => onTranscribe(message)}>
-                Transcrever audio
+                Transcrever áudio
               </button>
             ) : null}
           </div>
@@ -1229,14 +1229,20 @@ export function AtlasApp({ token, user }: Props) {
       });
     }
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (c) =>
-        c.customerName.toLowerCase().includes(q) ||
-        c.customerPhone.includes(q) ||
-        c.lead?.company?.toLowerCase().includes(q)
-    );
-  }, [visibleConversations, search, tagFilter]);
+    if (q) {
+      rows = rows.filter(
+        (c) =>
+          c.customerName.toLowerCase().includes(q) ||
+          c.customerPhone.includes(q) ||
+          c.lead?.company?.toLowerCase().includes(q)
+      );
+    }
+    if (activeId && !rows.some((item) => item.id === activeId)) {
+      const activeRow = conversations.find((item) => item.id === activeId);
+      if (activeRow) rows = [activeRow, ...rows];
+    }
+    return rows;
+  }, [visibleConversations, search, tagFilter, activeId, conversations]);
 
   const whatsappOperationalStatus = useMemo(() => {
     const instances = new Map<string, { label: string; connected: boolean }>();
@@ -1335,7 +1341,7 @@ export function AtlasApp({ token, user }: Props) {
   async function handleTranscribeMessage(message: Message) {
     if (!activeId) return;
     try {
-      setInfo("Transcrevendo audio...");
+      setInfo("Transcrevendo áudio...");
       const updated = await transcribeMessage(token, activeId, message.id);
       patchActiveMessage(updated);
       setInfo("Audio transcrito.");
@@ -1432,7 +1438,7 @@ export function AtlasApp({ token, user }: Props) {
       recorder.start();
       setRecording(true);
     } catch {
-      setError("Permita acesso ao microfone para gravar audio");
+      setError("Permita acesso ao microfone para gravar áudio");
     }
   }
 
@@ -1452,7 +1458,7 @@ export function AtlasApp({ token, user }: Props) {
       await openConversation(activeId);
       await refreshConversations();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar audio");
+      setError(err instanceof Error ? err.message : "Falha ao enviar áudio");
     } finally {
       if (sendingMediaRef.current === uploadKey) {
         sendingMediaRef.current = null;
@@ -1870,7 +1876,7 @@ export function AtlasApp({ token, user }: Props) {
                     {groupMessagesForThread(active.messages ?? []).map((group) => (
                       <section key={group.dateKey} className="mb-5 last:mb-0">
                         <div className="sticky top-0 z-20 mb-3 flex justify-center">
-                          <span className="rounded-full border border-slate-200/80 bg-white/95 px-3 py-1 text-[11px] font-medium capitalize text-slate-600 shadow-sm backdrop-blur">
+                          <span className="rounded-full border border-slate-200/80 bg-white/95 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm backdrop-blur">
                             {group.dateLabel}
                           </span>
                         </div>
@@ -1902,7 +1908,7 @@ export function AtlasApp({ token, user }: Props) {
                   {pendingAudioFile ? (
                     <div className="mx-4 mb-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
                       <p className="mb-2 text-xs font-semibold text-blue-700">
-                        {pendingAudioSending ? "Enviando audio..." : "Audio gravado (pré-escuta antes de enviar)"}
+                        {pendingAudioSending ? "Enviando áudio..." : "Áudio gravado (pré-escuta antes de enviar)"}
                       </p>
                       <audio controls src={pendingAudioUrl} className="w-full" />
                       <div className="mt-2 flex gap-2">
@@ -1913,7 +1919,7 @@ export function AtlasApp({ token, user }: Props) {
                               Enviando...
                             </>
                           ) : (
-                            "Enviar audio"
+                            "Enviar áudio"
                           )}
                         </Button>
                         <Button size="sm" variant="glass" disabled={pendingAudioSending} onClick={discardPendingAudio}>

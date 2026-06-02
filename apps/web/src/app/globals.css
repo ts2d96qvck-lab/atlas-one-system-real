@@ -75,18 +75,18 @@ html.dark .atlas-field {
 
 .atlas-page {
   width: 100%;
-  padding: 1rem 1rem 7rem;
+  padding: 1rem 1rem 8.5rem;
 }
 
 @media (min-width: 640px) {
   .atlas-page {
-    padding: 1.5rem 1.5rem 7rem;
+    padding: 1.5rem 1.5rem 8.5rem;
   }
 }
 
 @media (min-width: 1024px) {
   .atlas-page {
-    padding: 2rem 2rem 7rem;
+    padding: 2rem 2rem 9rem;
   }
 }
 

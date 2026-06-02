@@ -42,7 +42,7 @@ export function AutomationsView({ token }: Props) {
       setError("");
     } else {
       const body = await res.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao carregar automacoes");
+      setError(body?.error ?? "Falha ao carregar automações");
     }
     setLoading(false);
   }
@@ -173,7 +173,7 @@ export function AutomationsView({ token }: Props) {
             </select>
             <textarea
               className="atlas-field w-full px-3 py-2 text-sm outline-none"
-              placeholder="Mensagem automatica para enviar no WhatsApp"
+              placeholder="Mensagem automática para enviar no WhatsApp"
               value={form.message}
               onChange={(e) => setForm({ ...form, message: e.target.value })}
             />
@@ -189,7 +189,7 @@ export function AutomationsView({ token }: Props) {
               className="atlas-field w-full px-3 py-2 text-sm outline-none"
               type="number"
               min={0}
-              placeholder="Valor minimo do lead para disparar (opcional)"
+              placeholder="Valor mínimo do lead para disparar (opcional)"
               value={form.minLeadValue}
               onChange={(e) => setForm({ ...form, minLeadValue: e.target.value })}
             />
@@ -199,7 +199,7 @@ export function AutomationsView({ token }: Props) {
                 checked={form.onlyBusinessHours}
                 onChange={(e) => setForm({ ...form, onlyBusinessHours: e.target.checked })}
               />
-              Rodar apenas em horario comercial (seg-sex, 08h-18h)
+              Rodar apenas em horário comercial (seg–sex, 08h–18h)
             </label>
             <input
               className="atlas-field w-full px-3 py-2 text-sm outline-none"

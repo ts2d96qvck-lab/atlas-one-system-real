@@ -823,7 +823,7 @@ export function AtlasShell() {
           ) : (
             <form className="space-y-4" onSubmit={handleLogin}>
               <label className="block text-sm">
-                <span className="text-atlas-muted">Empresa (ID da empresa)</span>
+                <span className="text-atlas-muted">Identificador da empresa</span>
                 <input
                   className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                   value={tenantSlug}
@@ -918,7 +918,7 @@ export function AtlasShell() {
         <div className="text-[10px] font-medium text-slate-400">atualizado · {liveAt}</div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 pt-2 sm:pb-28">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 sm:pb-32">
       {view === "inbox" ? <AtlasApp token={session.token} user={session.user} /> : null}
       {view === "dashboard" && canAccessView(session.user, "dashboard") ? <DashboardView token={session.token} /> : null}
       {canAccessView(session.user, "admin") && adminMounted ? (

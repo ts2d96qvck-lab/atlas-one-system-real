@@ -223,7 +223,7 @@ export function DashboardView({ token }: Props) {
 
   return (
     <main className="atlas-page">
-      <div className="atlas-page-inner max-w-7xl">
+      <div className="atlas-page-inner w-full min-w-0 max-w-[88rem]">
         <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-slate-900 text-cyan-300">
@@ -278,7 +278,7 @@ export function DashboardView({ token }: Props) {
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">SLA operacional</p>
                   <p className="text-lg font-semibold text-slate-900">
-                    Meta: {sla.config?.firstResponseMinutes ?? 15} min · {sla.config?.resolutionHours ?? 24}h resolucao
+                    Meta: {sla.config?.firstResponseMinutes ?? 15} min · {sla.config?.resolutionHours ?? 24}h resolução
                   </p>
                 </div>
               </div>
@@ -286,19 +286,19 @@ export function DashboardView({ token }: Props) {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl bg-white/90 p-3">
-                <p className="text-xs text-slate-500">Tempo medio 1a resposta</p>
+                <p className="text-xs text-slate-500">Tempo médio 1ª resposta</p>
                 <p className="text-2xl font-semibold text-slate-900">
                   {sla.avgFirstResponseMinutes != null ? `${sla.avgFirstResponseMinutes} min` : "—"}
                 </p>
               </div>
               <div className="rounded-xl bg-white/90 p-3">
-                <p className="text-xs text-slate-500">Dentro do SLA (1a resposta)</p>
+                <p className="text-xs text-slate-500">Dentro do SLA (1ª resposta)</p>
                 <p className="text-2xl font-semibold text-emerald-700">
                   {toPercent(Number(sla.firstResponseWithinSlaPercent ?? 0))}
                 </p>
               </div>
               <div className="rounded-xl bg-white/90 p-3">
-                <p className="text-xs text-slate-500">Tempo medio resolucao</p>
+                <p className="text-xs text-slate-500">Tempo médio resolução</p>
                 <p className="text-2xl font-semibold text-slate-900">
                   {sla.avgResolutionHours != null ? `${sla.avgResolutionHours} h` : "—"}
                 </p>
@@ -330,7 +330,7 @@ export function DashboardView({ token }: Props) {
             <p className="mt-1 text-lg font-semibold text-slate-900">{toMoney(closedRevenue)}</p>
           </Card>
           <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Negocios fechados</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Negócios fechados</p>
             <p className="mt-1 text-lg font-semibold text-slate-900">{Number(metrics.closedDealsMonth ?? 0)}</p>
           </Card>
           <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
@@ -338,7 +338,7 @@ export function DashboardView({ token }: Props) {
             <p className="mt-1 text-lg font-semibold text-slate-900">{Number(metrics.openConversations ?? 0)}</p>
           </Card>
           <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Meta do mes</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Meta do mês</p>
             <p className="mt-1 text-lg font-semibold text-slate-900">{toMoney(targetRevenue)}</p>
           </Card>
           <Card className="border border-white/70 bg-white/75 p-4 backdrop-blur">
@@ -351,12 +351,12 @@ export function DashboardView({ token }: Props) {
           </Card>
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-12">
-          <Card className="lg:col-span-8 border border-white/70 bg-white/70 p-4 backdrop-blur-xl">
+        <div className="mt-4 grid min-w-0 gap-3 lg:grid-cols-12">
+          <Card className="min-w-0 border border-white/70 bg-white/70 p-4 backdrop-blur-xl lg:col-span-8">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Projecao comercial</p>
-                <p className="text-lg font-semibold text-slate-900">Trajetoria de receita</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Projeção comercial</p>
+                <p className="text-lg font-semibold text-slate-900">Trajetória de receita</p>
               </div>
               <div className="inline-flex items-center gap-1 rounded-lg border border-white/70 bg-white/80 px-2 py-1 text-xs text-slate-600">
                 <TrendingUp size={13} />
@@ -407,11 +407,11 @@ export function DashboardView({ token }: Props) {
             </div>
           </Card>
 
-          <Card className="lg:col-span-4 border border-white/70 bg-white/70 p-4 backdrop-blur-xl">
+          <Card className="min-w-0 border border-white/70 bg-white/70 p-4 backdrop-blur-xl lg:col-span-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Execucao da meta</p>
-                <p className="text-lg font-semibold text-slate-900">Target gauge</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Execução da meta</p>
+                <p className="text-lg font-semibold text-slate-900">Indicador de meta</p>
               </div>
               <Target size={18} className="text-slate-600" />
             </div>
@@ -444,11 +444,11 @@ export function DashboardView({ token }: Props) {
             </div>
             <div className="mt-3 grid gap-2">
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-                <strong>Simulador (não altera a meta oficial).</strong> Use estes campos apenas para projetar cenarios:
-                reunioes × taxa de fechamento = negocios previstos; negocios × ticket + extra = receita simulada.
+                <strong>Simulador (não altera a meta oficial).</strong> Use estes campos apenas para projetar cenários:
+                reuniões × taxa de fechamento = negócios previstos; negócios × ticket + extra = receita simulada.
               </p>
               <label className="text-[11px] font-medium text-slate-600">
-                Reunioes planejadas no mes
+                Reuniões planejadas no mês
                 <input
                   className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
                   type="number"
@@ -456,7 +456,7 @@ export function DashboardView({ token }: Props) {
                   value={projectionInput.meetingsPlanned}
                   onChange={(e) => setProjectionInput((s) => ({ ...s, meetingsPlanned: e.target.value }))}
                 />
-                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Quantas reunioes comerciais voce espera realizar.</span>
+                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Quantas reuniões comerciais você espera realizar.</span>
               </label>
               <label className="text-[11px] font-medium text-slate-600">
                 Taxa de fechamento (%)
@@ -469,11 +469,11 @@ export function DashboardView({ token }: Props) {
                   onChange={(e) => setProjectionInput((s) => ({ ...s, closeRatePercent: e.target.value }))}
                 />
                 <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
-                  Percentual de reunioes que viram venda. Ex.: 30 = 30% das reunioes fecham.
+                  Percentual de reuniões que viram venda. Ex.: 30 = 30% das reuniões fecham.
                 </span>
               </label>
               <label className="text-[11px] font-medium text-slate-600">
-                Ticket medio esperado (R$)
+                Ticket médio esperado (R$)
                 <input
                   className="mt-1 w-full rounded-lg border border-white/70 bg-white/90 px-3 py-2 text-xs text-slate-800"
                   type="number"
@@ -481,7 +481,7 @@ export function DashboardView({ token }: Props) {
                   value={projectionInput.averageTicket}
                   onChange={(e) => setProjectionInput((s) => ({ ...s, averageTicket: e.target.value }))}
                 />
-                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Valor medio de cada negocio fechado na simulação.</span>
+                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Valor médio de cada negócio fechado na simulação.</span>
               </label>
               <label className="text-[11px] font-medium text-slate-600">
                 Receita extra prevista (R$)
@@ -492,7 +492,7 @@ export function DashboardView({ token }: Props) {
                   value={projectionInput.extraRevenue}
                   onChange={(e) => setProjectionInput((s) => ({ ...s, extraRevenue: e.target.value }))}
                 />
-                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Renovacoes, upsell ou receitas fora do funil de reunioes.</span>
+                <span className="mt-0.5 block text-[10px] font-normal text-slate-500">Renovações, upsell ou receitas fora do funil de reuniões.</span>
               </label>
             </div>
             <div className="mt-3 rounded-lg bg-cyan-50 px-3 py-2 text-[11px] text-cyan-950">

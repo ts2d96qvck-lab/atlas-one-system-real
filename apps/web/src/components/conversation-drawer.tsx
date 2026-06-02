@@ -6,6 +6,7 @@ import { Button } from "@atlas-one/ui";
 import type { Conversation, TagCatalogItem, UserRow } from "../lib/api";
 import { ConversationActivityPanel } from "./conversation-activity-panel";
 import { ConversationTagEditor } from "./conversation-tags";
+import { INBOX_COPY } from "../lib/product-copy";
 import { AppCombobox } from "./ui/app-select";
 
 export type ConversationDrawerTab = "cliente" | "crm" | "tags" | "notas" | "historico";
@@ -77,9 +78,9 @@ export function ConversationDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-[70] flex justify-end pt-14 sm:pt-16">
       <button type="button" className="absolute inset-0 bg-slate-950/30" aria-label="Fechar painel" onClick={onClose} />
-      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl">
+      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl sm:max-w-[min(100vw-1rem,28rem)]">
         <div className="border-b border-slate-200 px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -172,7 +173,7 @@ export function ConversationDrawer({
                 <textarea
                   className="mt-2 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-300"
                   rows={2}
-                  placeholder="Nota da transferencia (opcional)"
+                  placeholder={INBOX_COPY.transferNotePlaceholder}
                   value={transferNote}
                   onChange={(e) => setTransferNote(e.target.value)}
                 />
@@ -201,7 +202,7 @@ export function ConversationDrawer({
           ) : tab === "crm" ? (
             <div className="space-y-4">
               <div>
-                <label className="text-[11px] font-medium text-slate-600">Cadencia comercial</label>
+                <label className="text-[11px] font-medium text-slate-600">{INBOX_COPY.cadenceLabel}</label>
                 <select
                   className="atlas-field mt-1 w-full rounded-lg px-3 py-2 text-sm outline-none"
                   value={cadenceDraft}
@@ -213,7 +214,7 @@ export function ConversationDrawer({
                   <option value="reativação">Reativação</option>
                 </select>
                 <Button className="mt-2 h-8 text-xs" variant="glass" onClick={() => void onSaveCadence()}>
-                  Salvar cadencia
+                  {INBOX_COPY.saveCadence}
                 </Button>
               </div>
               {active.lead ? (
