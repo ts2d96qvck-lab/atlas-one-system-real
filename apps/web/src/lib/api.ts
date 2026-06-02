@@ -354,8 +354,9 @@ export async function getBootstrapStatus(tenantSlug: string) {
   return response.json() as Promise<{ canBootstrap: boolean }>;
 }
 
-export function listConversations(token: string) {
-  return request<Conversation[]>(`/inbox/conversations`, token, {
+export function listConversations(token: string, bucket: "active" | "history" | "all" = "all") {
+  const query = bucket === "all" ? "" : `?bucket=${encodeURIComponent(bucket)}`;
+  return request<Conversation[]>(`/inbox/conversations${query}`, token, {
     headers: { "content-type": "application/json" }
   });
 }
@@ -378,11 +379,13 @@ export function createConversation(
 }
 
 export function deleteConversation(token: string, id: string) {
-  return request<{ id: string }>(`/inbox/conversations/${id}`, token, {
+  return request<Conversation>(`/inbox/conversations/${id}`, token, {
     method: "DELETE",
     headers: { "content-type": "application/json" }
   });
 }
+
+export const archiveConversation = deleteConversation;
 
 export function updateConversation(
   token: string,
@@ -502,8 +505,50 @@ export function editMessage(token: string, conversationId: string, messageId: st
   });
 }
 
-export function deleteMessage(token: string, conversationId: string, messageId: string) {
+export function hideMessage(token: string, conversationId: string, messageId: string, reason?: string) {
   return request<Message>(`/inbox/conversations/${conversationId}/messages/${messageId}`, token, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reason: reason ?? "" })
+  });
+}
+
+export const deleteMessage = hideMessage;
+
+export type LeadAttachment = {
+  id: string;
+  leadId: string;
+  fileName: string;
+  mimeType: string;
+  fileUrl: string;
+  category: string;
+  createdAt: string;
+};
+
+export function listLeadAttachments(token: string, leadId: string) {
+  return request<LeadAttachment[]>(`/crm/leads/${leadId}/attachments`, token, {
+    headers: { "content-type": "application/json" }
+  });
+}
+
+export async function uploadLeadAttachment(token: string, leadId: string, file: File, category?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  if (category) form.append("category", category);
+  const response = await fetchWithTimeout(`${apiUrl()}/crm/leads/${leadId}/attachments`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+    body: form
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.error ?? body?.message ?? "Falha ao anexar arquivo");
+  }
+  return response.json() as Promise<LeadAttachment>;
+}
+
+export function deleteLeadAttachment(token: string, leadId: string, attachmentId: string) {
+  return request<LeadAttachment>(`/crm/leads/${leadId}/attachments/${attachmentId}`, token, {
     method: "DELETE",
     headers: { "content-type": "application/json" }
   });

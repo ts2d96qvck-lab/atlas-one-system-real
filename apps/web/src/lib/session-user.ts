@@ -13,6 +13,8 @@ export function normalizeSessionUser(user: Partial<SessionUser> | null | undefin
 }
 
 export function hasPermission(user: SessionUser, permission: string) {
+  const role = user.role ?? "agent";
+  if (role === "owner" || role === "admin") return true;
   const permissions = user.permissions ?? [];
   return permissions.includes("*") || permissions.includes(permission);
 }

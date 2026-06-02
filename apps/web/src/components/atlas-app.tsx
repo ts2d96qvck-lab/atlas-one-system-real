@@ -28,8 +28,8 @@ import {
 import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
 import {
   createConversation,
-  deleteConversation,
-  deleteMessage,
+  archiveConversation,
+  hideMessage,
   editMessage,
   getConversation,
   getCompanySettings,
@@ -57,7 +57,15 @@ import {
 import { connectRealtime, joinTenant } from "../lib/socket";
 import { SecureMedia } from "./secure-media";
 import { QuickRepliesMenu } from "./quick-replies-menu";
-import { conversationStatusLabel, CONVERSATION_STATUS_SHORT, INBOX_COPY, roleLabel as productRoleLabel } from "../lib/product-copy";
+import {
+  conversationStatusLabel,
+  CONVERSATION_STATUS_SHORT,
+  INBOX_COPY,
+  INBOX_QUEUE_BUCKETS,
+  LIFECYCLE_STATUSES,
+  roleLabel as productRoleLabel,
+  type LifecycleStatus
+} from "../lib/product-copy";
 import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { AppCombobox } from "./ui/app-select";
@@ -107,9 +115,12 @@ function statusShortLabel(status: string) {
 }
 
 function statusToneClass(status: string) {
-  if (status === "closed") return "bg-slate-100 text-slate-600";
+  if (status === "archived") return "bg-slate-100 text-slate-600";
+  if (status === "closed") return "bg-slate-100 text-slate-700";
+  if (status === "resolved") return "bg-emerald-100 text-emerald-800";
   if (status === "waiting_customer") return "bg-amber-100 text-amber-800";
-  return "bg-emerald-100 text-emerald-800";
+  if (status === "waiting_internal") return "bg-violet-100 text-violet-800";
+  return "bg-sky-100 text-sky-800";
 }
 
 const INBOX_PANEL_CLASS = "overflow-hidden rounded-atlas-lg";
@@ -369,7 +380,8 @@ function MessageBubble({
   token,
   onReply,
   canManage,
-  onDelete,
+  canHide,
+  onHide,
   onEdit,
   onTranscribe,
   clustered,
@@ -380,7 +392,8 @@ function MessageBubble({
   token: string;
   onReply: (message: Message) => void;
   canManage?: boolean;
-  onDelete?: (message: Message) => void;
+  canHide?: boolean;
+  onHide?: (message: Message) => void;
   onEdit?: (message: Message) => void;
   onTranscribe?: (message: Message) => void;
   clustered?: boolean;
@@ -390,6 +403,8 @@ function MessageBubble({
   const outgoing = message.direction === "out";
   const raw = (message.raw && typeof message.raw === "object" ? message.raw : {}) as Record<string, unknown>;
   const deleted = Boolean(raw.deletedAt) || message.status === "deleted";
+  const hidden = Boolean(raw.hiddenAt) || message.status === "hidden";
+  const hiddenVisible = Boolean(raw.hiddenVisibleToSupervisor);
   const edited = Boolean(raw.editedAt) || message.status === "edited";
   const [menuOpen, setMenuOpen] = useState(false);
   const showText = shouldShowMessageText(message);
@@ -412,14 +427,16 @@ function MessageBubble({
   const deliveryStatus = messageDeliveryStatus(message);
   const statusView = deleted
     ? { icon: <Trash2 size={12} />, label: "Apagada", tone: "text-slate-400", badge: "bg-slate-100 text-slate-500" }
-    : messageStatusView(deliveryStatus, edited);
+    : hidden && !hiddenVisible
+      ? { icon: <Trash2 size={12} />, label: "Oculta", tone: "text-slate-400", badge: "bg-slate-100 text-slate-500" }
+      : messageStatusView(deliveryStatus, edited);
   const failureReason = typeof raw.failureReason === "string" ? raw.failureReason : typeof raw.lastProviderStatus === "string" ? raw.lastProviderStatus : "";
 
-  if (deleted) {
+  if (deleted || (hidden && !hiddenVisible)) {
     return (
       <div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}>
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs italic text-slate-500">
-          Mensagem apagada
+          {hidden ? "Mensagem oculta pela supervisão" : "Mensagem apagada"}
         </div>
       </div>
     );
@@ -435,10 +452,13 @@ function MessageBubble({
             : `bg-white text-slate-800 ${clusterLast === false ? "rounded-bl-sm" : "rounded-bl-md"} ${clustered && !clusterFirst ? "rounded-tl-sm" : ""}`
         }`}
       >
+        {hiddenVisible ? (
+          <p className="mb-1 text-[10px] font-medium text-amber-700">Conteúdo oculto (visível para supervisão)</p>
+        ) : null}
         {clustered && !clusterFirst ? null : (
         <div className="mb-1 flex items-center justify-between gap-2">
           <p className="text-[10px] font-semibold text-slate-500">{messageSenderLabel(raw, outgoing)}</p>
-          {canManage && outgoing ? (
+          {(canManage && outgoing) || canHide ? (
             <div className="relative">
               <button
                 type="button"
@@ -450,14 +470,14 @@ function MessageBubble({
               </button>
               {menuOpen ? (
                 <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-                  {message.type === "text" && onEdit ? (
+                  {message.type === "text" && onEdit && canManage && outgoing ? (
                     <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] hover:bg-slate-50" onClick={() => { onEdit(message); setMenuOpen(false); }}>
                       Editar
                     </button>
                   ) : null}
-                  {onDelete ? (
-                    <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-rose-600 hover:bg-rose-50" onClick={() => { onDelete(message); setMenuOpen(false); }}>
-                      Apagar
+                  {onHide && canHide ? (
+                    <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-rose-600 hover:bg-rose-50" onClick={() => { onHide(message); setMenuOpen(false); }}>
+                      Ocultar
                     </button>
                   ) : null}
                 </div>
@@ -528,14 +548,16 @@ type ConversationHeaderBarProps = {
   active: Conversation;
   customerAvatarUrl?: string | null;
   accessToken: string;
-  onSetStatus: (status: "open" | "waiting_customer" | "closed") => void;
+  onSetStatus: (status: LifecycleStatus) => void;
   onOpenDrawer: () => void;
 };
 
 function statusDotClass(status: string) {
-  if (status === "closed") return "bg-slate-400";
+  if (status === "archived" || status === "closed") return "bg-slate-400";
+  if (status === "resolved") return "bg-emerald-500";
   if (status === "waiting_customer") return "bg-amber-400";
-  return "bg-emerald-500";
+  if (status === "waiting_internal") return "bg-violet-500";
+  return "bg-sky-500";
 }
 
 function ConversationHeaderBar({
@@ -581,8 +603,8 @@ function ConversationHeaderBar({
               <ChevronDown size={12} className="text-slate-400" />
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-            {(["open", "waiting_customer", "closed"] as const).map((status) => (
+          <PopoverContent align="end" className="w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+            {LIFECYCLE_STATUSES.map((status) => (
               <button
                 key={status}
                 type="button"
@@ -893,6 +915,7 @@ export function AtlasApp({ token, user }: Props) {
   );
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
   const [activeThreadFlash, setActiveThreadFlash] = useState<string | null>(null);
+  const [queueBucket, setQueueBucket] = useState<"active" | "history" | "all">("active");
   const [queueDepartmentId, setQueueDepartmentId] = useState<string>("all");
   const [queueOwnerId, setQueueOwnerId] = useState<string>("all");
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -925,7 +948,8 @@ export function AtlasApp({ token, user }: Props) {
 
   const refreshConversations = useCallback(async () => {
     try {
-      const items = await listConversations(token);
+      const bucket = search.trim() ? "all" : queueBucket;
+      const items = await listConversations(token, bucket);
       setConversations(items);
       return items;
     } catch {
@@ -933,7 +957,7 @@ export function AtlasApp({ token, user }: Props) {
       setError("Caixa de entrada temporariamente indisponível. Tentando reconectar...");
       return [];
     }
-  }, [token]);
+  }, [token, queueBucket, search]);
 
   const openConversation = useCallback(
     async (id: string) => {
@@ -1297,22 +1321,19 @@ export function AtlasApp({ token, user }: Props) {
     });
   }
 
-  async function handleDeleteMessage(message: Message) {
-    if (!activeId) return;
-    if (!window.confirm("Apagar esta mensagem no Atlas One e no WhatsApp do cliente?")) return;
+  const roleCanHideMessages = ["owner", "admin", "supervisor"].includes(user.role);
+
+  async function handleHideMessage(message: Message) {
+    if (!activeId || !roleCanHideMessages) return;
+    const reason = window.prompt("Motivo para ocultar esta mensagem (opcional):", "") ?? "";
+    if (reason === null) return;
     try {
-      const updated = await deleteMessage(token, activeId, message.id);
+      const updated = await hideMessage(token, activeId, message.id, reason);
       patchActiveMessage(updated);
-      const raw = (updated.raw && typeof updated.raw === "object" ? updated.raw : {}) as Record<string, unknown>;
-      const sync = raw.whatsappSync && typeof raw.whatsappSync === "object" ? (raw.whatsappSync as Record<string, unknown>) : null;
-      if (sync?.synced === true) {
-        setInfo("Mensagem apagada no Atlas One e no WhatsApp do cliente.");
-      } else {
-        setInfo("Mensagem apagada no Atlas One. WhatsApp não sincronizado (sem ID do provedor).");
-      }
+      setInfo("Mensagem oculta. Supervisores ainda podem ver o conteúdo original.");
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível apagar a mensagem");
+      setError(err instanceof Error ? err.message : "Não foi possível ocultar a mensagem");
     }
   }
 
@@ -1557,21 +1578,21 @@ export function AtlasApp({ token, user }: Props) {
     }
   }
 
-  async function handleDeleteActiveConversation() {
+  async function handleArchiveActiveConversation() {
     if (!active) return;
-    const ok = window.confirm(`Excluir contato ${active.customerName}? Essa ação remove conversa e mensagens.`);
+    const ok = window.confirm(`Arquivar conversa de ${active.customerName}? Ela permanece no histórico e pode ser buscada.`);
     if (!ok) return;
     try {
-      await deleteConversation(token, active.id);
+      await archiveConversation(token, active.id);
       setActiveConversation(null);
       setActiveId(null);
       const items = await refreshConversations();
       if (items[0]) await openConversation(items[0].id);
       setError("");
-      setInfo(`Contato ${active.customerName} excluído com sucesso.`);
+      setInfo(`Conversa de ${active.customerName} arquivada.`);
     } catch (err) {
       setInfo("");
-      setError(err instanceof Error ? err.message : "Falha ao excluir contato");
+      setError(err instanceof Error ? err.message : "Falha ao arquivar conversa");
     }
   }
 
@@ -1604,21 +1625,26 @@ export function AtlasApp({ token, user }: Props) {
   const active = activeConversation;
   const activeCustomerAvatar = active ? getAvatarUrl(active.tags) : null;
 
-  async function setStatusQuick(status: "open" | "waiting_customer" | "closed") {
+  async function setStatusQuick(status: LifecycleStatus) {
     if (!active) return;
     try {
-      if (status === "closed") {
-        await updateConversation(token, active.id, { status, assignedToId: null, teamId: null });
+      const closingStatuses = new Set<LifecycleStatus>(["closed", "resolved", "archived"]);
+      if (closingStatuses.has(status)) {
+        await updateConversation(token, active.id, {
+          status,
+          assignedToId: status === "archived" ? null : active.assignedToId ?? null,
+          teamId: status === "closed" || status === "archived" ? null : active.teamId ?? null
+        });
         const items = await refreshConversations();
-        if (roleIsAgent) {
+        if (roleIsAgent && (status === "closed" || status === "archived")) {
           setActiveConversation(null);
           setActiveId(null);
           const nextMine = items.find((item) => item.assignedToId === user.id) ?? null;
           if (nextMine) await openConversation(nextMine.id);
-          setInfo("Atendimento finalizado e removido da sua fila.");
+          setInfo(`Atendimento ${statusLabel(status).toLowerCase()} e removido da sua fila.`);
         } else {
           await openConversation(active.id);
-          setInfo("Atendimento fechado.");
+          setInfo(`Status atualizado: ${statusLabel(status)}.`);
         }
         return;
       }
@@ -1704,7 +1730,21 @@ export function AtlasApp({ token, user }: Props) {
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
           <Card className={`flex min-h-[220px] min-w-0 flex-col p-2.5 sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
-            <div className="flex items-center justify-between gap-2">
+            <div className="mt-2 flex flex-wrap gap-1">
+              {(Object.keys(INBOX_QUEUE_BUCKETS) as Array<keyof typeof INBOX_QUEUE_BUCKETS>).map((bucket) => (
+                <button
+                  key={bucket}
+                  type="button"
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                    queueBucket === bucket ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white/70 text-slate-600"
+                  }`}
+                  onClick={() => setQueueBucket(bucket)}
+                >
+                  {INBOX_QUEUE_BUCKETS[bucket]}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-semibold text-slate-900">Caixa de entrada</h1>
                 <Badge className="h-5 px-2 text-[10px]">{filtered.length}</Badge>
@@ -1888,12 +1928,13 @@ export function AtlasApp({ token, user }: Props) {
                                   key={m.id}
                                   message={m}
                                   token={token}
-                                  canManage
+                                  canManage={roleCanHideMessages}
                                   clustered={cluster.length > 1}
                                   clusterFirst={messageIndex === 0}
                                   clusterLast={messageIndex === cluster.length - 1}
                                   onReply={(message) => setReplyToMessage(message)}
-                                  onDelete={(message) => void handleDeleteMessage(message)}
+                                  canHide={roleCanHideMessages}
+                                  onHide={(message) => void handleHideMessage(message)}
                                   onEdit={(message) => void handleEditMessage(message)}
                                   onTranscribe={(message) => void handleTranscribeMessage(message)}
                                 />
@@ -2087,7 +2128,7 @@ export function AtlasApp({ token, user }: Props) {
         setCadenceDraft={setCadenceDraft}
         onSaveContact={() => void saveContactIdentity()}
         onSaveCadence={() => void saveCadence()}
-        onDelete={() => void handleDeleteActiveConversation()}
+        onDelete={() => void handleArchiveActiveConversation()}
         onTransfer={(agent, note) => void transferTo(agent, note)}
         transferring={transferLoading}
         agents={agents}

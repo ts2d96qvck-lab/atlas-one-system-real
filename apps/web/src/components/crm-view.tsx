@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
-import { createLead, deleteLead, listUsers, updateLead, type Lead, type UserRow } from "../lib/api";
+import { createLead, deleteLead, deleteLeadAttachment, listLeadAttachments, listUsers, updateLead, uploadLeadAttachment, type Lead, type LeadAttachment, type UserRow } from "../lib/api";
 import { crmStageLabel } from "../lib/product-copy";
 import { EmptyState } from "./empty-state";
 import { AtlasViewHeader } from "./atlas-view-header";
@@ -84,6 +84,8 @@ export function CrmView({ token }: Props) {
   const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [leadAttachments, setLeadAttachments] = useState<LeadAttachment[]>([]);
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
   const [editForm, setEditForm] = useState({
     company: "",
@@ -170,6 +172,9 @@ export function CrmView({ token }: Props) {
       expectedCloseDate: toDatetimeLocal(lead.expectedCloseDate),
       assignedToId: lead.assignedToId ?? lead.assignedTo?.id ?? ""
     });
+    void listLeadAttachments(token, lead.id)
+      .then(setLeadAttachments)
+      .catch(() => setLeadAttachments([]));
   }
 
   async function saveLeadEdit() {
@@ -451,6 +456,49 @@ export function CrmView({ token }: Props) {
                 <span className="atlas-label mb-1.5">Responsável</span>
                 <AgentAssigneeSelect value={editForm.assignedToId} agents={agents} onChange={(assignedToId) => setEditForm((s) => ({ ...s, assignedToId }))} />
               </label>
+              <div className="block sm:col-span-2">
+                <span className="atlas-label mb-1.5">Anexos do lead</span>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                  {leadAttachments.length ? (
+                    <ul className="space-y-2">
+                      {leadAttachments.map((item) => (
+                        <li key={item.id} className="flex items-center justify-between gap-2 text-xs text-slate-700">
+                          <span className="truncate">{item.fileName}</span>
+                          <div className="flex items-center gap-2">
+                            <Badge className="h-5 px-2 text-[10px]">{item.category}</Badge>
+                            <button type="button" className="text-rose-600 hover:underline" onClick={() => void deleteLeadAttachment(token, editingLead.id, item.id).then(() => openEditor(editingLead))}>
+                              Remover
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-slate-500">Nenhum anexo ainda. Envie PDF, imagem, áudio ou proposta.</p>
+                  )}
+                  <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                    {attachmentUploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    Adicionar arquivo
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,image/*,audio/*,.doc,.docx"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !editingLead) return;
+                        setAttachmentUploading(true);
+                        void uploadLeadAttachment(token, editingLead.id, file)
+                          .then(() => openEditor(editingLead))
+                          .catch((err) => setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao anexar arquivo" }))
+                          .finally(() => {
+                            setAttachmentUploading(false);
+                            e.target.value = "";
+                          });
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="glass" className="h-9 px-3 text-xs" onClick={() => setEditingLead(null)} disabled={savingLead}>

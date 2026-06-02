@@ -69,3 +69,28 @@ export const CONVERSATION_STATUS_SHORT: Record<string, string> = {
   closed: "Fechado",
   archived: "Arquivado"
 };
+
+export const LIFECYCLE_STATUSES = [
+  "open",
+  "waiting_customer",
+  "waiting_internal",
+  "resolved",
+  "closed",
+  "archived"
+] as const;
+
+export type LifecycleStatus = (typeof LIFECYCLE_STATUSES)[number];
+
+export const ACTIVE_CONVERSATION_STATUSES: LifecycleStatus[] = [
+  "open",
+  "waiting_customer",
+  "waiting_internal"
+];
+
+export const HISTORY_CONVERSATION_STATUSES: LifecycleStatus[] = ["resolved", "closed", "archived"];
+
+export const INBOX_QUEUE_BUCKETS = {
+  active: "Em andamento",
+  history: "Histórico",
+  all: "Todas"
+} as const;

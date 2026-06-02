@@ -50,7 +50,9 @@ function canAccessView(user: SessionUser, view: AtlasView) {
   const isManagerTier = isAdminTier || ["manager", "team_manager"].includes(normalized.role);
 
   if (view === "inbox") return true;
-  if (view === "crm") return true;
+  if (view === "crm") {
+    return isManagerTier || hasPermission(normalized, "crm:read") || hasPermission(normalized, "lead:update");
+  }
   if (view === "dashboard") return isManagerTier || hasPermission(normalized, "dashboard:read");
   if (view === "admin") return isAdminTier || hasPermission(normalized, "admin:read");
   if (view === "automacoes") return isAdminTier || hasPermission(normalized, "automation:read");

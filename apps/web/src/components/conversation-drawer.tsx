@@ -191,12 +191,12 @@ export function ConversationDrawer({
                 </Button>
               </div>
               <Button
-                className="h-9 w-full text-xs text-rose-700"
+                className="h-9 w-full text-xs text-amber-800"
                 variant="glass"
                 onClick={() => void onDelete()}
               >
                 <Trash2 size={14} />
-                Excluir conversa
+                Arquivar conversa
               </Button>
             </div>
           ) : tab === "crm" ? (
