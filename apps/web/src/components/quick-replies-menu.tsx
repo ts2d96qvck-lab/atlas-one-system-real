@@ -12,9 +12,17 @@ type QuickRepliesMenuProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (shortcut: ShortcutItem) => void;
+  triggerClassName?: string;
 };
 
-export function QuickRepliesMenu({ shortcuts, disabled, open, onOpenChange, onSelect }: QuickRepliesMenuProps) {
+export function QuickRepliesMenu({
+  shortcuts,
+  disabled,
+  open,
+  onOpenChange,
+  onSelect,
+  triggerClassName
+}: QuickRepliesMenuProps) {
   const [query, setQuery] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -80,16 +88,28 @@ export function QuickRepliesMenu({ shortcuts, disabled, open, onOpenChange, onSe
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="glass"
-          size="icon"
-          disabled={disabled}
-          aria-label={INBOX_COPY.quickReplies}
-          title={INBOX_COPY.quickRepliesHint}
-        >
-          <Hash size={18} />
-        </Button>
+        {triggerClassName ? (
+          <button
+            type="button"
+            className={triggerClassName}
+            disabled={disabled}
+            aria-label={INBOX_COPY.quickReplies}
+            title={INBOX_COPY.quickRepliesHint}
+          >
+            <Hash size={17} />
+          </button>
+        ) : (
+          <Button
+            type="button"
+            variant="glass"
+            size="icon"
+            disabled={disabled}
+            aria-label={INBOX_COPY.quickReplies}
+            title={INBOX_COPY.quickRepliesHint}
+          >
+            <Hash size={18} />
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent
         align="start"

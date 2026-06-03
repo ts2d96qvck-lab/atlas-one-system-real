@@ -119,13 +119,12 @@ function statusShortLabel(status: string) {
   return CONVERSATION_STATUS_SHORT[status] ?? status.slice(0, 8);
 }
 
-function statusToneClass(status: string) {
-  if (status === "archived") return "bg-slate-100 text-slate-600";
-  if (status === "closed") return "bg-slate-100 text-slate-700";
-  if (status === "resolved") return "bg-emerald-100 text-emerald-800";
-  if (status === "waiting_customer") return "bg-amber-100 text-amber-800";
-  if (status === "waiting_internal") return "bg-violet-100 text-violet-800";
-  return "bg-sky-100 text-sky-800";
+function statusMetaTone(status: string) {
+  if (status === "archived" || status === "closed") return "text-slate-500";
+  if (status === "resolved") return "text-emerald-600/90";
+  if (status === "waiting_customer") return "text-amber-600/90";
+  if (status === "waiting_internal") return "text-violet-600/90";
+  return "text-slate-600";
 }
 
 const INBOX_PANEL_CLASS = "overflow-hidden rounded-atlas-lg";
@@ -448,13 +447,13 @@ function MessageBubble({
   }
 
   return (
-    <div className={`group flex ${outgoing ? "justify-end" : "justify-start"} ${clustered && !clusterFirst ? "-mt-1.5" : ""}`}>
+    <div className={`group flex ${outgoing ? "justify-end" : "justify-start"} ${clustered && !clusterFirst ? "-mt-1" : ""}`}>
       <div
         onDoubleClick={() => onReply(message)}
-        className={`relative z-10 max-w-[88%] overflow-hidden break-words rounded-2xl px-3 py-2.5 text-[13px] leading-5 shadow-sm sm:max-w-[78%] xl:max-w-[340px] ${
+        className={`relative z-10 max-w-[min(88%,26rem)] overflow-hidden break-words rounded-[1.125rem] px-3.5 py-2.5 text-[13px] leading-[1.45] sm:max-w-[min(82%,24rem)] ${
           outgoing
-            ? `bg-[#d9fdd3] text-slate-900 ${clusterLast === false ? "rounded-br-sm" : "rounded-br-md"} ${clustered && !clusterFirst ? "rounded-tr-sm" : ""}`
-            : `bg-white text-slate-800 ${clusterLast === false ? "rounded-bl-sm" : "rounded-bl-md"} ${clustered && !clusterFirst ? "rounded-tl-sm" : ""}`
+            ? `inbox-v43-bubble-out ${clusterLast === false ? "rounded-br-md" : "rounded-br-[1.125rem]"} ${clustered && !clusterFirst ? "rounded-tr-md" : ""}`
+            : `inbox-v43-bubble-in ${clusterLast === false ? "rounded-bl-md" : "rounded-bl-[1.125rem]"} ${clustered && !clusterFirst ? "rounded-tl-md" : ""}`
         }`}
       >
         {hiddenVisible ? (
@@ -518,19 +517,19 @@ function MessageBubble({
             ) : null}
           </div>
         ) : null}
-        <div className="mt-1 flex flex-wrap items-center justify-end gap-1.5 text-[10px] text-slate-500">
-          {edited ? <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">editada</span> : null}
+        <div className="mt-1.5 flex flex-wrap items-center justify-end gap-2 text-[10px] text-slate-400">
+          {edited ? <span className="font-medium text-violet-600/80">editada</span> : null}
           {outgoing ? (
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium ${statusView.badge}`}
+              className="inbox-v43-bubble-status inline-flex items-center gap-0.5"
               title={statusView.label}
               aria-label={`Status: ${statusView.label}`}
             >
               <span className={statusView.tone}>{statusView.icon}</span>
-              <span className="hidden sm:inline">{statusView.label}</span>
+              <span>{statusView.label}</span>
             </span>
           ) : null}
-          <span>{formatTime(message.createdAt)}</span>
+          <span className="tabular-nums">{formatTime(message.createdAt)}</span>
         </div>
         {failureReason && deliveryStatus.includes("fail") ? (
           <p className="mt-1 text-[10px] text-rose-600">Falha: {failureReason}</p>
@@ -579,7 +578,7 @@ function ConversationHeaderBar({
   const instanceLabel = active.instance?.label || active.instance?.name || "WhatsApp";
 
   return (
-    <div className="inbox-v42-chat-header flex items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4">
+    <div className="inbox-v42-chat-header flex items-center gap-2.5 px-3 py-3.5 sm:gap-3 sm:px-5">
       {onMobileBack ? (
         <button
           type="button"
@@ -597,16 +596,16 @@ function ConversationHeaderBar({
         accessToken={accessToken}
       />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold tracking-tight text-slate-900">{active.customerName}</p>
-        <p className="truncate text-xs text-slate-500">
-          {formatPhoneDisplay(active.customerPhone)} · {assignee}
+        <p className="truncate text-base font-semibold tracking-tight text-slate-900">{active.customerName}</p>
+        <p className="truncate text-[12px] text-slate-500">
+          {formatPhoneDisplay(active.customerPhone)} · {teamName} · {assignee}
         </p>
       </div>
       <Popover>
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-white"
+            className="inbox-v43-header-pill inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-white/80"
             title="Alterar status"
           >
             <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
@@ -632,7 +631,7 @@ function ConversationHeaderBar({
       </Popover>
       <button
         type="button"
-        className="rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-600 shadow-sm hover:bg-white"
+        className="inbox-v43-header-pill rounded-full p-2.5 text-slate-600 hover:bg-white/80"
         onClick={onOpenDrawer}
         aria-label="Detalhes da conversa"
         title={`Detalhes · ${teamName} · ${instanceLabel}`}
@@ -1782,17 +1781,17 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   return (
-    <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-3">
+    <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-1.5 sm:p-2.5">
       <section className="inbox-v42-shell flex h-full min-h-0 flex-col overflow-hidden">
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(148px,184px)_minmax(0,1fr)] lg:grid-cols-[minmax(168px,200px)_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]">
           <div
             className={`inbox-v42-queue relative min-w-0 flex-col ${INBOX_PANEL_CLASS} ${
               mobileShowsChat ? "hidden md:flex" : "flex"
             } min-h-0 flex-1 md:min-h-0`}
           >
-            <div className="shrink-0 space-y-2.5 border-b border-slate-200/60 px-2.5 pb-2.5 pt-2.5">
+            <div className="shrink-0 space-y-2.5 border-b border-slate-200/40 px-3 pb-3 pt-3">
               <div className="flex items-center justify-between gap-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inbox</p>
+                <p className="inbox-v43-queue-title">Inbox</p>
                 <div className="flex items-center gap-0.5">
                   <button
                     type="button"
@@ -1972,7 +1971,7 @@ export function AtlasApp({ token, user }: Props) {
                   : "Nenhuma conversa encontrada com os filtros atuais."}
               </div>
             ) : null}
-              <div className="atlas-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto px-1.5 py-1">
+              <div className="atlas-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 py-1.5">
                 {filtered.map((item) => {
                   const last = item.messages?.[0];
                   const selected = item.id === activeId;
@@ -2019,31 +2018,40 @@ export function AtlasApp({ token, user }: Props) {
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline justify-between gap-1">
-                            <p className={`truncate text-[13px] leading-tight ${unread ? "font-semibold text-slate-900" : "font-medium text-slate-800"}`}>
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p
+                              className={`inbox-v43-row-title truncate ${unread ? "font-semibold text-slate-900" : "font-medium text-slate-800"}`}
+                            >
                               {item.customerName}
                             </p>
-                            <span className="shrink-0 text-[10px] tabular-nums text-slate-400">
+                            <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
                               {formatTime(item.lastMessageAt ?? last?.createdAt)}
                             </span>
                           </div>
-                          <p className={`truncate text-[11px] leading-snug ${unread ? "text-slate-700" : "text-slate-500"}`}>{preview}</p>
-                          <div className="inbox-v42-row-meta">
-                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusToneClass(item.status)}`}>
-                              {statusShortLabel(item.status)}
-                            </span>
-                            {overdue ? (
-                              <span
-                                className={`rounded border px-1 py-0.5 text-[10px] font-medium ${slaToneClass(slaState.tone)}`}
-                                title={slaState.detailLabel}
-                              >
-                                {slaState.summaryLabel}
+                          <p className={`inbox-v43-row-preview truncate ${unread ? "text-slate-600" : "text-slate-500"}`}>{preview}</p>
+                          <div className="mt-0.5 flex items-center justify-between gap-2">
+                            <p className="inbox-v43-row-meta min-w-0 flex-1 truncate text-slate-400">
+                              <span className={`font-medium ${statusMetaTone(item.status)}`}>{statusShortLabel(item.status)}</span>
+                              {overdue ? (
+                                <>
+                                  <span className="text-slate-300"> · </span>
+                                  <span className={`font-medium ${slaToneClass(slaState.tone)}`} title={slaState.detailLabel}>
+                                    {slaState.summaryLabel}
+                                  </span>
+                                </>
+                              ) : null}
+                              <span className="text-slate-400">
+                                {" "}
+                                · {teamName} · {assigneeName}
                               </span>
-                            ) : null}
-                            <span className="truncate text-[10px] text-slate-500">{assigneeName}</span>
-                            <span className="truncate text-[10px] text-slate-400">· {teamName}</span>
+                            </p>
+                            <ConversationTagChips
+                              tags={item.tags}
+                              catalog={tagCatalog}
+                              compact
+                              className="inbox-v43-row-tags shrink-0"
+                            />
                           </div>
-                          <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-0.5" />
                         </div>
                       </button>
                     </div>
@@ -2087,39 +2095,41 @@ export function AtlasApp({ token, user }: Props) {
                     onOpenDrawer={() => setDrawerOpen(true)}
                     onMobileBack={mobileBackToQueue}
                   />
-                  <div className="inbox-v42-thread atlas-scroll relative isolate flex-1 overflow-auto px-4 py-5 sm:px-6 sm:py-6">
-                    {groupMessagesForThread(active.messages ?? []).map((group) => (
-                      <section key={group.dateKey} className="mb-5 last:mb-0">
-                        <div className="sticky top-0 z-20 mb-3 flex justify-center">
-                          <span className="rounded-full border border-slate-200/80 bg-white/95 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm backdrop-blur">
-                            {group.dateLabel}
-                          </span>
-                        </div>
-                        <div className="space-y-3">
-                          {group.clusters.map((cluster, clusterIndex) => (
-                            <div key={`${group.dateKey}-${clusterIndex}`} className="space-y-0">
-                              {cluster.map((m, messageIndex) => (
-                                <MessageBubble
-                                  key={m.id}
-                                  message={m}
-                                  token={token}
-                                  canManage={roleCanHideMessages}
-                                  clustered={cluster.length > 1}
-                                  clusterFirst={messageIndex === 0}
-                                  clusterLast={messageIndex === cluster.length - 1}
-                                  onReply={(message) => setReplyToMessage(message)}
-                                  canHide={roleCanHideMessages}
-                                  onHide={(message) => void handleHideMessage(message)}
-                                  onEdit={(message) => void handleEditMessage(message)}
-                                  onTranscribe={(message) => void handleTranscribeMessage(message)}
-                                />
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-                    <div ref={messagesEndRef} />
+                  <div className="inbox-v42-thread atlas-scroll relative isolate flex-1 overflow-auto py-5 sm:py-6">
+                    <div className="inbox-v43-thread-column px-4 sm:px-5">
+                      {groupMessagesForThread(active.messages ?? []).map((group) => (
+                        <section key={group.dateKey} className="mb-5 last:mb-0">
+                          <div className="sticky top-0 z-20 mb-3 flex justify-center">
+                            <span className="rounded-full border border-slate-200/50 bg-white/80 px-3 py-1 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur-md">
+                              {group.dateLabel}
+                            </span>
+                          </div>
+                          <div className="space-y-2.5">
+                            {group.clusters.map((cluster, clusterIndex) => (
+                              <div key={`${group.dateKey}-${clusterIndex}`} className="space-y-0">
+                                {cluster.map((m, messageIndex) => (
+                                  <MessageBubble
+                                    key={m.id}
+                                    message={m}
+                                    token={token}
+                                    canManage={roleCanHideMessages}
+                                    clustered={cluster.length > 1}
+                                    clusterFirst={messageIndex === 0}
+                                    clusterLast={messageIndex === cluster.length - 1}
+                                    onReply={(message) => setReplyToMessage(message)}
+                                    canHide={roleCanHideMessages}
+                                    onHide={(message) => void handleHideMessage(message)}
+                                    onEdit={(message) => void handleEditMessage(message)}
+                                    onTranscribe={(message) => void handleTranscribeMessage(message)}
+                                  />
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
                   </div>
                   {pendingAudioFile ? (
                     <div className="mx-4 mb-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
@@ -2220,10 +2230,7 @@ export function AtlasApp({ token, user }: Props) {
                       <p className="whitespace-pre-wrap">{buildSignaturePreview(draft, user, companySettings?.messaging)}</p>
                     </div>
                   ) : null}
-                  <form
-                    onSubmit={handleSend}
-                    className="inbox-v42-composer z-10 flex items-end gap-2.5 px-4 py-3 sm:px-5"
-                  >
+                  <form onSubmit={handleSend} className="inbox-v42-composer z-10 sm:px-2">
                     <input
                       ref={fileRef}
                       type="file"
@@ -2235,49 +2242,57 @@ export function AtlasApp({ token, user }: Props) {
                         e.target.value = "";
                       }}
                     />
-                    <Button
-                      type="button"
-                      variant="glass"
-                      size="icon"
-                      disabled={mediaSendLocked || sendingText}
-                      onClick={() => fileRef.current?.click()}
-                      title="Anexar arquivo"
-                    >
-                      <Paperclip size={18} />
-                    </Button>
-                    <QuickRepliesMenu
-                      shortcuts={shortcuts}
-                      disabled={!activeId}
-                      open={shortcutMenuOpen}
-                      onOpenChange={setShortcutMenuOpen}
-                      onSelect={insertShortcut}
-                    />
-                    <Button
-                      type="button"
-                      variant="glass"
-                      size="icon"
-                      disabled={mediaSendLocked || sendingText}
-                      onClick={toggleRecord}
-                      className={recording ? "ring-2 ring-red-400" : ""}
-                    >
-                      {recording ? <Square size={16} className="text-red-500" /> : <Mic size={18} />}
-                    </Button>
-                    <textarea
-                      className="atlas-field max-h-32 min-h-[40px] flex-1 resize-none rounded-[18px] px-4 py-2 text-sm outline-none focus:border-blue-300 disabled:opacity-60"
-                      placeholder="Mensagem..."
-                      value={draft}
-                      disabled={sendingText}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          if (!sendingText && draft.trim()) void sendCurrentDraft();
-                        }
-                      }}
-                    />
-                    <Button type="submit" size="icon" disabled={!draft.trim() || sendingText || mediaSendLocked}>
-                      {sendingText ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                    </Button>
+                    <div className="inbox-v43-composer-inner">
+                      <div className="inbox-v43-composer-tools">
+                        <button
+                          type="button"
+                          className="inbox-v43-composer-tool"
+                          disabled={mediaSendLocked || sendingText}
+                          onClick={() => fileRef.current?.click()}
+                          title="Anexar arquivo"
+                        >
+                          <Paperclip size={17} />
+                        </button>
+                        <QuickRepliesMenu
+                          shortcuts={shortcuts}
+                          disabled={!activeId}
+                          open={shortcutMenuOpen}
+                          onOpenChange={setShortcutMenuOpen}
+                          onSelect={insertShortcut}
+                          triggerClassName="inbox-v43-composer-tool"
+                        />
+                        <button
+                          type="button"
+                          className={`inbox-v43-composer-tool ${recording ? "text-rose-500" : ""}`}
+                          disabled={mediaSendLocked || sendingText}
+                          onClick={toggleRecord}
+                          title={recording ? "Parar gravação" : "Gravar áudio"}
+                        >
+                          {recording ? <Square size={15} /> : <Mic size={17} />}
+                        </button>
+                      </div>
+                      <textarea
+                        className="inbox-v43-composer-input"
+                        placeholder="Escreva uma mensagem..."
+                        value={draft}
+                        disabled={sendingText}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            if (!sendingText && draft.trim()) void sendCurrentDraft();
+                          }
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        className="inbox-v43-composer-send"
+                        disabled={!draft.trim() || sendingText || mediaSendLocked}
+                        title="Enviar"
+                      >
+                        {sendingText ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+                      </button>
+                    </div>
                   </form>
                 </>
               ) : (

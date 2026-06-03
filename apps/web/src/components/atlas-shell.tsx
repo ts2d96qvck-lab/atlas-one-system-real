@@ -891,15 +891,15 @@ export function AtlasShell() {
 
   return (
     <div className="atlas-app-bg flex h-dvh max-h-dvh overflow-hidden">
-      <aside className="atlas-glass-strong hidden w-[15.5rem] shrink-0 flex-col border-r border-white/50 lg:flex">
-        <div className="border-b border-white/40 px-4 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Atlas One</p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">{session.user.tenantSlug}</p>
-          <p className="truncate text-xs text-slate-500">
+      <aside className="atlas-sidebar-lite hidden w-[12.25rem] shrink-0 flex-col lg:flex xl:w-[13rem]">
+        <div className="border-b border-white/30 px-3 py-3.5">
+          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">Atlas One</p>
+          <p className="mt-1 truncate text-[13px] font-semibold tracking-tight text-slate-800">{session.user.tenantSlug}</p>
+          <p className="truncate text-[11px] text-slate-500">
             {session.user.name} · {roleLabel(session.user.role)}
           </p>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2.5">
           {visibleViews.map((item) => {
             const isActive = view === item.id;
             const Icon = item.icon;
@@ -910,13 +910,13 @@ export function AtlasShell() {
                 onClick={() => setView(item.id)}
                 className={`atlas-nav-item ${isActive ? "atlas-nav-item-active" : ""}`}
               >
-                <Icon size={17} className="shrink-0 opacity-80" />
+                <Icon size={16} className="shrink-0 opacity-70" />
                 {item.label}
               </button>
             );
           })}
         </nav>
-        <div className="border-t border-white/40 p-3">
+        <div className="border-t border-white/30 px-2 py-2.5">
           <button
             type="button"
             className="atlas-nav-item w-full"
@@ -954,7 +954,7 @@ export function AtlasShell() {
         </div>
 
         <div className="fixed bottom-3 left-1/2 z-50 flex w-[min(calc(100vw-1.5rem),920px)] -translate-x-1/2 flex-col items-center gap-1.5 px-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
-          <div className="glass-panel flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl p-1 sm:gap-1">
+          <div className="glass-panel flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl border border-white/50 bg-white/55 p-1 shadow-sm backdrop-blur-xl sm:gap-1">
             {visibleViews.map((item) => {
               const isActive = view === item.id;
               const Icon = item.icon;
@@ -965,8 +965,8 @@ export function AtlasShell() {
                   onClick={() => setView(item.id)}
                   className={`relative flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-medium transition sm:px-3 sm:text-sm ${
                     isActive
-                      ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900"
-                      : "text-slate-600 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                      ? "bg-white/90 text-slate-900 shadow-sm ring-1 ring-slate-200/80 dark:bg-white/12 dark:text-slate-100 dark:ring-slate-600/50"
+                      : "text-slate-500 hover:bg-white/70 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
                   }`}
                 >
                   <Icon size={14} />
