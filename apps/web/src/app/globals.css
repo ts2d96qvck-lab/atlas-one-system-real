@@ -416,18 +416,10 @@ html.dark .inbox-v42-row:hover {
 
 .inbox-v42-row-meta {
   display: flex;
-  gap: 0.35rem;
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  transition: max-height 0.18s ease, opacity 0.18s ease, margin 0.18s ease;
-}
-
-.inbox-v42-row:hover .inbox-v42-row-meta,
-.inbox-v42-row:focus-within .inbox-v42-row-meta {
-  max-height: 1.25rem;
-  opacity: 1;
-  margin-top: 0.2rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.15rem;
 }
 
 .inbox-v42-thread {

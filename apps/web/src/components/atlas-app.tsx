@@ -8,6 +8,7 @@ import {
   Clock3,
   CornerUpLeft,
   FileText,
+  ChevronLeft,
   Filter,
   ListChecks,
   Loader2,
@@ -68,7 +69,7 @@ import {
   roleLabel as productRoleLabel,
   type LifecycleStatus
 } from "../lib/product-copy";
-import { TagFilterPopover } from "./conversation-tags";
+import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { InboxBulkBar } from "./inbox-bulk-bar";
 import { AppCombobox } from "./ui/app-select";
@@ -554,6 +555,7 @@ type ConversationHeaderBarProps = {
   accessToken: string;
   onSetStatus: (status: LifecycleStatus) => void;
   onOpenDrawer: () => void;
+  onMobileBack?: () => void;
 };
 
 function statusDotClass(status: string) {
@@ -569,14 +571,25 @@ function ConversationHeaderBar({
   customerAvatarUrl,
   accessToken,
   onSetStatus,
-  onOpenDrawer
+  onOpenDrawer,
+  onMobileBack
 }: ConversationHeaderBarProps) {
   const assignee = active.assignedTo?.name ?? "Sem atendente";
   const teamName = active.team?.name ?? "Sem departamento";
   const instanceLabel = active.instance?.label || active.instance?.name || "WhatsApp";
 
   return (
-    <div className="inbox-v42-chat-header flex items-center gap-3 px-4 py-3">
+    <div className="inbox-v42-chat-header flex items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4">
+      {onMobileBack ? (
+        <button
+          type="button"
+          className="shrink-0 rounded-full border border-slate-200/80 bg-white/80 p-2 text-slate-600 shadow-sm hover:bg-white md:hidden"
+          onClick={onMobileBack}
+          aria-label="Voltar para a fila"
+        >
+          <ChevronLeft size={18} />
+        </button>
+      ) : null}
       <CustomerAvatar
         name={active.customerName}
         phone={active.customerPhone}
@@ -1199,6 +1212,14 @@ export function AtlasApp({ token, user }: Props) {
     setBulkSelectMode(false);
   }
 
+  function mobileBackToQueue() {
+    setActiveId(null);
+    setActiveConversation(null);
+    setDrawerOpen(false);
+  }
+
+  const mobileShowsChat = Boolean(activeId);
+
   async function runBulkAction(payload: Parameters<typeof bulkUpdateConversations>[1]) {
     if (!payload.ids.length) return;
     setBulkWorking(true);
@@ -1764,21 +1785,28 @@ export function AtlasApp({ token, user }: Props) {
     <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-3">
       <section className="inbox-v42-shell flex h-full min-h-0 flex-col overflow-hidden">
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(148px,184px)_minmax(0,1fr)] lg:grid-cols-[minmax(168px,200px)_minmax(0,1fr)]">
-          <div className={`inbox-v42-queue relative flex min-h-[240px] min-w-0 flex-col md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+          <div
+            className={`inbox-v42-queue relative min-w-0 flex-col ${INBOX_PANEL_CLASS} ${
+              mobileShowsChat ? "hidden md:flex" : "flex"
+            } min-h-0 flex-1 md:min-h-0`}
+          >
             <div className="shrink-0 space-y-2.5 border-b border-slate-200/60 px-2.5 pb-2.5 pt-2.5">
               <div className="flex items-center justify-between gap-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inbox</p>
                 <div className="flex items-center gap-0.5">
                   <button
                     type="button"
-                    className={`rounded-lg p-1.5 transition ${bulkSelectMode ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-white/70"}`}
-                    title={bulkSelectMode ? "Sair da seleção" : "Selecionar várias"}
+                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition ${
+                      bulkSelectMode ? "bg-slate-900 text-white" : "border border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white"
+                    }`}
+                    title={bulkSelectMode ? "Sair da seleção" : "Selecionar várias conversas"}
                     onClick={() => {
                       if (bulkSelectMode) clearConversationSelection();
                       else setBulkSelectMode(true);
                     }}
                   >
-                    <ListChecks size={15} />
+                    <ListChecks size={13} />
+                    {bulkSelectMode ? "Cancelar" : "Selecionar"}
                   </button>
                   <button
                     type="button"
@@ -1954,6 +1982,7 @@ export function AtlasApp({ token, user }: Props) {
                   const slaState = computeConversationSla(item, slaConfig);
                   const dotClass = overdue ? "bg-rose-500" : unread ? "bg-blue-500" : statusDotClass(item.status);
                   const assigneeName = item.assignedTo?.name ?? "Sem atendente";
+                  const teamName = item.team?.name ?? "Sem departamento";
                   const preview = last?.text?.trim() || "Sem mensagens";
                   return (
                     <div
@@ -2000,14 +2029,21 @@ export function AtlasApp({ token, user }: Props) {
                           </div>
                           <p className={`truncate text-[11px] leading-snug ${unread ? "text-slate-700" : "text-slate-500"}`}>{preview}</p>
                           <div className="inbox-v42-row-meta">
-                            <span className={`rounded px-1 py-px text-[9px] font-medium ${statusToneClass(item.status)}`}>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusToneClass(item.status)}`}>
                               {statusShortLabel(item.status)}
                             </span>
-                            <span className="truncate text-[9px] text-slate-500">{assigneeName}</span>
                             {overdue ? (
-                              <span className={`text-[9px] font-medium ${slaToneClass(slaState.tone)}`}>SLA</span>
+                              <span
+                                className={`rounded border px-1 py-0.5 text-[10px] font-medium ${slaToneClass(slaState.tone)}`}
+                                title={slaState.detailLabel}
+                              >
+                                {slaState.summaryLabel}
+                              </span>
                             ) : null}
+                            <span className="truncate text-[10px] text-slate-500">{assigneeName}</span>
+                            <span className="truncate text-[10px] text-slate-400">· {teamName}</span>
                           </div>
+                          <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-0.5" />
                         </div>
                       </button>
                     </div>
@@ -2031,7 +2067,11 @@ export function AtlasApp({ token, user }: Props) {
               />
           </div>
 
-          <div className={`flex min-h-[320px] min-w-0 flex-col md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+          <div
+            className={`min-w-0 flex-col ${INBOX_PANEL_CLASS} ${
+              mobileShowsChat ? "flex min-h-0 flex-1" : "hidden min-h-0 flex-1 md:flex"
+            }`}
+          >
               {roleIsManager && managerAlertCount > 0 ? (
                 <div className="shrink-0 border-b border-rose-200/60 bg-rose-50/80 px-4 py-1.5 text-center text-[11px] font-medium text-rose-800">
                   {managerAlertCount} conversa{managerAlertCount === 1 ? "" : "s"} fora do SLA
@@ -2045,6 +2085,7 @@ export function AtlasApp({ token, user }: Props) {
                     accessToken={token}
                     onSetStatus={(status) => void setStatusQuick(status)}
                     onOpenDrawer={() => setDrawerOpen(true)}
+                    onMobileBack={mobileBackToQueue}
                   />
                   <div className="inbox-v42-thread atlas-scroll relative isolate flex-1 overflow-auto px-4 py-5 sm:px-6 sm:py-6">
                     {groupMessagesForThread(active.messages ?? []).map((group) => (
