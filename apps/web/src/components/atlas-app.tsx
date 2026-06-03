@@ -2327,6 +2327,10 @@ export function AtlasApp({ token, user }: Props) {
         tagCatalog={tagCatalog}
         tagsSaving={tagsSaving}
         onTagsChange={(tags) => updateActiveTags(tags)}
+        sessionUser={user}
+        composerDraft={draft}
+        onApplySuggestedReply={(text) => setDraft(text)}
+        onApplyPolish={(text) => setDraft(text)}
       />
       <NewContactModal
         open={newContactModalOpen}

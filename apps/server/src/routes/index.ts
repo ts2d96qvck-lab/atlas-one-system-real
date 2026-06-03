@@ -15,6 +15,7 @@ import { v1Routes } from "./v1.routes";
 import { integrationsAdminRoutes } from "./integrations-admin.routes";
 import { billingRoutes } from "./billing.routes";
 import { statusRoutes } from "./status.routes";
+import { aiRoutes } from "./ai.routes";
 
 export async function registerRoutes(app: FastifyInstance) {
   app.get("/health", healthController);
@@ -34,4 +35,5 @@ export async function registerRoutes(app: FastifyInstance) {
   await app.register(campaignRoutes, { prefix: "/campaigns" });
   await app.register(paymentsRoutes, { prefix: "/payments" });
   await app.register(mediaRoutes, { prefix: "/media" });
+  await app.register(aiRoutes, { prefix: "/ai" });
 }

@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import { Loader2, Megaphone, Pause, Play, Plus, Trash2, XCircle } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
+import type { SessionUser } from "../lib/api";
+import { hasPermission } from "../lib/session-user";
 import { AtlasViewHeader } from "./atlas-view-header";
 import { EmptyState } from "./empty-state";
+import { AtlasAiCampaignsPanel } from "./atlas-ai/atlas-ai-campaigns-panel";
 
 const MESSAGE_KIND_LABEL: Record<string, string> = {
   session: "Mensagem livre",
   template: "Template Meta"
 };
 
-type Props = { token: string };
+type Props = { token: string; user: SessionUser };
 
 type Instance = { id: string; name: string; label: string; status: string };
 
@@ -36,7 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelada"
 };
 
-export function CampaignsView({ token }: Props) {
+export function CampaignsView({ token, user }: Props) {
   const [items, setItems] = useState<Campaign[]>([]);
   const [instances, setInstances] = useState<Instance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,6 +248,16 @@ export function CampaignsView({ token }: Props) {
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
               />
             </label>
+            {hasPermission(user, "ai:use") ? (
+              <AtlasAiCampaignsPanel
+                token={token}
+                message={form.messageKind === "session" ? form.message : form.templateName || form.message}
+                campaignName={form.name}
+                messageKind={form.messageKind}
+                templateName={form.templateName}
+                onApplyMessage={(text) => setForm((prev) => ({ ...prev, message: text }))}
+              />
+            ) : null}
             <label className="block">
               <span className="atlas-label mb-1.5">Destinatários</span>
               <textarea

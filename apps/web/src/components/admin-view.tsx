@@ -5,6 +5,7 @@ import { Building2, CreditCard, Hash, Loader2, Link2, MessageCircle, Plug, Plus,
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { AtlasViewHeader } from "./atlas-view-header";
+import { AdminAiStatus } from "./admin-ai-status";
 import {
   approveAccessRequest,
   connectInstance,
@@ -1182,6 +1183,7 @@ export function AdminView({ token, user }: Props) {
           title="Administração"
           description="Números WhatsApp, usuários, departamentos e integrações"
         />
+        <AdminAiStatus token={token} />
         <div className="atlas-v5-toolbar">
           <p className="text-xs text-slate-500">
             API:{" "}

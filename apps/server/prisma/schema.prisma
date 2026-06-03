@@ -37,6 +37,7 @@ model Tenant {
   webhookEndpoints    WebhookEndpoint[]
   webhookDeliveries   WebhookDelivery[]
   externalIdentities  ExternalIdentity[]
+  aiUsageLogs         AtlasAiUsageLog[]
 }
 
 model User {
@@ -358,6 +359,30 @@ model CampaignRecipient {
   @@unique([campaignId, phone])
   @@index([campaignId, status])
   @@index([tenantId, phone])
+}
+
+model AtlasAiUsageLog {
+  id               String   @id @default(cuid())
+  tenantId         String
+  userId           String?
+  feature          String
+  provider         String
+  model            String?
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  latencyMs        Int?
+  status           String   @default("success")
+  errorCode        String?
+  entityType       String?
+  entityId         String?
+  createdAt        DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, feature, createdAt])
+  @@index([tenantId, userId, createdAt])
 }
 
 model AuditLog {

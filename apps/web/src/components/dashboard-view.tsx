@@ -6,10 +6,13 @@ import { Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { downloadOpsExport } from "../lib/api";
 import { AtlasViewHeader } from "./atlas-view-header";
+import { AtlasAiAskPanel } from "./atlas-ai/atlas-ai-ask-panel";
+import { hasPermission } from "../lib/session-user";
+import type { SessionUser } from "../lib/api";
 
-type Props = { token: string };
+type Props = { token: string; user: SessionUser };
 
-export function DashboardView({ token }: Props) {
+export function DashboardView({ token, user }: Props) {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
@@ -265,6 +268,8 @@ export function DashboardView({ token }: Props) {
           }
         />
         {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
+
+        {hasPermission(user, "ai:use") ? <AtlasAiAskPanel token={token} /> : null}
 
         <div className="mb-5 grid gap-3 lg:grid-cols-4">
           <Card className="atlas-v5-card-pad lg:col-span-4">

@@ -938,15 +938,17 @@ export function AtlasShell() {
 
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 lg:pb-4 lg:pt-3">
           {view === "inbox" ? <AtlasApp token={session.token} user={session.user} /> : null}
-          {view === "dashboard" && canAccessView(session.user, "dashboard") ? <DashboardView token={session.token} /> : null}
+          {view === "dashboard" && canAccessView(session.user, "dashboard") ? (
+            <DashboardView token={session.token} user={session.user} />
+          ) : null}
           {canAccessView(session.user, "admin") && adminMounted ? (
             <div className={view === "admin" ? "" : "hidden"} aria-hidden={view !== "admin"}>
               <AdminView token={session.token} user={session.user} />
             </div>
           ) : null}
-          {view === "crm" ? <CrmView token={session.token} /> : null}
+          {view === "crm" ? <CrmView token={session.token} user={session.user} /> : null}
           {view === "campanhas" && canAccessView(session.user, "campanhas") ? (
-            <CampaignsView token={session.token} />
+            <CampaignsView token={session.token} user={session.user} />
           ) : null}
           {view === "automacoes" && canAccessView(session.user, "automacoes") ? (
             <AutomationsView token={session.token} />

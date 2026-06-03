@@ -677,6 +677,131 @@ html.dark .atlas-v5-modal-panel {
   box-shadow: none;
 }
 
+/* Atlas AI V1.1 — premium assistant panels */
+
+.atlas-ai-shell {
+  border-radius: 1rem;
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  background: linear-gradient(165deg, rgba(245, 243, 255, 0.95) 0%, rgba(255, 255, 255, 0.92) 48%, rgba(248, 250, 252, 0.98) 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 12px 40px rgba(91, 33, 182, 0.08);
+}
+
+html.dark .atlas-ai-shell {
+  border-color: rgba(167, 139, 250, 0.28);
+  background: linear-gradient(165deg, rgba(46, 16, 101, 0.55) 0%, rgba(15, 23, 42, 0.88) 100%);
+}
+
+.atlas-ai-shell-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem 0.5rem;
+}
+
+.atlas-ai-badge {
+  display: grid;
+  height: 2.25rem;
+  width: 2.25rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: linear-gradient(145deg, #7c3aed 0%, #5b21b6 100%);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(91, 33, 182, 0.35);
+}
+
+.atlas-ai-section {
+  margin: 0 0.75rem 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+}
+
+html.dark .atlas-ai-section {
+  border-color: rgba(51, 65, 85, 0.8);
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.atlas-ai-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.9);
+}
+
+.atlas-ai-section-body {
+  padding: 0.75rem;
+}
+
+.atlas-ai-result-card {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, rgba(255, 255, 255, 0.95) 100%);
+  padding: 0.75rem;
+}
+
+.atlas-ai-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.atlas-ai-pill {
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #475569;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.atlas-ai-pill:hover {
+  border-color: rgba(167, 139, 250, 0.45);
+  color: #5b21b6;
+}
+
+.atlas-ai-pill-active {
+  border-color: rgba(124, 58, 237, 0.55);
+  background: rgba(237, 233, 254, 0.95);
+  color: #5b21b6;
+}
+
+.atlas-ai-empty {
+  margin: 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px dashed rgba(167, 139, 250, 0.35);
+  background: rgba(255, 255, 255, 0.6);
+  padding: 1rem;
+  text-align: center;
+}
+
+.atlas-ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #6d28d9;
+}
+
+.atlas-ai-priority-alta {
+  color: #be123c;
+  font-weight: 700;
+}
+.atlas-ai-priority-media {
+  color: #b45309;
+  font-weight: 700;
+}
+.atlas-ai-priority-baixa {
+  color: #047857;
+  font-weight: 700;
+}
+
 /* Inbox V4.3 — premium liquid glass (inherits V5 module shell) */
 
 .inbox-v42-queue {

@@ -4,13 +4,27 @@ import { useEffect, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
-import { createLead, deleteLead, deleteLeadAttachment, listLeadAttachments, listUsers, updateLead, uploadLeadAttachment, type Lead, type LeadAttachment, type UserRow } from "../lib/api";
+import {
+  createLead,
+  deleteLead,
+  deleteLeadAttachment,
+  listLeadAttachments,
+  listUsers,
+  updateLead,
+  uploadLeadAttachment,
+  type Lead,
+  type LeadAttachment,
+  type SessionUser,
+  type UserRow
+} from "../lib/api";
 import { crmStageLabel } from "../lib/product-copy";
 import { EmptyState } from "./empty-state";
 import { AtlasViewHeader } from "./atlas-view-header";
 import { LeadAttachmentsPanel } from "./lead-attachments-panel";
+import { AtlasAiCrmPanel } from "./atlas-ai/atlas-ai-crm-panel";
+import { hasPermission } from "../lib/session-user";
 
-type Props = { token: string };
+type Props = { token: string; user: SessionUser };
 
 type PipelineData = {
   pipeline: { stages: { id: string; name: string; order: number }[] } | null;
@@ -77,7 +91,7 @@ function AgentAssigneeSelect({
   );
 }
 
-export function CrmView({ token }: Props) {
+export function CrmView({ token, user }: Props) {
   const [data, setData] = useState<PipelineData | null>(null);
   const [agents, setAgents] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -455,6 +469,18 @@ export function CrmView({ token }: Props) {
                   }
                 />
               </div>
+              {hasPermission(user, "ai:use") ? (
+                <AtlasAiCrmPanel
+                  token={token}
+                  leadId={editingLead.id}
+                  onApplyTask={(task) =>
+                    setFeedback({
+                      type: "success",
+                      text: `Tarefa sugerida: ${task.titulo}${task.descricao ? ` — ${task.descricao}` : ""}`
+                    })
+                  }
+                />
+              ) : null}
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
               <Button

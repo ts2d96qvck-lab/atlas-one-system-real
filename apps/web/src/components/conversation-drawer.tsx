@@ -10,8 +10,12 @@ import { ConversationTagEditor } from "./conversation-tags";
 import { INBOX_COPY } from "../lib/product-copy";
 import { AppCombobox } from "./ui/app-select";
 import { LeadAttachmentsPanel } from "./lead-attachments-panel";
+import { AtlasAiInboxPanel } from "./atlas-ai/atlas-ai-inbox-panel";
+import { AtlasAiPermissionEmpty } from "./atlas-ai/atlas-ai-shared";
+import { hasPermission } from "../lib/session-user";
+import type { SessionUser } from "../lib/api";
 
-export type ConversationDrawerTab = "cliente" | "crm" | "tags" | "notas" | "historico";
+export type ConversationDrawerTab = "cliente" | "crm" | "tags" | "notas" | "historico" | "ai";
 
 type Props = {
   open: boolean;
@@ -37,11 +41,17 @@ type Props = {
   tagCatalog: TagCatalogItem[];
   tagsSaving: boolean;
   onTagsChange: (tags: string[]) => void | Promise<void>;
+  sessionUser: SessionUser;
+  composerDraft?: string;
+  onApplySuggestedReply?: (text: string) => void;
+  onApplyPolish?: (text: string) => void;
+  onApplyTransferSummary?: (text: string) => void;
 };
 
 const TABS: { id: ConversationDrawerTab; label: string }[] = [
   { id: "cliente", label: "Cliente" },
   { id: "crm", label: "CRM" },
+  { id: "ai", label: "Atlas AI" },
   { id: "tags", label: "Tags" },
   { id: "notas", label: "Notas" },
   { id: "historico", label: "Histórico" }
@@ -66,7 +76,12 @@ export function ConversationDrawer({
   agents,
   tagCatalog,
   tagsSaving,
-  onTagsChange
+  onTagsChange,
+  sessionUser,
+  composerDraft,
+  onApplySuggestedReply,
+  onApplyPolish,
+  onApplyTransferSummary
 }: Props) {
   const [transferAgentId, setTransferAgentId] = useState("");
   const [transferNote, setTransferNote] = useState("");
@@ -126,7 +141,7 @@ export function ConversationDrawer({
         </div>
 
         <div className="flex gap-1 overflow-x-auto border-b border-slate-100 bg-slate-50/60 px-3 py-2">
-          {TABS.map((item) => (
+          {TABS.filter((item) => item.id !== "ai" || hasPermission(sessionUser, "ai:use")).map((item) => (
             <button
               key={item.id}
               type="button"
@@ -256,6 +271,21 @@ export function ConversationDrawer({
                 <p className="text-xs text-slate-500">Nenhum lead vinculado a esta conversa.</p>
               )}
             </div>
+          ) : tab === "ai" ? (
+            hasPermission(sessionUser, "ai:use") ? (
+              <AtlasAiInboxPanel
+                token={token}
+                conversationId={active.id}
+                composerDraft={composerDraft}
+                transferNote={transferNote}
+                targetAgentName={agents.find((item) => item.id === transferAgentId)?.name}
+                onApplyReply={onApplySuggestedReply}
+                onApplyPolish={onApplyPolish}
+                onApplyTransferSummary={(text) => setTransferNote(text)}
+              />
+            ) : (
+              <AtlasAiPermissionEmpty />
+            )
           ) : tab === "tags" ? (
             <ConversationTagEditor
               tags={active.tags}
