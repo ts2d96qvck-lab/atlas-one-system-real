@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, Loader2, Tag, UserRound, X } from "lucide-react";
-import { Button } from "@atlas-one/ui";
+import { Archive, Loader2, MoreHorizontal, Tag, UserRound, X } from "lucide-react";
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
 import type { TagCatalogItem, TeamRow, UserRow } from "../lib/api";
 import { conversationStatusLabel, LIFECYCLE_STATUSES, type LifecycleStatus } from "../lib/product-copy";
 import { AppCombobox } from "./ui/app-select";
@@ -35,28 +35,35 @@ export function InboxBulkBar({
   onDepartment
 }: Props) {
   const [transferAgentId, setTransferAgentId] = useState("");
-  const [transferNote, setTransferNote] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [statusValue, setStatusValue] = useState<LifecycleStatus>("resolved");
   const [teamId, setTeamId] = useState("");
+  const [moreOpen, setMoreOpen] = useState(false);
 
   if (count <= 0) return null;
 
   return (
-    <div className="sticky bottom-0 z-10 mt-2 rounded-xl border border-slate-900/10 bg-slate-900 px-3 py-2 text-white shadow-lg">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-semibold">{count} selecionada{count === 1 ? "" : "s"}</span>
-        <button type="button" className="rounded-md p-1 hover:bg-white/10" onClick={onClear} aria-label="Limpar seleção">
-          <X size={14} />
-        </button>
-        <span className="hidden h-4 w-px bg-white/20 sm:inline-block" />
-        <div className="flex min-w-[140px] flex-1 items-center gap-1">
-          <UserRound size={13} className="shrink-0 opacity-70" />
+    <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20">
+      <div className="inbox-v42-bulk pointer-events-auto px-3 py-2.5">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold tracking-tight">
+            {count} selecionada{count === 1 ? "" : "s"}
+          </span>
+          <button
+            type="button"
+            className="rounded-full p-1 text-white/80 transition hover:bg-white/10 hover:text-white"
+            onClick={onClear}
+            aria-label="Limpar seleção"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
           <AppCombobox
             value={transferAgentId}
             onChange={setTransferAgentId}
             searchable
-            className="min-w-0 flex-1 [&_button]:h-7 [&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-[11px] [&_button]:text-white"
+            className="min-w-[7.5rem] flex-1 [&_button]:h-8 [&_button]:border-white/15 [&_button]:bg-white/10 [&_button]:text-xs [&_button]:text-white"
             options={[
               { value: "", label: "Transferir para…" },
               ...agents.map((agent) => ({
@@ -68,99 +75,114 @@ export function InboxBulkBar({
           />
           <Button
             type="button"
-            variant="glass"
-            className="h-7 shrink-0 border-white/20 bg-white/10 px-2 text-[10px] text-white hover:bg-white/20"
+            className="h-8 shrink-0 rounded-lg bg-white px-3 text-xs font-medium text-slate-900 hover:bg-slate-100"
             disabled={working || !transferAgentId}
-            onClick={() => void onTransfer(transferAgentId, transferNote.trim() || undefined)}
+            onClick={() => void onTransfer(transferAgentId)}
           >
+            <UserRound size={14} className="mr-1 inline" />
             Transferir
           </Button>
-        </div>
-        <div className="flex items-center gap-1">
-          <Tag size={13} className="opacity-70" />
-          <input
-            list="inbox-bulk-tags"
-            className="h-7 w-28 rounded-md border border-white/20 bg-white/10 px-2 text-[11px] outline-none placeholder:text-white/50"
-            placeholder="Tag"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && tagInput.trim()) {
-                void onAddTags([tagInput.trim()]);
-                setTagInput("");
-              }
-            }}
-          />
-          <datalist id="inbox-bulk-tags">
-            {tagCatalog.map((tag) => (
-              <option key={tag.name} value={tag.name} />
+          <select
+            className="h-8 max-w-[7rem] rounded-lg border border-white/15 bg-white/10 px-2 text-xs text-white outline-none"
+            value={statusValue}
+            onChange={(e) => setStatusValue(e.target.value as LifecycleStatus)}
+          >
+            {LIFECYCLE_STATUSES.map((status) => (
+              <option key={status} value={status} className="text-slate-900">
+                {conversationStatusLabel(status)}
+              </option>
             ))}
-          </datalist>
+          </select>
           <Button
             type="button"
-            variant="glass"
-            className="h-7 border-white/20 bg-white/10 px-2 text-[10px] text-white hover:bg-white/20"
-            disabled={working || !tagInput.trim()}
-            onClick={() => {
-              if (!tagInput.trim()) return;
-              void onAddTags([tagInput.trim()]);
-              setTagInput("");
-            }}
+            className="h-8 rounded-lg border border-white/15 bg-white/10 px-2.5 text-xs text-white hover:bg-white/15"
+            disabled={working}
+            onClick={() => void onStatus(statusValue)}
           >
-            Tag
+            Status
           </Button>
+          <Button
+            type="button"
+            className="h-8 rounded-lg bg-amber-500/90 px-2.5 text-xs font-medium text-white hover:bg-amber-500"
+            disabled={working}
+            onClick={() => void onArchive()}
+          >
+            {working ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
+          </Button>
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                className="h-8 w-8 rounded-lg border border-white/15 bg-white/10 p-0 text-white hover:bg-white/15"
+                aria-label="Mais ações em lote"
+              >
+                <MoreHorizontal size={16} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+              <p className="text-[11px] font-semibold text-slate-600">Mais ações</p>
+              <div className="flex gap-1">
+                <Tag size={13} className="mt-2 shrink-0 text-slate-400" />
+                <input
+                  list="inbox-bulk-tags"
+                  className="atlas-field h-8 min-w-0 flex-1 px-2 text-xs"
+                  placeholder="Nova tag"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && tagInput.trim()) {
+                      void onAddTags([tagInput.trim()]);
+                      setTagInput("");
+                      setMoreOpen(false);
+                    }
+                  }}
+                />
+                <datalist id="inbox-bulk-tags">
+                  {tagCatalog.map((tag) => (
+                    <option key={tag.name} value={tag.name} />
+                  ))}
+                </datalist>
+                <Button
+                  type="button"
+                  className="h-8 px-2 text-xs"
+                  disabled={working || !tagInput.trim()}
+                  onClick={() => {
+                    if (!tagInput.trim()) return;
+                    void onAddTags([tagInput.trim()]);
+                    setTagInput("");
+                    setMoreOpen(false);
+                  }}
+                >
+                  Tag
+                </Button>
+              </div>
+              <select
+                className="atlas-field h-8 w-full px-2 text-xs"
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+              >
+                <option value="">Departamento…</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="glass"
+                className="h-8 w-full text-xs"
+                disabled={working || !teamId}
+                onClick={() => {
+                  void onDepartment(teamId || null);
+                  setMoreOpen(false);
+                }}
+              >
+                Aplicar departamento
+              </Button>
+            </PopoverContent>
+          </Popover>
         </div>
-        <select
-          className="h-7 rounded-md border border-white/20 bg-white/10 px-2 text-[11px] outline-none"
-          value={statusValue}
-          onChange={(e) => setStatusValue(e.target.value as LifecycleStatus)}
-        >
-          {LIFECYCLE_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {conversationStatusLabel(status)}
-            </option>
-          ))}
-        </select>
-        <Button
-          type="button"
-          variant="glass"
-          className="h-7 border-white/20 bg-white/10 px-2 text-[10px] text-white hover:bg-white/20"
-          disabled={working}
-          onClick={() => void onStatus(statusValue)}
-        >
-          Status
-        </Button>
-        <select
-          className="h-7 max-w-[120px] rounded-md border border-white/20 bg-white/10 px-2 text-[11px] outline-none"
-          value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}
-        >
-          <option value="">Departamento…</option>
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-        </select>
-        <Button
-          type="button"
-          variant="glass"
-          className="h-7 border-white/20 bg-white/10 px-2 text-[10px] text-white hover:bg-white/20"
-          disabled={working || !teamId}
-          onClick={() => void onDepartment(teamId || null)}
-        >
-          Depto
-        </Button>
-        <Button
-          type="button"
-          variant="glass"
-          className="h-7 border-amber-200/40 bg-amber-500/20 px-2 text-[10px] text-amber-50 hover:bg-amber-500/30"
-          disabled={working}
-          onClick={() => void onArchive()}
-        >
-          {working ? <Loader2 size={12} className="animate-spin" /> : <Archive size={12} />}
-          Arquivar
-        </Button>
       </div>
     </div>
   );

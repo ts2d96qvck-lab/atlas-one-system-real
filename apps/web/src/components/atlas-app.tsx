@@ -9,6 +9,7 @@ import {
   CornerUpLeft,
   FileText,
   Filter,
+  ListChecks,
   Loader2,
   LogOut,
   MessageCircle,
@@ -24,7 +25,7 @@ import {
   VolumeX,
   X
 } from "lucide-react";
-import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
 import {
   createConversation,
   archiveConversation,
@@ -67,7 +68,7 @@ import {
   roleLabel as productRoleLabel,
   type LifecycleStatus
 } from "../lib/product-copy";
-import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
+import { TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { InboxBulkBar } from "./inbox-bulk-bar";
 import { AppCombobox } from "./ui/app-select";
@@ -553,9 +554,6 @@ type ConversationHeaderBarProps = {
   accessToken: string;
   onSetStatus: (status: LifecycleStatus) => void;
   onOpenDrawer: () => void;
-  onFilterAssignee?: () => void;
-  onFilterTeam?: () => void;
-  onFilterInstance?: () => void;
 };
 
 function statusDotClass(status: string) {
@@ -571,98 +569,63 @@ function ConversationHeaderBar({
   customerAvatarUrl,
   accessToken,
   onSetStatus,
-  onOpenDrawer,
-  onFilterAssignee,
-  onFilterTeam,
-  onFilterInstance
+  onOpenDrawer
 }: ConversationHeaderBarProps) {
   const assignee = active.assignedTo?.name ?? "Sem atendente";
   const teamName = active.team?.name ?? "Sem departamento";
-  const instanceLabel = active.instance?.label || active.instance?.name || "Número WhatsApp";
-  const instanceState = String(active.instance?.status ?? "").toLowerCase();
-  const instanceConnected = instanceState === "connected" || instanceState === "open";
+  const instanceLabel = active.instance?.label || active.instance?.name || "WhatsApp";
 
   return (
-    <div className="flex flex-col gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
-      <div className="flex items-center gap-2.5">
-        <CustomerAvatar
-          name={active.customerName}
-          phone={active.customerPhone}
-          avatarUrl={customerAvatarUrl}
-          accessToken={accessToken}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-900">{active.customerName}</p>
-          <p className="truncate text-xs text-slate-500">{formatPhoneDisplay(active.customerPhone)}</p>
-        </div>
-        <Popover>
-          <PopoverTrigger asChild>
+    <div className="inbox-v42-chat-header flex items-center gap-3 px-4 py-3">
+      <CustomerAvatar
+        name={active.customerName}
+        phone={active.customerPhone}
+        avatarUrl={customerAvatarUrl}
+        accessToken={accessToken}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-semibold tracking-tight text-slate-900">{active.customerName}</p>
+        <p className="truncate text-xs text-slate-500">
+          {formatPhoneDisplay(active.customerPhone)} · {assignee}
+        </p>
+      </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-white"
+            title="Alterar status"
+          >
+            <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
+            {statusLabel(active.status)}
+            <ChevronDown size={12} className="text-slate-400" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+          {LIFECYCLE_STATUSES.map((status) => (
             <button
+              key={status}
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
-              title="Alterar status"
+              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs ${
+                active.status === status ? "bg-slate-100 font-medium text-slate-900" : "text-slate-600 hover:bg-slate-50"
+              }`}
+              onClick={() => onSetStatus(status)}
             >
-              <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
-              {statusLabel(active.status)}
-              <ChevronDown size={12} className="text-slate-400" />
+              <span className={`h-2 w-2 rounded-full ${statusDotClass(status)}`} />
+              {statusLabel(status)}
             </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-            {LIFECYCLE_STATUSES.map((status) => (
-              <button
-                key={status}
-                type="button"
-                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs ${
-                  active.status === status ? "bg-slate-100 font-medium text-slate-900" : "text-slate-600 hover:bg-slate-50"
-                }`}
-                onClick={() => onSetStatus(status)}
-              >
-                <span className={`h-2 w-2 rounded-full ${statusDotClass(status)}`} />
-                {statusLabel(status)}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
-        <button
-          type="button"
-          className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
-          onClick={onOpenDrawer}
-          aria-label="Detalhes da conversa"
-          title="Detalhes, CRM e transferência"
-        >
-          <MoreVertical size={16} />
-        </button>
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 hover:bg-slate-100"
-          title={onFilterAssignee ? "Filtrar fila por atendente" : "Atendente"}
-          onClick={onFilterAssignee}
-        >
-          <User size={11} className="text-slate-400" />
-          {assignee}
-        </button>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 hover:bg-slate-100"
-          title={onFilterTeam ? "Filtrar fila por departamento" : "Departamento"}
-          onClick={onFilterTeam}
-        >
-          {teamName}
-        </button>
-        <button
-          type="button"
-          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 hover:opacity-90 ${
-            instanceConnected ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
-          }`}
-          title={onFilterInstance ? "Filtrar fila por número WhatsApp" : instanceConnected ? "WhatsApp conectado" : "WhatsApp desconectado ou instável"}
-          onClick={onFilterInstance}
-        >
-          <MessageCircle size={11} />
-          {instanceLabel}
-        </button>
-      </div>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        className="rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-600 shadow-sm hover:bg-white"
+        onClick={onOpenDrawer}
+        aria-label="Detalhes da conversa"
+        title={`Detalhes · ${teamName} · ${instanceLabel}`}
+      >
+        <MoreVertical size={16} />
+      </button>
     </div>
   );
 }
@@ -936,6 +899,7 @@ export function AtlasApp({ token, user }: Props) {
   const [queueStatusFilter, setQueueStatusFilter] = useState<string>("all");
   const [queueInstanceId, setQueueInstanceId] = useState<string>("all");
   const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [bulkWorking, setBulkWorking] = useState(false);
   const [slaTick, setSlaTick] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -1224,42 +1188,6 @@ export function AtlasApp({ token, user }: Props) {
     return filters;
   }, [agents, departmentOptions, instanceFilterOptions, queueDepartmentId, queueInstanceId, queueOwnerId, queueStatusFilter]);
 
-  function applyChipFilter(kind: "assignee" | "team" | "instance" | "status", conversation: Conversation) {
-    if (kind === "assignee") {
-      if (canMonitorByUser) {
-        if (conversation.assignedToId) {
-          setQueueOwnerId(conversation.assignedToId);
-          if (conversation.teamId) setQueueDepartmentId(conversation.teamId);
-        } else {
-          setQueueOwnerId("unassigned");
-        }
-        return;
-      }
-      setDrawerTab("cliente");
-      setDrawerOpen(true);
-      return;
-    }
-    if (kind === "team") {
-      if (canMonitorByUser && conversation.teamId) {
-        setQueueDepartmentId(conversation.teamId);
-        setQueueOwnerId("all");
-        return;
-      }
-      setDrawerTab("cliente");
-      setDrawerOpen(true);
-      return;
-    }
-    if (kind === "instance") {
-      if (conversation.instance?.id) setQueueInstanceId(conversation.instance.id);
-      return;
-    }
-    if (kind === "status") {
-      setQueueStatusFilter(conversation.status);
-      if (["resolved", "closed", "archived"].includes(conversation.status)) setQueueBucket("history");
-      else if (queueBucket === "history") setQueueBucket("active");
-    }
-  }
-
   function toggleConversationSelection(id: string) {
     setSelectedConversationIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
@@ -1268,6 +1196,7 @@ export function AtlasApp({ token, user }: Props) {
 
   function clearConversationSelection() {
     setSelectedConversationIds([]);
+    setBulkSelectMode(false);
   }
 
   async function runBulkAction(payload: Parameters<typeof bulkUpdateConversations>[1]) {
@@ -1832,56 +1761,66 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   return (
-    <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-2.5 lg:p-3">
-      <section className="flex h-full min-h-0 flex-col overflow-hidden">
-        <header className={`glass-panel flex min-h-12 shrink-0 flex-wrap items-center gap-2 ${INBOX_PANEL_CLASS} px-3 py-2 sm:gap-3 sm:px-4`}>
-          <input
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-            placeholder="Buscar por nome, telefone ou empresa..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {roleIsManager && managerAlertCount > 0 ? (
-            <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700">
-              {managerAlertCount} fora do SLA
-            </span>
-          ) : null}
-          <button
-            type="button"
-            className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
-            title="Perfil e notificações"
-            onClick={() => setProfileOpen(true)}
-          >
-            <User size={16} />
-          </button>
-        </header>
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden md:grid-cols-[minmax(196px,228px)_minmax(0,1fr)] xl:grid-cols-[minmax(212px,248px)_minmax(0,1fr)]">
-          <Card className={`flex min-h-[220px] min-w-0 flex-col p-2.5 sm:min-h-[260px] md:min-h-0 ${INBOX_PANEL_CLASS}`}>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {(Object.keys(INBOX_QUEUE_BUCKETS) as Array<keyof typeof INBOX_QUEUE_BUCKETS>).map((bucket) => (
-                <button
-                  key={bucket}
-                  type="button"
-                  className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-                    queueBucket === bucket ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white/70 text-slate-600"
-                  }`}
-                  onClick={() => {
-                    setQueueBucket(bucket);
-                    if (bucket === "active") setQueueStatusFilter("all");
-                  }}
-                  title={INBOX_QUEUE_BUCKET_HELP[bucket]}
-                >
-                  {INBOX_QUEUE_BUCKETS[bucket]}
-                </button>
-              ))}
-            </div>
+    <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-2 sm:p-3">
+      <section className="inbox-v42-shell flex h-full min-h-0 flex-col overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(148px,184px)_minmax(0,1fr)] lg:grid-cols-[minmax(168px,200px)_minmax(0,1fr)]">
+          <div className={`inbox-v42-queue relative flex min-h-[240px] min-w-0 flex-col md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+            <div className="shrink-0 space-y-2.5 border-b border-slate-200/60 px-2.5 pb-2.5 pt-2.5">
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inbox</p>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    className={`rounded-lg p-1.5 transition ${bulkSelectMode ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-white/70"}`}
+                    title={bulkSelectMode ? "Sair da seleção" : "Selecionar várias"}
+                    onClick={() => {
+                      if (bulkSelectMode) clearConversationSelection();
+                      else setBulkSelectMode(true);
+                    }}
+                  >
+                    <ListChecks size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg p-1.5 text-slate-500 hover:bg-white/70"
+                    title="Perfil e notificações"
+                    onClick={() => setProfileOpen(true)}
+                  >
+                    <User size={15} />
+                  </button>
+                </div>
+              </div>
+              <div className="inbox-v42-segment" role="tablist" aria-label="Filas">
+                {(Object.keys(INBOX_QUEUE_BUCKETS) as Array<keyof typeof INBOX_QUEUE_BUCKETS>).map((bucket) => (
+                  <button
+                    key={bucket}
+                    type="button"
+                    role="tab"
+                    data-active={queueBucket === bucket}
+                    aria-selected={queueBucket === bucket}
+                    onClick={() => {
+                      setQueueBucket(bucket);
+                      if (bucket === "active") setQueueStatusFilter("all");
+                    }}
+                    title={INBOX_QUEUE_BUCKET_HELP[bucket]}
+                  >
+                    {INBOX_QUEUE_BUCKETS[bucket]}
+                  </button>
+                ))}
+              </div>
+              <input
+                className="inbox-v42-search"
+                placeholder="Buscar..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             {activeQueueFilters.length ? (
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 px-0.5">
                 {activeQueueFilters.map((filter) => (
                   <button
                     key={filter.key}
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/70 px-2 py-0.5 text-[10px] text-slate-700"
                     onClick={filter.onClear}
                   >
                     {filter.label}
@@ -1890,7 +1829,7 @@ export function AtlasApp({ token, user }: Props) {
                 ))}
                 <button
                   type="button"
-                  className="rounded-full px-2 py-0.5 text-[10px] text-slate-500 hover:text-slate-700"
+                  className="text-[10px] text-slate-500 underline-offset-2 hover:underline"
                   onClick={() => {
                     setQueueDepartmentId("all");
                     setQueueOwnerId("all");
@@ -1898,35 +1837,34 @@ export function AtlasApp({ token, user }: Props) {
                     setQueueInstanceId("all");
                   }}
                 >
-                  Limpar filtros
+                  Limpar
                 </button>
               </div>
             ) : null}
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold text-slate-900">Caixa de entrada</h1>
-                <Badge className="h-5 px-2 text-[10px]">{filtered.length}</Badge>
-              </div>
-              <div className="flex items-center gap-1">
-                {filtered.length ? (
+            </div>
+            <div className="flex shrink-0 items-center justify-between gap-1 border-b border-slate-200/50 px-2.5 py-1.5">
+              <span className="text-[11px] font-medium text-slate-600">
+                {filtered.length} conversa{filtered.length === 1 ? "" : "s"}
+              </span>
+              <div className="flex items-center gap-0.5">
+                {bulkSelectMode && filtered.length ? (
                   <button
                     type="button"
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-50"
+                    className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-white/60"
                     onClick={() =>
                       setSelectedConversationIds((current) =>
                         current.length === filtered.length ? [] : filtered.map((item) => item.id)
                       )
                     }
                   >
-                    {selectedConversationIds.length === filtered.length && filtered.length > 0 ? "Desmarcar" : "Selecionar"}
+                    {selectedConversationIds.length === filtered.length ? "Nenhuma" : "Todas"}
                   </button>
                 ) : null}
                 {canMonitorByUser ? (
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="glass" className="h-8 px-2.5 text-[11px]" title="Filtrar fila">
-                        <Filter size={13} />
-                        Fila
+                      <Button type="button" variant="glass" size="icon" className="h-7 w-7" title="Filtrar fila">
+                        <Filter size={14} />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent align="end" className="w-[min(100vw-2rem,320px)] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
@@ -1987,11 +1925,11 @@ export function AtlasApp({ token, user }: Props) {
                   type="button"
                   variant="glass"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-7 w-7"
                   title="Novo contato"
                   onClick={() => setNewContactModalOpen(true)}
                 >
-                  <Plus size={16} />
+                  <Plus size={15} />
                 </Button>
               </div>
             </div>
@@ -2006,7 +1944,7 @@ export function AtlasApp({ token, user }: Props) {
                   : "Nenhuma conversa encontrada com os filtros atuais."}
               </div>
             ) : null}
-              <div className="atlas-scroll mt-2 min-h-0 flex-1 space-y-0.5 overflow-auto pr-0.5">
+              <div className="atlas-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto px-1.5 py-1">
                 {filtered.map((item) => {
                   const last = item.messages?.[0];
                   const selected = item.id === activeId;
@@ -2016,80 +1954,62 @@ export function AtlasApp({ token, user }: Props) {
                   const slaState = computeConversationSla(item, slaConfig);
                   const dotClass = overdue ? "bg-rose-500" : unread ? "bg-blue-500" : statusDotClass(item.status);
                   const assigneeName = item.assignedTo?.name ?? "Sem atendente";
+                  const preview = last?.text?.trim() || "Sem mensagens";
                   return (
                     <div
                       key={item.id}
-                      className={`w-full rounded-xl border px-2.5 py-2 text-left transition ${
-                        selected
-                          ? "border-slate-300 bg-slate-50 shadow-sm"
-                          : checked
-                            ? "border-slate-400 bg-slate-50/80"
-                            : "border-transparent hover:border-slate-200 hover:bg-white"
-                      }`}
+                      className="inbox-v42-row group"
+                      data-active={selected}
+                      data-selected={checked}
                     >
-                      <div className="flex items-start gap-2">
+                      {bulkSelectMode ? (
                         <input
                           type="checkbox"
-                          className="mt-2 h-3.5 w-3.5 shrink-0 rounded border-slate-300"
+                          className="h-4 w-4 shrink-0 rounded border-slate-300"
                           checked={checked}
                           onChange={() => toggleConversationSelection(item.id)}
-                          aria-label={`Selecionar conversa ${item.customerName}`}
+                          aria-label={`Selecionar ${item.customerName}`}
                         />
+                      ) : null}
+                      <button
+                        type="button"
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        onClick={() => (bulkSelectMode ? toggleConversationSelection(item.id) : openConversation(item.id))}
+                      >
+                        <div className="relative shrink-0">
+                          <CustomerAvatar
+                            name={item.customerName}
+                            phone={item.customerPhone}
+                            avatarUrl={getAvatarUrl(item.tags)}
+                            size="sm"
+                            accessToken={token}
+                          />
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white ${dotClass}`}
+                            title={overdue ? slaState.detailLabel : unread ? "Não lida" : statusLabel(item.status)}
+                          />
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <button type="button" onClick={() => openConversation(item.id)} className="w-full text-left">
-                            <div className="flex items-start gap-2">
-                              <div className="relative shrink-0">
-                                <CustomerAvatar
-                                  name={item.customerName}
-                                  phone={item.customerPhone}
-                                  avatarUrl={getAvatarUrl(item.tags)}
-                                  size="sm"
-                                  accessToken={token}
-                                />
-                                <span
-                                  className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white ${dotClass}`}
-                                  title={overdue ? "Fora do SLA" : unread ? "Não lida" : statusLabel(item.status)}
-                                />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between gap-2">
-                                  <p className="truncate text-[13px] font-semibold leading-tight text-slate-900">{item.customerName}</p>
-                                  <span className="shrink-0 text-[10px] text-slate-400">{formatTime(item.lastMessageAt ?? last?.createdAt)}</span>
-                                </div>
-                                <p className="truncate text-[11px] leading-tight text-slate-500">{formatPhoneDisplay(item.customerPhone)}</p>
-                                <p className="mt-0.5 truncate text-[11px] leading-tight text-slate-600">{last?.text ?? "Sem mensagens"}</p>
-                              </div>
-                            </div>
-                          </button>
-                          <div className="mt-1 flex flex-wrap items-center gap-1 pl-10">
-                            <button
-                              type="button"
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-medium hover:ring-1 hover:ring-slate-300 ${statusToneClass(item.status)}`}
-                              title="Filtrar por status"
-                              onClick={() => applyChipFilter("status", item)}
-                            >
+                          <div className="flex items-baseline justify-between gap-1">
+                            <p className={`truncate text-[13px] leading-tight ${unread ? "font-semibold text-slate-900" : "font-medium text-slate-800"}`}>
+                              {item.customerName}
+                            </p>
+                            <span className="shrink-0 text-[10px] tabular-nums text-slate-400">
+                              {formatTime(item.lastMessageAt ?? last?.createdAt)}
+                            </span>
+                          </div>
+                          <p className={`truncate text-[11px] leading-snug ${unread ? "text-slate-700" : "text-slate-500"}`}>{preview}</p>
+                          <div className="inbox-v42-row-meta">
+                            <span className={`rounded px-1 py-px text-[9px] font-medium ${statusToneClass(item.status)}`}>
                               {statusShortLabel(item.status)}
-                            </button>
-                            <button
-                              type="button"
-                              className="truncate rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
-                              title="Filtrar por atendente"
-                              onClick={() => applyChipFilter("assignee", item)}
-                            >
-                              {assigneeName}
-                            </button>
+                            </span>
+                            <span className="truncate text-[9px] text-slate-500">{assigneeName}</span>
                             {overdue ? (
-                              <span
-                                className={`rounded border px-1.5 py-0.5 text-[10px] ${slaToneClass(slaState.tone)}`}
-                                title={slaState.detailLabel}
-                              >
-                                {slaState.summaryLabel}
-                              </span>
+                              <span className={`text-[9px] font-medium ${slaToneClass(slaState.tone)}`}>SLA</span>
                             ) : null}
                           </div>
-                          <ConversationTagChips tags={item.tags} catalog={tagCatalog} compact className="mt-1 pl-10" />
                         </div>
-                      </div>
+                      </button>
                     </div>
                   );
                 })}
@@ -2109,9 +2029,14 @@ export function AtlasApp({ token, user }: Props) {
                 onArchive={() => runBulkAction({ ids: selectedConversationIds, archive: true })}
                 onDepartment={(teamId) => runBulkAction({ ids: selectedConversationIds, teamId })}
               />
-            </Card>
+          </div>
 
-            <Card className={`flex min-h-[320px] min-w-0 flex-col p-0 md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+          <div className={`flex min-h-[320px] min-w-0 flex-col md:min-h-0 ${INBOX_PANEL_CLASS}`}>
+              {roleIsManager && managerAlertCount > 0 ? (
+                <div className="shrink-0 border-b border-rose-200/60 bg-rose-50/80 px-4 py-1.5 text-center text-[11px] font-medium text-rose-800">
+                  {managerAlertCount} conversa{managerAlertCount === 1 ? "" : "s"} fora do SLA
+                </div>
+              ) : null}
               {active ? (
                 <>
                   <ConversationHeaderBar
@@ -2120,11 +2045,8 @@ export function AtlasApp({ token, user }: Props) {
                     accessToken={token}
                     onSetStatus={(status) => void setStatusQuick(status)}
                     onOpenDrawer={() => setDrawerOpen(true)}
-                    onFilterAssignee={() => applyChipFilter("assignee", active)}
-                    onFilterTeam={() => applyChipFilter("team", active)}
-                    onFilterInstance={() => applyChipFilter("instance", active)}
                   />
-                  <div className="atlas-scroll relative isolate flex-1 overflow-auto bg-slate-50/80 px-3 py-4 sm:px-5 sm:py-5">
+                  <div className="inbox-v42-thread atlas-scroll relative isolate flex-1 overflow-auto px-4 py-5 sm:px-6 sm:py-6">
                     {groupMessagesForThread(active.messages ?? []).map((group) => (
                       <section key={group.dateKey} className="mb-5 last:mb-0">
                         <div className="sticky top-0 z-20 mb-3 flex justify-center">
@@ -2259,7 +2181,7 @@ export function AtlasApp({ token, user }: Props) {
                   ) : null}
                   <form
                     onSubmit={handleSend}
-                    className="z-10 flex items-end gap-2 rounded-b-2xl border-t border-slate-200 bg-white px-3 py-2.5 sm:px-4"
+                    className="inbox-v42-composer z-10 flex items-end gap-2.5 px-4 py-3 sm:px-5"
                   >
                     <input
                       ref={fileRef}
@@ -2318,12 +2240,14 @@ export function AtlasApp({ token, user }: Props) {
                   </form>
                 </>
               ) : (
-                <div className="grid flex-1 place-items-center text-atlas-muted">
-                  <MessageCircle size={32} />
+                <div className="inbox-v42-thread grid flex-1 place-items-center gap-2 px-6 text-center text-slate-500">
+                  <MessageCircle size={36} className="text-slate-300" strokeWidth={1.25} />
+                  <p className="text-sm font-medium text-slate-600">Selecione uma conversa</p>
+                  <p className="max-w-xs text-xs text-slate-400">Escolha um contato na fila para responder ou use + para iniciar um novo.</p>
                 </div>
               )}
-            </Card>
-          </div>
+            </div>
+        </div>
           {error ? <p className="shrink-0 text-sm text-red-600">{error}</p> : null}
           {!error && info ? <p className="shrink-0 text-sm text-emerald-700">{info}</p> : null}
       </section>
