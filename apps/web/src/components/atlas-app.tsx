@@ -666,8 +666,8 @@ function NewContactModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/30 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+    <div className="atlas-v5-modal-backdrop">
+      <div className="atlas-v5-modal-panel max-w-md">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-base font-semibold">Novo contato</p>
@@ -745,8 +745,8 @@ function UserProfileModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/30 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/70 bg-white p-4 shadow-xl">
+    <div className="atlas-v5-modal-backdrop">
+      <div className="atlas-v5-modal-panel max-w-md">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-base font-semibold">Perfil do atendente</p>
@@ -1782,7 +1782,7 @@ export function AtlasApp({ token, user }: Props) {
 
   return (
     <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-1.5 sm:p-2.5">
-      <section className="inbox-v42-shell flex h-full min-h-0 flex-col overflow-hidden">
+      <section className="inbox-v42-shell atlas-v5-module-shell flex h-full min-h-0 flex-col overflow-hidden">
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]">
           <div
             className={`inbox-v42-queue relative min-w-0 flex-col ${INBOX_PANEL_CLASS} ${

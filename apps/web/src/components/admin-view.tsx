@@ -1174,14 +1174,15 @@ export function AdminView({ token, user }: Props) {
 
   return (
     <main className="atlas-page">
-      <div className="atlas-page-inner max-w-5xl space-y-6">
+      <div className="atlas-page-inner w-full min-w-0">
+        <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
         <AtlasViewHeader
           icon={Settings}
           section="Configuração"
           title="Administração"
           description="Números WhatsApp, usuários, departamentos e integrações"
         />
-        <div className="glass-panel mb-2 rounded-atlas-lg p-3 sm:p-4">
+        <div className="atlas-v5-toolbar">
           <p className="text-xs text-slate-500">
             API:{" "}
             <span
@@ -1213,7 +1214,7 @@ export function AdminView({ token, user }: Props) {
               <a
                 key={item.id}
                 href={`#${item.id}`}
-                className="shrink-0 rounded-lg border border-white/60 bg-white/50 px-3 py-1.5 text-xs font-medium text-slate-700 backdrop-blur-sm hover:border-slate-300/80 hover:bg-white/75"
+                className="atlas-v5-chip shrink-0"
               >
                 {item.label}
               </a>
@@ -1221,7 +1222,7 @@ export function AdminView({ token, user }: Props) {
           </nav>
         </div>
 
-        <Card id="admin-config" className="scroll-mt-24 p-5">
+        <Card id="admin-config" className="atlas-v5-card-pad scroll-mt-24">
           <div className="flex items-center gap-2">
             <Settings size={18} className="text-atlas-blue" />
             <p className="font-semibold">Configurações da empresa</p>
@@ -1333,7 +1334,7 @@ export function AdminView({ token, user }: Props) {
         </Card>
 
         {ssoSettings?.availableProviders.length ? (
-          <Card className="p-5">
+          <Card className="atlas-v5-card-pad">
             <div className="flex items-center gap-2">
               <Shield size={18} className="text-atlas-blue" />
               <p className="font-semibold">Login SSO (OIDC)</p>
@@ -1687,7 +1688,7 @@ export function AdminView({ token, user }: Props) {
           )}
         </Card>
 
-        <Card className="p-5">
+        <Card className="atlas-v5-card-pad">
           <div className="flex items-center gap-2">
             <Hash size={15} className="text-atlas-blue" />
             <p className="font-semibold">Atalhos por hashtag (respostas rápidas)</p>
@@ -1733,7 +1734,7 @@ export function AdminView({ token, user }: Props) {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="atlas-v5-card-pad">
           <div className="flex items-center gap-2">
             <Hash size={15} className="text-atlas-blue" />
             <p className="font-semibold">Catálogo de tags do inbox</p>
@@ -1952,7 +1953,7 @@ export function AdminView({ token, user }: Props) {
           ) : null}
         </Card>
 
-        <Card className="p-5">
+        <Card className="atlas-v5-card-pad">
           <p className="font-semibold">Adicionar número de WhatsApp</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <input
@@ -2259,7 +2260,7 @@ export function AdminView({ token, user }: Props) {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="atlas-v5-card-pad">
           <p className="font-semibold">Equipe</p>
           {loading ? (
             <Loader2 className="mx-auto mt-6 animate-spin" />
@@ -2322,7 +2323,7 @@ export function AdminView({ token, user }: Props) {
           ) : null}
         </Card>
 
-        <Card className="p-5">
+        <Card className="atlas-v5-card-pad">
           <p className="font-semibold">Números salvos</p>
           <div className="mt-3 space-y-2">
             {instances.map((instance) => (
@@ -2391,7 +2392,7 @@ export function AdminView({ token, user }: Props) {
         </Card>
 
         {isPlatformAdmin ? (
-          <Card className="scroll-mt-24 border-2 border-rose-300 bg-rose-50/60 p-5 shadow-sm ring-1 ring-rose-200/80">
+          <Card className="atlas-v5-card-danger atlas-v5-card-pad scroll-mt-24">
           <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">Zona de risco · plataforma</p>
           <p className="mt-1 font-semibold text-rose-900">Reset destrutivo da empresa</p>
           <p className="mt-1 text-xs text-rose-800/90">
@@ -2446,7 +2447,7 @@ export function AdminView({ token, user }: Props) {
         </Card>
         ) : null}
 
-        {isOwner ? <Card className="p-5">
+        {isOwner ? <Card className="atlas-v5-card-pad">
           <p className="font-semibold">Revenda multiempresa (onboarding)</p>
           <p className="mt-1 text-xs text-atlas-muted">Crie o cliente e libere o acesso do dono em poucos cliques.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -2514,7 +2515,7 @@ export function AdminView({ token, user }: Props) {
           {!!tenants.length && (
             <div className="mt-4 space-y-2">
               {tenants.map((t) => (
-                <div key={t.id} className="flex items-center justify-between rounded-2xl bg-white/70 px-4 py-3 text-sm">
+                <div key={t.id} className="atlas-v5-list-row flex items-center justify-between text-sm">
                   <div>
                     <p className="font-medium">{t.name}</p>
                     <p className="text-xs text-atlas-muted">{t.slug}</p>
@@ -2528,6 +2529,7 @@ export function AdminView({ token, user }: Props) {
             </div>
           )}
         </Card> : null}
+        </div>
       </div>
     </main>
   );

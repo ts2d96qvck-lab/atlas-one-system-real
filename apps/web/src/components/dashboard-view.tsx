@@ -215,7 +215,8 @@ export function DashboardView({ token }: Props) {
 
   return (
     <main className="atlas-page">
-      <div className="atlas-page-inner w-full min-w-0 max-w-[88rem]">
+      <div className="atlas-page-inner w-full min-w-0">
+        <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
         <AtlasViewHeader
           icon={BarChart3}
           section="Operação e vendas"
@@ -235,10 +236,7 @@ export function DashboardView({ token }: Props) {
                 <ChevronDown size={14} className={exportMenuOpen ? "rotate-180" : ""} />
               </Button>
               {exportMenuOpen ? (
-                <div
-                  className="absolute right-0 top-full z-20 mt-1 min-w-[11rem] rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
-                  role="menu"
-                >
+                <div className="atlas-v5-menu right-0 top-full" role="menu">
                   {(
                     [
                       ["leads", "Leads CSV"],
@@ -250,7 +248,7 @@ export function DashboardView({ token }: Props) {
                       key={kind}
                       type="button"
                       role="menuitem"
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      className="atlas-v5-menu-item disabled:opacity-50"
                       disabled={!!exporting}
                       onClick={() => {
                         setExportMenuOpen(false);
@@ -269,7 +267,7 @@ export function DashboardView({ token }: Props) {
         {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
 
         <div className="mb-5 grid gap-3 lg:grid-cols-4">
-          <Card className="border border-slate-200 bg-white p-4 lg:col-span-4">
+          <Card className="atlas-v5-card-pad lg:col-span-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Timer size={18} className="text-cyan-700" />
@@ -283,25 +281,25 @@ export function DashboardView({ token }: Props) {
               <p className="text-xs text-slate-500">{sla.conversationsAnalyzed ?? 0} conversas (30 dias)</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl bg-white/90 p-3">
+              <div className="atlas-v5-stat">
                 <p className="text-xs text-slate-500">Tempo médio 1ª resposta</p>
                 <p className="text-2xl font-semibold text-slate-900">
                   {sla.avgFirstResponseMinutes != null ? `${sla.avgFirstResponseMinutes} min` : "—"}
                 </p>
               </div>
-              <div className="rounded-xl bg-white/90 p-3">
+              <div className="atlas-v5-stat">
                 <p className="text-xs text-slate-500">Dentro do SLA (1ª resposta)</p>
                 <p className="text-2xl font-semibold text-emerald-700">
                   {toPercent(Number(sla.firstResponseWithinSlaPercent ?? 0))}
                 </p>
               </div>
-              <div className="rounded-xl bg-white/90 p-3">
+              <div className="atlas-v5-stat">
                 <p className="text-xs text-slate-500">Tempo médio resolução</p>
                 <p className="text-2xl font-semibold text-slate-900">
                   {sla.avgResolutionHours != null ? `${sla.avgResolutionHours} h` : "—"}
                 </p>
               </div>
-              <div className="rounded-xl bg-white/90 p-3">
+              <div className="atlas-v5-stat">
                 <p className="text-xs text-slate-500">Abertas fora do SLA</p>
                 <p className="text-2xl font-semibold text-rose-700">{Number(sla.openOverSlaCount ?? 0)}</p>
               </div>
@@ -337,7 +335,7 @@ export function DashboardView({ token }: Props) {
         </div>
 
         <div className="mt-4 grid min-w-0 gap-3 lg:grid-cols-12">
-          <Card className="min-w-0 border border-white/70 bg-white/70 p-4 backdrop-blur-xl lg:col-span-8">
+          <Card className="atlas-v5-card-pad min-w-0 lg:col-span-8">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Projeção comercial</p>
@@ -380,7 +378,7 @@ export function DashboardView({ token }: Props) {
             </p>
           </Card>
 
-          <Card className="min-w-0 border border-white/70 bg-white/70 p-4 backdrop-blur-xl lg:col-span-4">
+          <Card className="atlas-v5-card-pad min-w-0 lg:col-span-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Execução da meta</p>
@@ -467,7 +465,7 @@ export function DashboardView({ token }: Props) {
             </details>
             </Card>
 
-          <Card className="lg:col-span-7 border border-white/70 bg-white/75 p-4 backdrop-blur">
+          <Card className="atlas-v5-card-pad lg:col-span-7">
             <div className="mb-2 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Intensidade do funil</p>
@@ -496,7 +494,7 @@ export function DashboardView({ token }: Props) {
             </div>
           </Card>
 
-          <Card className="lg:col-span-5 border border-white/70 bg-white/75 p-4 backdrop-blur">
+          <Card className="atlas-v5-card-pad lg:col-span-5">
             <div className="mb-2 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Operação WhatsApp</p>
@@ -557,7 +555,7 @@ export function DashboardView({ token }: Props) {
           </Card>
         </div>
 
-        <Card className="mt-3 border border-white/70 bg-white/75 p-4 backdrop-blur">
+        <Card className="atlas-v5-card-pad">
           <div className="mb-2 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Ranking da equipe</p>
@@ -586,6 +584,7 @@ export function DashboardView({ token }: Props) {
             {!teamRows.length ? <p className="text-xs text-slate-500">Sem dados de desempenho ainda.</p> : null}
           </div>
         </Card>
+        </div>
       </div>
     </main>
   );

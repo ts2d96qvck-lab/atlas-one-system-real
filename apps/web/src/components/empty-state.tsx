@@ -14,8 +14,8 @@ type Props = {
 
 export function EmptyState({ icon: Icon = Inbox, title, description, actionLabel, onAction }: Props) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-900/40">
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+    <div className="atlas-v5-empty">
+      <div className="atlas-v5-empty-icon">
         <Icon size={20} strokeWidth={1.75} />
       </div>
       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</p>

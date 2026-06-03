@@ -269,7 +269,8 @@ export function CrmView({ token }: Props) {
 
   return (
     <main className="atlas-page">
-      <div className="atlas-page-inner w-full max-w-[1400px]">
+      <div className="atlas-page-inner w-full min-w-0">
+        <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
         <AtlasViewHeader
           icon={Users}
           section="Comercial"
@@ -280,7 +281,7 @@ export function CrmView({ token }: Props) {
                 <Plus size={16} />
                 Novo lead
               </Button>
-              <Card className="px-4 py-3">
+              <Card className="atlas-v5-card-pad-sm">
                 <p className="text-xs text-slate-500">Pipeline total</p>
                 <p className="text-xl font-semibold text-slate-900">{formatMoney(total)}</p>
               </Card>
@@ -299,7 +300,7 @@ export function CrmView({ token }: Props) {
             return (
               <Card
                 key={stage.id}
-                className="flex min-h-[420px] min-w-[272px] flex-shrink-0 flex-col p-3"
+                className="atlas-v5-card-pad-sm flex min-h-[420px] min-w-[272px] flex-shrink-0 flex-col"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
                   if (dragId) moveLead(dragId, stage.name);
@@ -327,7 +328,7 @@ export function CrmView({ token }: Props) {
                       key={lead.id}
                       draggable
                       onDragStart={() => setDragId(lead.id)}
-                      className="cursor-grab rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:border-slate-300 active:cursor-grabbing"
+                      className="atlas-v5-list-row cursor-grab active:cursor-grabbing"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -375,10 +376,11 @@ export function CrmView({ token }: Props) {
             );
           })}
         </div>
+        </div>
       </div>
       {editingLead ? (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/25 p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+        <div className="atlas-v5-modal-backdrop">
+          <div className="atlas-v5-modal-panel max-w-xl">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-base font-semibold text-slate-900">Editar lead</p>
@@ -478,8 +480,8 @@ export function CrmView({ token }: Props) {
         </div>
       ) : null}
       {creatingLead ? (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/25 p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+        <div className="atlas-v5-modal-backdrop">
+          <div className="atlas-v5-modal-panel max-w-xl">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-base font-semibold text-slate-900">Novo lead</p>

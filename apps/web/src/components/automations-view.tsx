@@ -148,7 +148,8 @@ export function AutomationsView({ token }: Props) {
 
   return (
     <main className="atlas-page">
-      <div className="atlas-page-inner max-w-3xl space-y-6">
+      <div className="atlas-page-inner w-full min-w-0">
+        <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
         <AtlasViewHeader
           icon={Bot}
           section="Operação"
@@ -157,7 +158,7 @@ export function AutomationsView({ token }: Props) {
           iconClassName="bg-violet-600 text-white border-violet-500/30"
         />
 
-        <Card className="p-5">
+        <Card className="atlas-v5-card-pad">
           <p className="font-semibold text-slate-900">Nova automação</p>
           <p className="mt-1 text-xs text-slate-500">
             Use variáveis no texto: {"{{customer_name}}"}, {"{{lead_status}}"}, {"{{lead_value}}"}.
@@ -267,7 +268,7 @@ export function AutomationsView({ token }: Props) {
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
-              <Card key={item.id} className="flex items-center justify-between p-4">
+              <Card key={item.id} className="atlas-v5-card-pad-sm flex items-center justify-between">
                 <div>
                   <p className="font-semibold">{item.name}</p>
                   <p className="text-sm text-atlas-muted">{triggerLabel(item.trigger)}</p>
@@ -288,6 +289,7 @@ export function AutomationsView({ token }: Props) {
             ))}
           </div>
         )}
+        </div>
       </div>
     </main>
   );
