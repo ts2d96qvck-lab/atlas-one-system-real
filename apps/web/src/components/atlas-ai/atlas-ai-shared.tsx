@@ -1,22 +1,34 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Check, Copy, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Check, Copy, Loader2, RefreshCw, Sparkles, X, type LucideIcon } from "lucide-react";
 import { Button } from "@atlas-one/ui";
 import { getAtlasAiStatus, type AtlasAiResponse } from "../../lib/atlas-ai";
+
+export function AtlasAiHero() {
+  return (
+    <header className="atlas-ai-hero">
+      <div className="atlas-ai-hero-glow" aria-hidden />
+      <div className="atlas-ai-hero-inner">
+        <span className="atlas-ai-hero-badge">
+          <Sparkles size={20} />
+        </span>
+        <div className="min-w-0">
+          <p className="atlas-ai-hero-title">
+            <span aria-hidden>✨</span> Atlas AI
+          </p>
+          <p className="atlas-ai-hero-subtitle">Copiloto inteligente da operação</p>
+        </div>
+      </div>
+    </header>
+  );
+}
 
 export function AtlasAiShell({ subtitle, children }: { subtitle?: string; children: ReactNode }) {
   return (
     <div className="atlas-ai-shell">
-      <div className="atlas-ai-shell-header">
-        <span className="atlas-ai-badge">
-          <Sparkles size={18} />
-        </span>
-        <div>
-          <p className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Atlas AI</p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">{subtitle ?? "Assistente inteligente da operação"}</p>
-        </div>
-      </div>
+      <AtlasAiHero />
+      {subtitle ? <p className="atlas-ai-shell-subline">{subtitle}</p> : null}
       {children}
     </div>
   );
@@ -24,20 +36,177 @@ export function AtlasAiShell({ subtitle, children }: { subtitle?: string; childr
 
 export function AtlasAiConfigureEmpty() {
   return (
-    <div className="atlas-ai-empty">
-      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Atlas AI em configuração</p>
+    <div className="atlas-ai-empty atlas-ai-empty-premium">
+      <span className="atlas-ai-empty-icon">
+        <Sparkles size={22} />
+      </span>
+      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Quase pronto para sua equipe</p>
       <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-        Seu administrador pode ativar o assistente para acelerar respostas, resumos e decisões comerciais.
+        O administrador precisa conectar as chaves de IA no servidor. Depois disso, resumos, respostas e handoffs ficam disponíveis em um clique.
       </p>
+      <ul className="atlas-ai-empty-features">
+        <li>Resumos instantâneos</li>
+        <li>Respostas no tom certo</li>
+        <li>Próxima ação priorizada</li>
+      </ul>
     </div>
   );
 }
 
 export function AtlasAiPermissionEmpty() {
   return (
-    <div className="atlas-ai-empty">
-      <p className="text-sm font-semibold text-slate-800">Recurso premium</p>
-      <p className="mt-1.5 text-xs text-slate-500">Peça ao gestor a permissão Atlas AI para sua equipe.</p>
+    <div className="atlas-ai-empty atlas-ai-empty-premium">
+      <span className="atlas-ai-empty-icon">
+        <Sparkles size={22} />
+      </span>
+      <p className="text-sm font-semibold text-slate-800">Atlas AI — recurso premium</p>
+      <p className="mt-1.5 text-xs text-slate-500">Peça ao gestor a permissão <strong>Atlas AI</strong> para liberar o copiloto na sua equipe.</p>
+    </div>
+  );
+}
+
+export function AtlasAiHubActionCard({
+  icon: Icon,
+  title,
+  benefit,
+  cta,
+  active,
+  loading,
+  ready,
+  disabled,
+  onSelect,
+  onRun
+}: {
+  icon: LucideIcon;
+  title: string;
+  benefit: string;
+  cta: string;
+  active?: boolean;
+  loading?: boolean;
+  ready?: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+  onRun: () => void;
+}) {
+  return (
+    <article className={`atlas-ai-hub-card ${active ? "atlas-ai-hub-card-active" : ""} ${ready ? "atlas-ai-hub-card-ready" : ""}`}>
+      <button type="button" className="atlas-ai-hub-card-main" onClick={onSelect}>
+        <span className="atlas-ai-hub-card-icon">
+          <Icon size={18} />
+        </span>
+        <span className="min-w-0 flex-1 text-left">
+          <span className="atlas-ai-hub-card-title">{title}</span>
+          <span className="atlas-ai-hub-card-benefit">{benefit}</span>
+        </span>
+        {ready ? <span className="atlas-ai-hub-card-dot" title="Resultado disponível" /> : null}
+      </button>
+      <Button
+        className="atlas-ai-hub-card-cta"
+        disabled={disabled || loading}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRun();
+        }}
+      >
+        {loading ? <Loader2 size={14} className="animate-spin" /> : cta}
+      </Button>
+    </article>
+  );
+}
+
+export function AtlasAiHubWorkspace({
+  title,
+  children,
+  error,
+  onClose
+}: {
+  title: string;
+  children: ReactNode;
+  error?: string;
+  onClose: () => void;
+}) {
+  return (
+    <section className="atlas-ai-workspace">
+      <div className="atlas-ai-workspace-head">
+        <p className="atlas-ai-workspace-title">{title}</p>
+        <button type="button" className="atlas-ai-workspace-close" onClick={onClose} aria-label="Fechar">
+          <X size={14} />
+        </button>
+      </div>
+      {error ? <p className="atlas-ai-workspace-error">{error}</p> : null}
+      <div className="atlas-ai-workspace-body">{children}</div>
+    </section>
+  );
+}
+
+export function AtlasAiHubLoading({ label }: { label: string }) {
+  return (
+    <div className="atlas-ai-hub-loading">
+      <div className="atlas-ai-hub-loading-shimmer" aria-hidden />
+      <Loader2 size={16} className="animate-spin text-violet-600" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+export function AtlasAiExecutiveQuote({ text, label }: { text: string; label?: string }) {
+  if (!text.trim()) return null;
+  return (
+    <blockquote className="atlas-ai-executive-quote">
+      {label ? <p className="atlas-ai-executive-label">{label}</p> : null}
+      <p>{text}</p>
+    </blockquote>
+  );
+}
+
+export function AtlasAiExecutiveField({
+  label,
+  value,
+  highlight
+}: {
+  label: string;
+  value?: string | null;
+  highlight?: boolean;
+}) {
+  if (!value?.trim()) return null;
+  return (
+    <div className={`atlas-ai-executive-field ${highlight ? "atlas-ai-executive-field-highlight" : ""}`}>
+      <p className="atlas-ai-executive-label">{label}</p>
+      <p className="atlas-ai-executive-value">{value}</p>
+    </div>
+  );
+}
+
+export function AtlasAiExecutiveList({
+  label,
+  items,
+  variant
+}: {
+  label: string;
+  items?: string[];
+  variant?: "default" | "risk";
+}) {
+  if (!items?.length) return null;
+  return (
+    <div className={`atlas-ai-executive-list ${variant === "risk" ? "atlas-ai-executive-list-risk" : ""}`}>
+      <p className="atlas-ai-executive-label">{label}</p>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function AtlasAiPriorityBadge({ value }: { value?: string }) {
+  if (!value) return null;
+  const v = value.toLowerCase();
+  const cls = v.includes("alta") ? "alta" : v.includes("media") ? "media" : "baixa";
+  return (
+    <div className="atlas-ai-priority-badge">
+      <span className="atlas-ai-executive-label">Prioridade</span>
+      <span className={`atlas-ai-priority-chip atlas-ai-priority-${cls}`}>{value}</span>
     </div>
   );
 }
@@ -152,34 +321,36 @@ export function AtlasAiActionBar({
   primaryLabel,
   onCopy,
   onRegenerate,
+  regenerateLabel = "Gerar novamente",
   copied
 }: {
   onPrimary?: () => void;
   primaryLabel?: string;
   onCopy?: () => void;
   onRegenerate?: () => void;
+  regenerateLabel?: string;
   copied?: boolean;
 }) {
   return (
-    <>
+    <div className="atlas-ai-action-bar">
       {onPrimary && primaryLabel ? (
-        <Button className="h-8 px-2.5 text-[11px]" onClick={onPrimary}>
+        <Button className="atlas-ai-action-primary" onClick={onPrimary}>
           {primaryLabel}
         </Button>
       ) : null}
       {onCopy ? (
-        <Button variant="glass" className="h-8 gap-1 px-2.5 text-[11px]" onClick={onCopy}>
+        <Button variant="glass" className="atlas-ai-action-secondary" onClick={onCopy}>
           {copied ? <Check size={14} /> : <Copy size={14} />}
           {copied ? "Copiado" : "Copiar"}
         </Button>
       ) : null}
       {onRegenerate ? (
-        <Button variant="glass" className="h-8 gap-1 px-2.5 text-[11px]" onClick={onRegenerate}>
+        <Button variant="glass" className="atlas-ai-action-secondary" onClick={onRegenerate}>
           <RefreshCw size={14} />
-          Melhorar novamente
+          {regenerateLabel}
         </Button>
       ) : null}
-    </>
+    </div>
   );
 }
 

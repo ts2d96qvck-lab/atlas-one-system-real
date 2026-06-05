@@ -2,6 +2,16 @@
 
 import { useEffect, useState } from "react";
 import {
+  ArrowRightLeft,
+  FileText,
+  Loader2,
+  MessageSquare,
+  Sparkles,
+  Target,
+  Wand2,
+  type LucideIcon
+} from "lucide-react";
+import {
   aiConversationSummary,
   aiMessagePolish,
   aiNextBestAction,
@@ -16,19 +26,75 @@ import {
 import {
   AtlasAiActionBar,
   AtlasAiConfigureEmpty,
-  AtlasAiField,
-  AtlasAiList,
-  AtlasAiPriority,
+  AtlasAiExecutiveField,
+  AtlasAiExecutiveList,
+  AtlasAiExecutiveQuote,
+  AtlasAiHero,
+  AtlasAiHubActionCard,
+  AtlasAiHubLoading,
+  AtlasAiHubWorkspace,
   AtlasAiPills,
-  AtlasAiResultCard,
-  AtlasAiSection,
-  AtlasAiShell,
+  AtlasAiPriorityBadge,
   useAiRunner,
   useAtlasAiReady
 } from "./atlas-ai-shared";
 
 const TONES = ["formal", "comercial", "executivo", "suporte", "amigavel", "cobranca"] as const;
 const POLISH = ["corrigir", "profissional", "encurtar", "consultivo", "humano", "cobranca_educada"] as const;
+
+type InboxFeature = "summary" | "reply" | "action" | "transfer" | "polish";
+
+type ActionDef = {
+  id: InboxFeature;
+  title: string;
+  benefit: string;
+  cta: string;
+  loadingLabel: string;
+  icon: LucideIcon;
+};
+
+const INBOX_ACTIONS: ActionDef[] = [
+  {
+    id: "summary",
+    title: "Resumir conversa",
+    benefit: "Contexto, intenção e riscos em segundos",
+    cta: "Resumir",
+    loadingLabel: "Analisando conversa…",
+    icon: FileText
+  },
+  {
+    id: "reply",
+    title: "Sugerir resposta",
+    benefit: "Resposta pronta no tom certo para o cliente",
+    cta: "Sugerir",
+    loadingLabel: "Gerando sugestão…",
+    icon: MessageSquare
+  },
+  {
+    id: "action",
+    title: "Próxima ação",
+    benefit: "Prioridade clara do que fazer agora",
+    cta: "Priorizar",
+    loadingLabel: "Priorizando ação…",
+    icon: Target
+  },
+  {
+    id: "transfer",
+    title: "Transferência inteligente",
+    benefit: "Handoff completo para o próximo atendente",
+    cta: "Preparar",
+    loadingLabel: "Montando handoff…",
+    icon: ArrowRightLeft
+  },
+  {
+    id: "polish",
+    title: "Melhorar mensagem",
+    benefit: "Refine o rascunho antes de enviar",
+    cta: "Refinar",
+    loadingLabel: "Refinando texto…",
+    icon: Wand2
+  }
+];
 
 type Props = {
   token: string;
@@ -53,6 +119,7 @@ export function AtlasAiInboxPanel({
 }: Props) {
   const configured = useAtlasAiReady(token);
   const { loadingKey, error, results, run } = useAiRunner(token);
+  const [active, setActive] = useState<InboxFeature | null>(null);
   const [tone, setTone] = useState<ReplyTone>("comercial");
   const [polishMode, setPolishMode] = useState<PolishMode>("profissional");
   const [polishDraft, setPolishDraft] = useState(composerDraft);
@@ -64,18 +131,32 @@ export function AtlasAiInboxPanel({
 
   if (!conversationId) {
     return (
-      <AtlasAiShell subtitle="Selecione uma conversa">
-        <p className="px-3 pb-3 text-xs text-slate-500">Abra uma conversa para usar o assistente.</p>
-      </AtlasAiShell>
+      <div className="atlas-ai-inbox-root">
+        <AtlasAiHero />
+        <div className="atlas-ai-inbox-idle">
+          <Sparkles size={20} className="text-violet-500" />
+          <p className="text-sm font-medium text-slate-700">Selecione uma conversa</p>
+          <p className="text-xs text-slate-500">O copiloto analisa o histórico e sugere a melhor próxima jogada.</p>
+        </div>
+      </div>
     );
   }
 
-  if (configured === false) return <AtlasAiShell><AtlasAiConfigureEmpty /></AtlasAiShell>;
+  if (configured === false) {
+    return (
+      <div className="atlas-ai-inbox-root">
+        <AtlasAiHero />
+        <AtlasAiConfigureEmpty />
+      </div>
+    );
+  }
+
   if (configured === null) {
     return (
-      <AtlasAiShell>
-        <p className="px-3 pb-3 text-xs text-slate-500">Verificando Atlas AI…</p>
-      </AtlasAiShell>
+      <div className="atlas-ai-inbox-root">
+        <AtlasAiHero />
+        <AtlasAiHubLoading label="Verificando Atlas AI…" />
+      </div>
     );
   }
 
@@ -93,147 +174,186 @@ export function AtlasAiInboxPanel({
         ? transfer.contexto
         : "";
 
+  function openFeature(id: InboxFeature) {
+    setActive((prev) => (prev === id ? null : id));
+  }
+
+  async function runFeature(id: InboxFeature) {
+    if (!conversationId) return;
+    setActive(id);
+    if (id === "summary") await run("summary", () => aiConversationSummary(token, conversationId));
+    if (id === "reply") await run("reply", () => aiSuggestedReply(token, conversationId, tone));
+    if (id === "action") await run("action", () => aiNextBestAction(token, conversationId));
+    if (id === "transfer") {
+      await run("transfer", () =>
+        aiTransferSummary(token, conversationId, { targetAgentName, transferNote })
+      );
+    }
+    if (id === "polish" && polishDraft.trim()) {
+      await run("polish", () =>
+        aiMessagePolish(token, conversationId, { draft: polishDraft, mode: polishMode })
+      );
+    }
+  }
+
+  const activeDef = INBOX_ACTIONS.find((item) => item.id === active);
+
   return (
-    <AtlasAiShell subtitle="Atendimento mais rápido e assertivo">
-      <div className="space-y-0 pb-2">
-        <AtlasAiSection
-          title="Resumo da conversa"
-          description="Entenda o contexto em segundos"
-          loading={loadingKey === "summary"}
-          loadingLabel="Analisando conversa…"
-          error={loadingKey === "summary" ? undefined : error}
-          runLabel="Gerar resumo"
-          disabled={!!loadingKey}
-          onRun={() => void run("summary", () => aiConversationSummary(token, conversationId))}
-        >
-          {summary ? (
-            <AtlasAiResultCard>
-              <AtlasAiField label="Resumo" value={String(summary.resumo ?? summary.summary ?? "")} />
-              <AtlasAiField label="Intenção do cliente" value={String(summary.intencaoCliente ?? "")} />
-              <AtlasAiList label="Pontos importantes" items={(summary.pontosImportantes as string[]) ?? (summary.bullets as string[])} />
-              <AtlasAiList label="Riscos" items={summary.riscos as string[]} />
-              <AtlasAiField label="Próxima ação" value={String(summary.proximaAcaoRecomendada ?? "")} />
-            </AtlasAiResultCard>
-          ) : null}
-        </AtlasAiSection>
+    <div className="atlas-ai-inbox-root">
+      <AtlasAiHero />
 
-        <AtlasAiSection
-          title="Resposta sugerida"
-          description="Tom ajustado ao seu estilo"
-          loading={loadingKey === "reply"}
-          loadingLabel="Gerando sugestão…"
-          runLabel="Gerar resposta"
-          disabled={!!loadingKey}
-          onRun={() => void run("reply", () => aiSuggestedReply(token, conversationId, tone))}
-        >
-          <AtlasAiPills options={TONES} labels={REPLY_TONE_LABELS} value={tone} onChange={setTone} />
-          {reply ? (
-            <AtlasAiResultCard>
-              <AtlasAiField label="Sugestão" value={replyText} />
-              {typeof reply.dicaUso === "string" ? <p className="text-[11px] text-slate-500">{reply.dicaUso}</p> : null}
-              <AtlasAiActionBar
-                primaryLabel="Usar resposta"
-                onPrimary={onApplyReply && replyText ? () => onApplyReply(replyText) : undefined}
-                onCopy={() =>
-                  void copyAtlasAiText(replyText).then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  })
-                }
-                onRegenerate={() => void run("reply", () => aiSuggestedReply(token, conversationId, tone))}
-                copied={copied}
-              />
-            </AtlasAiResultCard>
-          ) : null}
-        </AtlasAiSection>
-
-        <AtlasAiSection
-          title="Próxima melhor ação"
-          loading={loadingKey === "action"}
-          loadingLabel="Priorizando ação…"
-          runLabel="Sugerir ação"
-          disabled={!!loadingKey}
-          onRun={() => void run("action", () => aiNextBestAction(token, conversationId))}
-        >
-          {action ? (
-            <AtlasAiResultCard>
-              <AtlasAiPriority value={String(action.prioridade ?? action.priority ?? "")} />
-              <AtlasAiField label="Motivo" value={String(action.motivo ?? action.rationale ?? "")} />
-              <AtlasAiField label="Ação recomendada" value={String(action.acaoRecomendada ?? action.action ?? "")} />
-              <AtlasAiField label="Prazo sugerido" value={String(action.prazoSugerido ?? "")} />
-              <AtlasAiField label="Responsável sugerido" value={String(action.responsavelSugerido ?? "")} />
-            </AtlasAiResultCard>
-          ) : null}
-        </AtlasAiSection>
-
-        <AtlasAiSection
-          title="Resumo de transferência"
-          description="Handoff claro para o time"
-          loading={loadingKey === "transfer"}
-          loadingLabel="Montando handoff…"
-          runLabel="Gerar handoff"
-          disabled={!!loadingKey}
-          onRun={() =>
-            void run("transfer", () =>
-              aiTransferSummary(token, conversationId, { targetAgentName, transferNote })
-            )
-          }
-        >
-          {transfer ? (
-            <AtlasAiResultCard>
-              <AtlasAiField label="Contexto" value={String(transfer.contexto ?? transfer.summary ?? "")} />
-              <AtlasAiList label="Já tratado" items={transfer.tratado as string[]} />
-              <AtlasAiList label="Pendências" items={(transfer.pendencias as string[]) ?? (transfer.openItems as string[])} />
-              <AtlasAiList label="Cuidados" items={transfer.cuidados as string[]} />
-              <AtlasAiField label="Próxima ação" value={String(transfer.proximaAcao ?? "")} />
-              <AtlasAiActionBar
-                primaryLabel="Colar na nota"
-                onPrimary={
-                  onApplyTransferSummary && handoffText ? () => onApplyTransferSummary(handoffText) : undefined
-                }
-                onCopy={() => void copyAtlasAiText(handoffText)}
-              />
-            </AtlasAiResultCard>
-          ) : null}
-        </AtlasAiSection>
-
-        <AtlasAiSection
-          title="Refinar mensagem"
-          description="Melhore o rascunho antes de enviar"
-          loading={loadingKey === "polish"}
-          loadingLabel="Refinando texto…"
-          runLabel="Refinar"
-          disabled={!!loadingKey || !polishDraft.trim()}
-          onRun={() =>
-            void run("polish", () =>
-              aiMessagePolish(token, conversationId, { draft: polishDraft, mode: polishMode })
-            )
-          }
-        >
-          <AtlasAiPills options={POLISH} labels={POLISH_MODE_LABELS} value={polishMode} onChange={setPolishMode} />
-          <textarea
-            className="atlas-field mt-2 min-h-[72px] w-full rounded-lg px-3 py-2 text-xs outline-none"
-            value={polishDraft}
-            onChange={(e) => setPolishDraft(e.target.value)}
-            placeholder="Cole ou edite a mensagem do composer"
+      <div className="atlas-ai-action-hub">
+        {INBOX_ACTIONS.map((item) => (
+          <AtlasAiHubActionCard
+            key={item.id}
+            icon={item.icon}
+            title={item.title}
+            benefit={item.benefit}
+            cta={item.cta}
+            active={active === item.id}
+            loading={loadingKey === item.id}
+            ready={!!results[item.id]}
+            disabled={!!loadingKey || (item.id === "polish" && !polishDraft.trim())}
+            onSelect={() => openFeature(item.id)}
+            onRun={() => void runFeature(item.id)}
           />
-          {polish ? (
-            <AtlasAiResultCard>
-              <AtlasAiField label="Mensagem refinada" value={String(polish.mensagem ?? "")} />
-              <AtlasAiField label="O que mudou" value={String(polish.oQueMudou ?? "")} />
-              <AtlasAiActionBar
-                primaryLabel="Usar no composer"
-                onPrimary={
-                  onApplyPolish && typeof polish.mensagem === "string"
-                    ? () => onApplyPolish(String(polish.mensagem))
-                    : undefined
-                }
-                onCopy={() => void copyAtlasAiText(String(polish.mensagem ?? ""))}
-              />
-            </AtlasAiResultCard>
-          ) : null}
-        </AtlasAiSection>
+        ))}
       </div>
-    </AtlasAiShell>
+
+      {active && activeDef ? (
+        <AtlasAiHubWorkspace
+          title={activeDef.title}
+          onClose={() => setActive(null)}
+          error={loadingKey === active ? undefined : error}
+        >
+          {loadingKey === active ? (
+            <AtlasAiHubLoading label={activeDef.loadingLabel} />
+          ) : (
+            <>
+              {active === "reply" ? (
+                <div className="atlas-ai-workspace-controls">
+                  <p className="atlas-ai-workspace-label">Tom da resposta</p>
+                  <AtlasAiPills options={TONES} labels={REPLY_TONE_LABELS} value={tone} onChange={setTone} />
+                </div>
+              ) : null}
+
+              {active === "polish" ? (
+                <div className="atlas-ai-workspace-controls">
+                  <p className="atlas-ai-workspace-label">Modo de refinamento</p>
+                  <AtlasAiPills options={POLISH} labels={POLISH_MODE_LABELS} value={polishMode} onChange={setPolishMode} />
+                  <textarea
+                    className="atlas-ai-polish-input"
+                    value={polishDraft}
+                    onChange={(e) => setPolishDraft(e.target.value)}
+                    placeholder="Cole ou edite a mensagem do composer"
+                  />
+                </div>
+              ) : null}
+
+              {active === "summary" && summary ? (
+                <div className="atlas-ai-executive-stack">
+                  <AtlasAiExecutiveField label="Resumo" value={String(summary.resumo ?? summary.summary ?? "")} highlight />
+                  <AtlasAiExecutiveField label="Intenção do cliente" value={String(summary.intencaoCliente ?? "")} />
+                  <AtlasAiExecutiveList label="Pontos importantes" items={(summary.pontosImportantes as string[]) ?? (summary.bullets as string[])} />
+                  <AtlasAiExecutiveList label="Riscos" items={summary.riscos as string[]} variant="risk" />
+                  <AtlasAiExecutiveField label="Próxima ação recomendada" value={String(summary.proximaAcaoRecomendada ?? "")} />
+                </div>
+              ) : null}
+
+              {active === "reply" && reply ? (
+                <div className="atlas-ai-executive-stack">
+                  <AtlasAiExecutiveQuote text={replyText} />
+                  {typeof reply.dicaUso === "string" ? (
+                    <p className="atlas-ai-tip">{reply.dicaUso}</p>
+                  ) : null}
+                  <div className="atlas-ai-action-row">
+                    <AtlasAiActionBar
+                      primaryLabel="Usar resposta"
+                      onPrimary={onApplyReply && replyText ? () => onApplyReply(replyText) : undefined}
+                      onCopy={() =>
+                        void copyAtlasAiText(replyText).then(() => {
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        })
+                      }
+                      onRegenerate={() => void runFeature("reply")}
+                      regenerateLabel="Gerar novamente"
+                      copied={copied}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {active === "action" && action ? (
+                <div className="atlas-ai-executive-stack">
+                  <AtlasAiPriorityBadge value={String(action.prioridade ?? action.priority ?? "")} />
+                  <AtlasAiExecutiveField label="Motivo" value={String(action.motivo ?? action.rationale ?? "")} />
+                  <AtlasAiExecutiveField label="Ação recomendada" value={String(action.acaoRecomendada ?? action.action ?? "")} highlight />
+                  <AtlasAiExecutiveField label="Prazo sugerido" value={String(action.prazoSugerido ?? "")} />
+                  <AtlasAiExecutiveField label="Responsável sugerido" value={String(action.responsavelSugerido ?? "")} />
+                </div>
+              ) : null}
+
+              {active === "transfer" && transfer ? (
+                <div className="atlas-ai-executive-stack">
+                  <AtlasAiExecutiveField label="Contexto para o próximo atendente" value={String(transfer.contexto ?? transfer.summary ?? "")} highlight />
+                  <AtlasAiExecutiveList label="O que já foi tratado" items={transfer.tratado as string[]} />
+                  <AtlasAiExecutiveList label="Pendências" items={(transfer.pendencias as string[]) ?? (transfer.openItems as string[])} />
+                  <AtlasAiExecutiveList label="Cuidados" items={transfer.cuidados as string[]} variant="risk" />
+                  <AtlasAiExecutiveField label="Próxima ação" value={String(transfer.proximaAcao ?? "")} />
+                  <div className="atlas-ai-action-row">
+                    <AtlasAiActionBar
+                      primaryLabel="Colar na nota"
+                      onPrimary={
+                        onApplyTransferSummary && handoffText ? () => onApplyTransferSummary(handoffText) : undefined
+                      }
+                      onCopy={() => void copyAtlasAiText(handoffText)}
+                      onRegenerate={() => void runFeature("transfer")}
+                      regenerateLabel="Gerar novamente"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {active === "polish" && polish ? (
+                <div className="atlas-ai-executive-stack">
+                  <AtlasAiExecutiveQuote text={String(polish.mensagem ?? "")} label="Mensagem refinada" />
+                  <AtlasAiExecutiveField label="O que mudou" value={String(polish.oQueMudou ?? "")} />
+                  <div className="atlas-ai-action-row">
+                    <AtlasAiActionBar
+                      primaryLabel="Usar resposta"
+                      onPrimary={
+                        onApplyPolish && typeof polish.mensagem === "string"
+                          ? () => onApplyPolish(String(polish.mensagem))
+                          : undefined
+                      }
+                      onCopy={() => void copyAtlasAiText(String(polish.mensagem ?? ""))}
+                      onRegenerate={() => void runFeature("polish")}
+                      regenerateLabel="Gerar novamente"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {!results[active] && loadingKey !== active ? (
+                <div className="atlas-ai-workspace-hint">
+                  <p>Toque em <strong>{activeDef.cta}</strong> no card acima para gerar o resultado.</p>
+                  {active === "polish" && !polishDraft.trim() ? (
+                    <p className="text-amber-700">Escreva ou cole uma mensagem no composer para refinar.</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+        </AtlasAiHubWorkspace>
+      ) : null}
+
+      {loadingKey && !active ? (
+        <div className="atlas-ai-inbox-busy">
+          <Loader2 size={14} className="animate-spin text-violet-600" />
+          <span>Processando…</span>
+        </div>
+      ) : null}
+    </div>
   );
 }

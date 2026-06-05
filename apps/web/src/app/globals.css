@@ -802,6 +802,487 @@ html.dark .atlas-ai-section {
   font-weight: 700;
 }
 
+/* Atlas AI V1.2 — flagship inbox hub */
+
+.atlas-ai-inbox-root {
+  margin: -1rem;
+  min-height: 100%;
+  background: linear-gradient(180deg, rgba(250, 245, 255, 0.65) 0%, rgba(248, 250, 252, 0.35) 100%);
+}
+
+html.dark .atlas-ai-inbox-root {
+  background: linear-gradient(180deg, rgba(46, 16, 101, 0.25) 0%, rgba(15, 23, 42, 0.15) 100%);
+}
+
+.atlas-ai-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 1rem 1rem 0.875rem;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.18);
+}
+
+.atlas-ai-hero-glow {
+  position: absolute;
+  inset: -40% -20% auto;
+  height: 120%;
+  background: radial-gradient(ellipse at 30% 0%, rgba(167, 139, 250, 0.35) 0%, transparent 62%);
+  pointer-events: none;
+}
+
+.atlas-ai-hero-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.atlas-ai-hero-badge {
+  display: grid;
+  height: 2.5rem;
+  width: 2.5rem;
+  place-items: center;
+  border-radius: 0.875rem;
+  background: linear-gradient(145deg, #8b5cf6 0%, #6d28d9 55%, #5b21b6 100%);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(91, 33, 182, 0.38);
+}
+
+.atlas-ai-hero-title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1e1b4b;
+}
+
+html.dark .atlas-ai-hero-title {
+  color: #ede9fe;
+}
+
+.atlas-ai-hero-subtitle {
+  margin-top: 0.125rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.atlas-ai-shell-subline {
+  padding: 0 1rem 0.5rem;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.atlas-ai-action-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.atlas-ai-hub-card {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 4px 16px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+html.dark .atlas-ai-hub-card {
+  border-color: rgba(51, 65, 85, 0.85);
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.atlas-ai-hub-card-active {
+  border-color: rgba(124, 58, 237, 0.45);
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.12), 0 8px 24px rgba(91, 33, 182, 0.12);
+}
+
+.atlas-ai-hub-card-ready .atlas-ai-hub-card-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.atlas-ai-hub-card-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  padding: 0.625rem 0 0.625rem 0.625rem;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.atlas-ai-hub-card-icon {
+  display: grid;
+  height: 2rem;
+  width: 2rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.625rem;
+  background: linear-gradient(145deg, rgba(237, 233, 254, 0.95) 0%, rgba(221, 214, 254, 0.85) 100%);
+  color: #6d28d9;
+}
+
+.atlas-ai-hub-card-title {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+html.dark .atlas-ai-hub-card-title {
+  color: #f1f5f9;
+}
+
+.atlas-ai-hub-card-benefit {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.625rem;
+  line-height: 1.35;
+  color: #64748b;
+}
+
+.atlas-ai-hub-card-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.atlas-ai-hub-card-cta {
+  align-self: center;
+  margin-right: 0.5rem;
+  height: 2rem !important;
+  min-width: 4.75rem;
+  padding: 0 0.75rem !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  border-radius: 0.625rem !important;
+  background: linear-gradient(145deg, #7c3aed 0%, #6d28d9 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 18px rgba(91, 33, 182, 0.28);
+}
+
+.atlas-ai-workspace {
+  margin: 0 0.75rem 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 12px 32px rgba(91, 33, 182, 0.1);
+  overflow: hidden;
+}
+
+html.dark .atlas-ai-workspace {
+  background: rgba(15, 23, 42, 0.88);
+  border-color: rgba(124, 58, 237, 0.35);
+}
+
+.atlas-ai-workspace-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.95);
+  background: linear-gradient(90deg, rgba(245, 243, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 100%);
+}
+
+.atlas-ai-workspace-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #312e81;
+}
+
+.atlas-ai-workspace-close {
+  display: grid;
+  height: 1.5rem;
+  width: 1.5rem;
+  place-items: center;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.atlas-ai-workspace-body {
+  padding: 0.75rem;
+}
+
+.atlas-ai-workspace-error {
+  margin: 0.5rem 0.75rem 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  background: rgba(254, 242, 242, 0.9);
+  font-size: 0.6875rem;
+  color: #be123c;
+}
+
+.atlas-ai-workspace-controls {
+  margin-bottom: 0.75rem;
+}
+
+.atlas-ai-workspace-label {
+  margin-bottom: 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.atlas-ai-polish-input {
+  margin-top: 0.5rem;
+  min-height: 4.5rem;
+  width: 100%;
+  resize: vertical;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(248, 250, 252, 0.9);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  outline: none;
+}
+
+.atlas-ai-polish-input:focus {
+  border-color: rgba(124, 58, 237, 0.45);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.18);
+}
+
+.atlas-ai-executive-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.atlas-ai-executive-field,
+.atlas-ai-executive-list {
+  border-radius: 0.625rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(248, 250, 252, 0.75);
+  padding: 0.625rem 0.75rem;
+}
+
+.atlas-ai-executive-field-highlight {
+  border-color: rgba(167, 139, 250, 0.35);
+  background: linear-gradient(180deg, rgba(245, 243, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+}
+
+.atlas-ai-executive-label {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+
+.atlas-ai-executive-value {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.atlas-ai-executive-list ul {
+  margin-top: 0.375rem;
+  padding-left: 1rem;
+  list-style: disc;
+}
+
+.atlas-ai-executive-list li {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.atlas-ai-executive-list-risk {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(255, 251, 235, 0.65);
+}
+
+.atlas-ai-executive-quote {
+  margin: 0;
+  border-radius: 0.75rem;
+  border-left: 3px solid #7c3aed;
+  background: linear-gradient(90deg, rgba(237, 233, 254, 0.65) 0%, rgba(255, 255, 255, 0.9) 100%);
+  padding: 0.75rem 0.875rem;
+}
+
+.atlas-ai-executive-quote p:last-child {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: #1e293b;
+  white-space: pre-wrap;
+}
+
+.atlas-ai-tip {
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.atlas-ai-priority-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+}
+
+.atlas-ai-priority-chip {
+  border-radius: 999px;
+  padding: 0.2rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.atlas-ai-priority-chip.atlas-ai-priority-alta {
+  background: rgba(254, 226, 226, 0.9);
+  color: #be123c;
+}
+
+.atlas-ai-priority-chip.atlas-ai-priority-media {
+  background: rgba(254, 243, 199, 0.9);
+  color: #b45309;
+}
+
+.atlas-ai-priority-chip.atlas-ai-priority-baixa {
+  background: rgba(209, 250, 229, 0.9);
+  color: #047857;
+}
+
+.atlas-ai-action-row {
+  margin-top: 0.25rem;
+}
+
+.atlas-ai-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.atlas-ai-action-primary {
+  height: 2rem !important;
+  padding: 0 0.75rem !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+}
+
+.atlas-ai-action-secondary {
+  height: 2rem !important;
+  gap: 0.25rem !important;
+  padding: 0 0.625rem !important;
+  font-size: 0.6875rem !important;
+}
+
+.atlas-ai-hub-loading {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.75rem;
+  padding: 1.25rem 1rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6d28d9;
+  overflow: hidden;
+}
+
+.atlas-ai-hub-loading-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(167, 139, 250, 0.12) 50%, transparent 100%);
+  animation: atlas-ai-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes atlas-ai-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.atlas-ai-empty-premium {
+  margin: 0.75rem;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  border-style: solid;
+  border-color: rgba(167, 139, 250, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 243, 255, 0.65) 100%);
+}
+
+.atlas-ai-empty-icon {
+  display: inline-grid;
+  height: 2.75rem;
+  width: 2.75rem;
+  place-items: center;
+  margin-bottom: 0.5rem;
+  border-radius: 0.875rem;
+  background: linear-gradient(145deg, rgba(237, 233, 254, 0.95) 0%, rgba(221, 214, 254, 0.75) 100%);
+  color: #7c3aed;
+}
+
+.atlas-ai-empty-features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.375rem;
+  margin-top: 0.875rem;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-ai-empty-features li {
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #6d28d9;
+}
+
+.atlas-ai-inbox-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 2rem 1.25rem;
+  text-align: center;
+}
+
+.atlas-ai-workspace-hint {
+  padding: 0.75rem;
+  border-radius: 0.625rem;
+  background: rgba(248, 250, 252, 0.9);
+  font-size: 0.6875rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.atlas-ai-inbox-busy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  font-size: 0.6875rem;
+  color: #6d28d9;
+}
+
 /* Inbox V4.3 — premium liquid glass (inherits V5 module shell) */
 
 .inbox-v42-queue {
