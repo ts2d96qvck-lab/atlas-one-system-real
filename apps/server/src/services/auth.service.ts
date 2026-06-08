@@ -680,12 +680,36 @@ export function verifyToken(token: string): SessionUser {
   return readSessionToken(token).user;
 }
 
+function normalizeRole(role: string) {
+  return role.trim().toLowerCase();
+}
+
+function normalizePermissions(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (value === "*") return ["*"];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "*") return ["*"];
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed) as unknown;
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch {
+        return [];
+      }
+    }
+  }
+  return [];
+}
+
+export function hasFullAccess(user: Pick<SessionUser, "role" | "permissions">) {
+  const role = normalizeRole(user.role ?? "agent");
+  if (role === "owner" || role === "admin") return true;
+  return normalizePermissions(user.permissions).includes("*");
+}
+
 export function hasPermission(user: SessionUser, permission: string) {
-  return (
-    user.role === "owner" ||
-    user.role === "admin" ||
-    user.permissions.includes("*") ||
-    user.permissions.includes(permission)
-  );
+  if (hasFullAccess(user)) return true;
+  return normalizePermissions(user.permissions).includes(permission);
 }
 

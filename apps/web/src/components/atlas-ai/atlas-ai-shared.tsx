@@ -5,7 +5,7 @@ import { Check, Copy, Loader2, RefreshCw, Sparkles, X, type LucideIcon } from "l
 import { Button } from "@atlas-one/ui";
 import { getAtlasAiStatus, type AtlasAiResponse } from "../../lib/atlas-ai";
 import type { SessionUser } from "../../lib/api";
-import { hasPermission } from "../../lib/session-user";
+import { canUseAtlasAi, hasFullAccess, hasPermission } from "../../lib/session-user";
 
 export type AtlasAiAccessState = "loading" | "ready" | "unconfigured" | "denied" | "error";
 
@@ -218,11 +218,12 @@ export function AtlasAiPriorityBadge({ value }: { value?: string }) {
 export function useAtlasAiAccess(token: string, user?: SessionUser): AtlasAiAccessState {
   const [state, setState] = useState<AtlasAiAccessState>("loading");
   const permissionKey = user?.permissions?.join("|") ?? "";
+  const fullAccess = user ? hasFullAccess(user) : false;
 
   useEffect(() => {
     let cancelled = false;
 
-    if (user && !hasPermission(user, "ai:use")) {
+    if (user && !canUseAtlasAi(user)) {
       setState("denied");
       return () => {
         cancelled = true;
@@ -237,7 +238,7 @@ export function useAtlasAiAccess(token: string, user?: SessionUser): AtlasAiAcce
           setState("unconfigured");
           return;
         }
-        if (status.canUse === false) {
+        if (status.canUse === false && !fullAccess) {
           setState("denied");
           return;
         }
@@ -245,13 +246,17 @@ export function useAtlasAiAccess(token: string, user?: SessionUser): AtlasAiAcce
       })
       .catch(() => {
         if (cancelled) return;
-        setState(user && !hasPermission(user, "ai:use") ? "denied" : "error");
+        if (fullAccess || (user && canUseAtlasAi(user))) {
+          setState("ready");
+          return;
+        }
+        setState("error");
       });
 
     return () => {
       cancelled = true;
     };
-  }, [token, user?.id, user?.role, permissionKey]);
+  }, [token, user?.id, user?.role, permissionKey, fullAccess]);
 
   return state;
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { getAtlasAiStatus } from "../lib/atlas-ai";
 import type { SessionUser } from "../lib/api";
-import { hasPermission } from "../lib/session-user";
+import { canUseAtlasAi, hasFullAccess } from "../lib/session-user";
 
 type Props = { token: string; user: SessionUser };
 
@@ -12,11 +12,12 @@ type AdminAiState = "loading" | "ready" | "unconfigured" | "denied" | "error";
 
 export function AdminAiStatus({ token, user }: Props) {
   const [state, setState] = useState<AdminAiState>("loading");
+  const fullAccess = hasFullAccess(user);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!hasPermission(user, "ai:use")) {
+    if (!canUseAtlasAi(user)) {
       setState("denied");
       return () => {
         cancelled = true;
@@ -31,20 +32,20 @@ export function AdminAiStatus({ token, user }: Props) {
           setState("unconfigured");
           return;
         }
-        if (status.canUse === false) {
+        if (status.canUse === false && !fullAccess) {
           setState("denied");
           return;
         }
         setState("ready");
       })
       .catch(() => {
-        if (!cancelled) setState("error");
+        if (!cancelled) setState(fullAccess ? "ready" : "error");
       });
 
     return () => {
       cancelled = true;
     };
-  }, [token, user.id, user.role, user.permissions?.join("|")]);
+  }, [token, user.id, user.role, user.permissions?.join("|"), fullAccess]);
 
   const label =
     state === "loading"

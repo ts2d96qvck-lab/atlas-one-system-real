@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireAuth, requireUser } from "../plugins/auth";
 import { requirePermission } from "../plugins/permissions";
-import { hasPermission } from "../services/auth.service";
+import { hasFullAccess, hasPermission } from "../services/auth.service";
 import { sendError } from "../utils/http";
 import {
   CAMPAIGN_VARIATION_MODES,
@@ -80,7 +80,7 @@ export async function aiRoutes(app: FastifyInstance) {
     const user = requireUser(request);
     return reply.send({
       ...getAiProviderStatus(),
-      canUse: hasPermission(user, "ai:use")
+      canUse: hasFullAccess(user) || hasPermission(user, "ai:use")
     });
   });
 

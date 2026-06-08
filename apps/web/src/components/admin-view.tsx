@@ -585,7 +585,7 @@ export function AdminView({ token, user }: Props) {
   }, [selectedUser?.id, selectedUser?.role, selectedUser?.permissions?.join("|")]);
 
   async function saveUserPermissions() {
-    if (!selectedUser || roleHasFullAccess(selectedUser.role)) return;
+    if (!selectedUser || roleHasFullAccess(selectedUser.role, selectedUser.permissions)) return;
     setPermissionsSaving(true);
     try {
       const permissions = permissionDraft.filter((item) => item !== "*");
@@ -2369,8 +2369,24 @@ export function AdminView({ token, user }: Props) {
                 <p className="mt-1 text-xs text-atlas-muted">
                   Perfil: {ROLE_LABEL[selectedUser.role] ?? selectedUser.role}
                 </p>
-                {roleHasFullAccess(selectedUser.role) ? (
-                  <p className="mt-2 text-xs text-emerald-700">Acesso total (*) — inclui Atlas AI.</p>
+                {roleHasFullAccess(selectedUser.role, selectedUser.permissions) ? (
+                  <>
+                    <p className="mt-2 text-xs text-emerald-700">Acesso total (*) — inclui Atlas AI.</p>
+                    <div className="mt-3 space-y-2">
+                      {ADMIN_PERMISSION_OPTIONS.map((option) => (
+                        <label
+                          key={option.id}
+                          className="flex items-start gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs opacity-90"
+                        >
+                          <input type="checkbox" className="mt-0.5" checked readOnly disabled />
+                          <span>
+                            <span className="font-semibold text-slate-800">{option.label}</span>
+                            <span className="mt-0.5 block text-slate-500">{option.description}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div className="mt-3 space-y-2">
@@ -2379,7 +2395,7 @@ export function AdminView({ token, user }: Props) {
                           <input
                             type="checkbox"
                             className="mt-0.5"
-                            checked={permissionDraft.includes(option.id)}
+                            checked={permissionDraft.includes(option.id) || permissionDraft.includes("*")}
                             onChange={(e) =>
                               setPermissionDraft((current) => togglePermission(current, option.id, e.target.checked))
                             }

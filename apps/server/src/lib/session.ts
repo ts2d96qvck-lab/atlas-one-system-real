@@ -9,7 +9,21 @@ import { sendError } from "../utils/http";
 type JwtPayload = SessionUser & { tv: number };
 
 function basePermissions(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(String) : [];
+  if (Array.isArray(value)) return value.map(String);
+  if (value === "*") return ["*"];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "*") return ["*"];
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed) as unknown;
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch {
+        return [];
+      }
+    }
+  }
+  return [];
 }
 
 export function signSessionToken(user: SessionUser, tokenVersion: number) {

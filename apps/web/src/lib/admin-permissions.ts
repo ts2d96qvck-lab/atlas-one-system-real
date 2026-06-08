@@ -37,16 +37,20 @@ export const ADMIN_PERMISSION_OPTIONS = [
   }
 ] as const;
 
-export function roleHasFullAccess(role: string) {
-  return role === "owner" || role === "admin";
+import { normalizePermissions } from "./session-user";
+
+export function roleHasFullAccess(role: string, permissions?: string[] | undefined) {
+  const normalizedRole = role.trim().toLowerCase();
+  if (normalizedRole === "owner" || normalizedRole === "admin") return true;
+  return userHasWildcard(permissions);
 }
 
 export function userHasWildcard(permissions: string[] | undefined) {
-  return Array.isArray(permissions) && permissions.includes("*");
+  return normalizePermissions(permissions).includes("*");
 }
 
 export function resolveEditablePermissions(role: string, permissions: string[] | undefined): string[] {
-  if (roleHasFullAccess(role) || userHasWildcard(permissions)) return ["*"];
+  if (roleHasFullAccess(role, permissions)) return ["*"];
   if (Array.isArray(permissions) && permissions.length) return [...permissions];
   return defaultPermissionsForRole(role);
 }

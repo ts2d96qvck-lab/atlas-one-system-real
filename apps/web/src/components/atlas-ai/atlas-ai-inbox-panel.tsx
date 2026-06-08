@@ -177,19 +177,6 @@ export function AtlasAiInboxPanel({
     return renderAccessGate(access, null);
   }
 
-  if (!conversationId) {
-    return (
-      <div className="atlas-ai-inbox-root">
-        <AtlasAiHero />
-        <div className="atlas-ai-inbox-idle">
-          <Sparkles size={20} className="text-violet-500" />
-          <p className="text-sm font-medium text-slate-700">Selecione uma conversa</p>
-          <p className="text-xs text-slate-500">O copiloto analisa o histórico e sugere a melhor próxima jogada.</p>
-        </div>
-      </div>
-    );
-  }
-
   const summary = results.summary?.data;
   const reply = results.reply?.data;
   const action = results.action?.data;
@@ -232,6 +219,13 @@ export function AtlasAiInboxPanel({
     <div className="atlas-ai-inbox-root">
       <AtlasAiHero />
 
+      {!conversationId ? (
+        <div className="atlas-ai-inbox-idle mx-3 mb-2 rounded-xl border border-violet-200/50 bg-violet-50/40 px-3 py-2 text-center">
+          <Sparkles size={16} className="mx-auto text-violet-500" />
+          <p className="mt-1 text-xs font-medium text-slate-700">Selecione uma conversa para executar as ações</p>
+        </div>
+      ) : null}
+
       <div className="atlas-ai-action-hub">
         {INBOX_ACTIONS.map((item) => (
           <AtlasAiHubActionCard
@@ -243,7 +237,11 @@ export function AtlasAiInboxPanel({
             active={active === item.id}
             loading={loadingKey === item.id}
             ready={!!results[item.id]}
-            disabled={!!loadingKey || (item.id === "polish" && !polishDraft.trim())}
+            disabled={
+              !conversationId ||
+              !!loadingKey ||
+              (item.id === "polish" && !polishDraft.trim())
+            }
             onSelect={() => openFeature(item.id)}
             onRun={() => void runFeature(item.id)}
           />
