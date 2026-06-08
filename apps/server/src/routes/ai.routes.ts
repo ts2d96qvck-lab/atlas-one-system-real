@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireAuth, requireUser } from "../plugins/auth";
 import { requirePermission } from "../plugins/permissions";
+import { hasPermission } from "../services/auth.service";
 import { sendError } from "../utils/http";
 import {
   CAMPAIGN_VARIATION_MODES,
@@ -75,8 +76,12 @@ function aiError(reply: Parameters<typeof sendError>[0], error: unknown) {
 }
 
 export async function aiRoutes(app: FastifyInstance) {
-  app.get("/status", { preHandler: [requireAuth, requirePermission("ai:use")] }, async (_request, reply) => {
-    return reply.send(getAiProviderStatus());
+  app.get("/status", { preHandler: [requireAuth] }, async (request, reply) => {
+    const user = requireUser(request);
+    return reply.send({
+      ...getAiProviderStatus(),
+      canUse: hasPermission(user, "ai:use")
+    });
   });
 
   app.post(

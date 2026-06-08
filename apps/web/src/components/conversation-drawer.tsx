@@ -275,6 +275,7 @@ export function ConversationDrawer({
             hasPermission(sessionUser, "ai:use") ? (
               <AtlasAiInboxPanel
                 token={token}
+                user={sessionUser}
                 conversationId={active.id}
                 composerDraft={composerDraft}
                 transferNote={transferNote}

@@ -9,9 +9,10 @@ import {
   type CampaignVariationMode,
   copyAtlasAiText
 } from "../../lib/atlas-ai";
+import type { SessionUser } from "../../lib/api";
 import {
+  AtlasAiAccessFallback,
   AtlasAiActionBar,
-  AtlasAiConfigureEmpty,
   AtlasAiField,
   AtlasAiList,
   AtlasAiPills,
@@ -19,13 +20,14 @@ import {
   AtlasAiSection,
   AtlasAiShell,
   useAiRunner,
-  useAtlasAiReady
+  useAtlasAiAccess
 } from "./atlas-ai-shared";
 
 const MODES = ["formal", "comercial", "executivo", "cobranca", "curta", "whatsapp_natural"] as const;
 
 type Props = {
   token: string;
+  user?: SessionUser;
   message: string;
   campaignName?: string;
   messageKind?: string;
@@ -35,17 +37,18 @@ type Props = {
 
 export function AtlasAiCampaignsPanel({
   token,
+  user,
   message,
   campaignName,
   messageKind,
   templateName,
   onApplyMessage
 }: Props) {
-  const configured = useAtlasAiReady(token);
+  const access = useAtlasAiAccess(token, user);
   const { loadingKey, error, results, run } = useAiRunner(token);
   const [variationMode, setVariationMode] = useState<CampaignVariationMode>("whatsapp_natural");
 
-  if (configured === false) return <AtlasAiConfigureEmpty />;
+  if (access !== "ready") return <AtlasAiAccessFallback access={access} />;
 
   const improve = results.improve?.data;
   const variation = results.variation?.data;
@@ -61,7 +64,7 @@ export function AtlasAiCampaignsPanel({
         loading={loadingKey === "improve"}
         loadingLabel="Aprimorando mensagem…"
         runLabel="Melhorar"
-        disabled={!!loadingKey || !message.trim() || configured === null}
+        disabled={!!loadingKey || !message.trim()}
         onRun={() =>
           void run("improve", () =>
             aiCampaignImproveMessage(token, { message, campaignName, messageKind, templateName })

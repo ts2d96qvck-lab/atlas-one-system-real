@@ -7,30 +7,32 @@ import {
   aiLeadWinLossInsight,
   copyAtlasAiText
 } from "../../lib/atlas-ai";
+import type { SessionUser } from "../../lib/api";
 import {
+  AtlasAiAccessFallback,
   AtlasAiActionBar,
-  AtlasAiConfigureEmpty,
   AtlasAiField,
   AtlasAiList,
   AtlasAiResultCard,
   AtlasAiSection,
   AtlasAiShell,
   useAiRunner,
-  useAtlasAiReady
+  useAtlasAiAccess
 } from "./atlas-ai-shared";
 
 type Props = {
   token: string;
+  user?: SessionUser;
   leadId?: string;
   onApplyTask?: (task: { titulo: string; descricao: string }) => void;
 };
 
-export function AtlasAiCrmPanel({ token, leadId, onApplyTask }: Props) {
-  const configured = useAtlasAiReady(token);
+export function AtlasAiCrmPanel({ token, user, leadId, onApplyTask }: Props) {
+  const access = useAtlasAiAccess(token, user);
   const { loadingKey, error, results, run } = useAiRunner(token);
 
   if (!leadId) return null;
-  if (configured === false) return <AtlasAiConfigureEmpty />;
+  if (access !== "ready") return <AtlasAiAccessFallback access={access} />;
 
   const summary = results.leadSummary?.data;
   const prob = results.probability?.data;
@@ -44,7 +46,7 @@ export function AtlasAiCrmPanel({ token, leadId, onApplyTask }: Props) {
         loading={loadingKey === "leadSummary"}
         loadingLabel="Analisando lead…"
         runLabel="Resumir lead"
-        disabled={!!loadingKey || configured === null}
+        disabled={!!loadingKey}
         onRun={() => void run("leadSummary", () => aiLeadSummary(token, leadId))}
       >
         {summary ? (

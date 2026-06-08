@@ -269,7 +269,7 @@ export function DashboardView({ token, user }: Props) {
         />
         {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
 
-        {hasPermission(user, "ai:use") ? <AtlasAiAskPanel token={token} /> : null}
+        {hasPermission(user, "ai:use") ? <AtlasAiAskPanel token={token} user={user} /> : null}
 
         <div className="mb-5 grid gap-3 lg:grid-cols-4">
           <Card className="atlas-v5-card-pad lg:col-span-4">

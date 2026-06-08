@@ -472,6 +472,7 @@ export function CrmView({ token, user }: Props) {
               {hasPermission(user, "ai:use") ? (
                 <AtlasAiCrmPanel
                   token={token}
+                  user={user}
                   leadId={editingLead.id}
                   onApplyTask={(task) =>
                     setFeedback({

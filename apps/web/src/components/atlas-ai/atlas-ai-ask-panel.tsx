@@ -2,29 +2,30 @@
 
 import { useState } from "react";
 import { aiAskAtlas, ASK_ATLAS_PROMPTS, copyAtlasAiText } from "../../lib/atlas-ai";
+import type { SessionUser } from "../../lib/api";
 import {
+  AtlasAiAccessFallback,
   AtlasAiActionBar,
-  AtlasAiConfigureEmpty,
   AtlasAiField,
   AtlasAiList,
   AtlasAiResultCard,
   AtlasAiShell,
   useAiRunner,
-  useAtlasAiReady
+  useAtlasAiAccess
 } from "./atlas-ai-shared";
 import { Button } from "@atlas-one/ui";
 
-type Props = { token: string };
+type Props = { token: string; user?: SessionUser };
 
-export function AtlasAiAskPanel({ token }: Props) {
-  const configured = useAtlasAiReady(token);
+export function AtlasAiAskPanel({ token, user }: Props) {
+  const access = useAtlasAiAccess(token, user);
   const { loadingKey, error, results, run } = useAiRunner(token);
   const [question, setQuestion] = useState("");
 
-  if (configured === false) {
+  if (access !== "ready") {
     return (
       <div className="atlas-v5-card-pad">
-        <AtlasAiConfigureEmpty />
+        <AtlasAiAccessFallback access={access} />
       </div>
     );
   }
@@ -58,7 +59,7 @@ export function AtlasAiAskPanel({ token }: Props) {
           />
           <Button
             className="mt-2 h-9 w-full text-xs"
-            disabled={!!loadingKey || !question.trim() || configured === null}
+            disabled={!!loadingKey || !question.trim()}
             onClick={() => void run("ask", () => aiAskAtlas(token, question))}
           >
             {loadingKey === "ask" ? "Analisando operação…" : "Perguntar ao Atlas"}

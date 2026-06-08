@@ -74,6 +74,12 @@ import {
 import { EmptyState } from "./empty-state";
 import { OwnerClientsPanel } from "./owner-clients-panel";
 import { tagChipStyle } from "../lib/inbox-tags";
+import {
+  ADMIN_PERMISSION_OPTIONS,
+  resolveEditablePermissions,
+  roleHasFullAccess,
+  togglePermission
+} from "../lib/admin-permissions";
 
 const TAG_COLOR_OPTIONS = ["#6366f1", "#22c55e", "#0ea5e9", "#f59e0b", "#ef4444", "#a855f7", "#64748b"];
 
@@ -85,6 +91,7 @@ type UserRow = {
   email: string;
   role: string;
   status: string;
+  permissions?: string[];
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -240,6 +247,8 @@ export function AdminView({ token, user }: Props) {
   const [auditLogs, setAuditLogs] = useState<AuditLogRow[]>([]);
   const [selectedInstance, setSelectedInstance] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
+  const [permissionsSaving, setPermissionsSaving] = useState(false);
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [billingBusyId, setBillingBusyId] = useState<string | null>(null);
@@ -566,6 +575,38 @@ export function AdminView({ token, user }: Props) {
   useEffect(() => {
     void refreshAuditLogs();
   }, [refreshAuditLogs]);
+
+  useEffect(() => {
+    if (!selectedUser) {
+      setPermissionDraft([]);
+      return;
+    }
+    setPermissionDraft(resolveEditablePermissions(selectedUser.role, selectedUser.permissions));
+  }, [selectedUser?.id, selectedUser?.role, selectedUser?.permissions?.join("|")]);
+
+  async function saveUserPermissions() {
+    if (!selectedUser || roleHasFullAccess(selectedUser.role)) return;
+    setPermissionsSaving(true);
+    try {
+      const permissions = permissionDraft.filter((item) => item !== "*");
+      const res = await fetch(`${apiUrl()}/admin/users/${selectedUser.id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ permissions })
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setMessage((body as { error?: string })?.error ?? "Erro ao salvar permissões");
+        return;
+      }
+      setMessage(`Permissões de ${selectedUser.name} atualizadas.`);
+      await refreshSnapshot();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro ao salvar permissões");
+    } finally {
+      setPermissionsSaving(false);
+    }
+  }
 
   async function connectWhatsApp(force = false) {
     if (!selectedInstance) {
@@ -1183,7 +1224,7 @@ export function AdminView({ token, user }: Props) {
           title="Administração"
           description="Números WhatsApp, usuários, departamentos e integrações"
         />
-        <AdminAiStatus token={token} />
+        {user ? <AdminAiStatus token={token} user={user} /> : null}
         <div className="atlas-v5-toolbar">
           <p className="text-xs text-slate-500">
             API:{" "}
@@ -2301,25 +2342,60 @@ export function AdminView({ token, user }: Props) {
             </div>
           )}
           {selectedUser && selectedUser.role !== "owner" ? (
-            <div className="mt-3 rounded-2xl border border-white/70 bg-white/70 p-3">
-              <p className="text-sm font-semibold">Ações rápidas · {selectedUser.name}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button variant="glass" onClick={removeSelectedUser}>
-                  <Trash2 size={14} /> Excluir usuário
-                </Button>
-                <Button
-                  variant="glass"
-                  onClick={async () => {
-                    await fetch(`${apiUrl()}/admin/users/${selectedUser.id}`, {
-                      method: "PATCH",
-                      headers,
-                      body: JSON.stringify({ status: selectedUser.status === "active" ? "inactive" : "active" })
-                    });
-                    await refreshSnapshot();
-                  }}
-                >
-                  {selectedUser.status === "active" ? "Desativar" : "Ativar"}
-                </Button>
+            <div className="mt-3 space-y-3">
+              <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
+                <p className="text-sm font-semibold">Ações rápidas · {selectedUser.name}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button variant="glass" onClick={removeSelectedUser}>
+                    <Trash2 size={14} /> Excluir usuário
+                  </Button>
+                  <Button
+                    variant="glass"
+                    onClick={async () => {
+                      await fetch(`${apiUrl()}/admin/users/${selectedUser.id}`, {
+                        method: "PATCH",
+                        headers,
+                        body: JSON.stringify({ status: selectedUser.status === "active" ? "inactive" : "active" })
+                      });
+                      await refreshSnapshot();
+                    }}
+                  >
+                    {selectedUser.status === "active" ? "Desativar" : "Ativar"}
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-violet-200/60 bg-violet-50/40 p-3">
+                <p className="text-sm font-semibold">Permissões do usuário</p>
+                <p className="mt-1 text-xs text-atlas-muted">
+                  Perfil: {ROLE_LABEL[selectedUser.role] ?? selectedUser.role}
+                </p>
+                {roleHasFullAccess(selectedUser.role) ? (
+                  <p className="mt-2 text-xs text-emerald-700">Acesso total (*) — inclui Atlas AI.</p>
+                ) : (
+                  <>
+                    <div className="mt-3 space-y-2">
+                      {ADMIN_PERMISSION_OPTIONS.map((option) => (
+                        <label key={option.id} className="flex items-start gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={permissionDraft.includes(option.id)}
+                            onChange={(e) =>
+                              setPermissionDraft((current) => togglePermission(current, option.id, e.target.checked))
+                            }
+                          />
+                          <span>
+                            <span className="font-semibold text-slate-800">{option.label}</span>
+                            <span className="mt-0.5 block text-slate-500">{option.description}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <Button className="mt-3 h-8 text-xs" onClick={() => void saveUserPermissions()} disabled={permissionsSaving}>
+                      {permissionsSaving ? <Loader2 size={14} className="animate-spin" /> : "Salvar permissões"}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ) : null}

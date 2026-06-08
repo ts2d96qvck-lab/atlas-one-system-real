@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Check, Copy, Loader2, RefreshCw, Sparkles, X, type LucideIcon } from "lucide-react";
 import { Button } from "@atlas-one/ui";
 import { getAtlasAiStatus, type AtlasAiResponse } from "../../lib/atlas-ai";
+import type { SessionUser } from "../../lib/api";
+import { hasPermission } from "../../lib/session-user";
+
+export type AtlasAiAccessState = "loading" | "ready" | "unconfigured" | "denied" | "error";
 
 export function AtlasAiHero() {
   return (
@@ -211,14 +215,67 @@ export function AtlasAiPriorityBadge({ value }: { value?: string }) {
   );
 }
 
-export function useAtlasAiReady(token: string) {
-  const [configured, setConfigured] = useState<boolean | null>(null);
+export function useAtlasAiAccess(token: string, user?: SessionUser): AtlasAiAccessState {
+  const [state, setState] = useState<AtlasAiAccessState>("loading");
+  const permissionKey = user?.permissions?.join("|") ?? "";
+
   useEffect(() => {
+    let cancelled = false;
+
+    if (user && !hasPermission(user, "ai:use")) {
+      setState("denied");
+      return () => {
+        cancelled = true;
+      };
+    }
+
     void getAtlasAiStatus(token)
-      .then((s) => setConfigured(!!s.configured && s.ready !== false))
-      .catch(() => setConfigured(false));
-  }, [token]);
-  return configured;
+      .then((status) => {
+        if (cancelled) return;
+        const configured = !!status.configured && status.ready !== false;
+        if (!configured) {
+          setState("unconfigured");
+          return;
+        }
+        if (status.canUse === false) {
+          setState("denied");
+          return;
+        }
+        setState("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setState(user && !hasPermission(user, "ai:use") ? "denied" : "error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.id, user?.role, permissionKey]);
+
+  return state;
+}
+
+/** @deprecated Prefer useAtlasAiAccess for permission-aware UI. */
+export function useAtlasAiReady(token: string, user?: SessionUser) {
+  const access = useAtlasAiAccess(token, user);
+  if (access === "loading") return null;
+  return access === "ready";
+}
+
+export function AtlasAiAccessFallback({ access }: { access: AtlasAiAccessState }) {
+  if (access === "loading") return <AtlasAiHubLoading label="Verificando Atlas AI…" />;
+  if (access === "denied") return <AtlasAiPermissionEmpty />;
+  if (access === "unconfigured") return <AtlasAiConfigureEmpty />;
+  if (access === "error") {
+    return (
+      <div className="atlas-ai-empty atlas-ai-empty-premium">
+        <p className="text-sm font-semibold text-slate-800">Não foi possível verificar agora</p>
+        <p className="mt-1.5 text-xs text-slate-500">Tente novamente em instantes ou recarregue a página.</p>
+      </div>
+    );
+  }
+  return null;
 }
 
 export function AtlasAiSection({

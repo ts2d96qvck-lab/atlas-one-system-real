@@ -251,6 +251,7 @@ export function CampaignsView({ token, user }: Props) {
             {hasPermission(user, "ai:use") ? (
               <AtlasAiCampaignsPanel
                 token={token}
+                user={user}
                 message={form.messageKind === "session" ? form.message : form.templateName || form.message}
                 campaignName={form.name}
                 messageKind={form.messageKind}

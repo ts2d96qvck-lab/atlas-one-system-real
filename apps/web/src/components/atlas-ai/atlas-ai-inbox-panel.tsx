@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowRightLeft,
   FileText,
@@ -26,6 +26,7 @@ import {
 import {
   AtlasAiActionBar,
   AtlasAiConfigureEmpty,
+  AtlasAiPermissionEmpty,
   AtlasAiExecutiveField,
   AtlasAiExecutiveList,
   AtlasAiExecutiveQuote,
@@ -36,8 +37,10 @@ import {
   AtlasAiPills,
   AtlasAiPriorityBadge,
   useAiRunner,
-  useAtlasAiReady
+  useAtlasAiAccess,
+  type AtlasAiAccessState
 } from "./atlas-ai-shared";
+import type { SessionUser } from "../../lib/api";
 
 const TONES = ["formal", "comercial", "executivo", "suporte", "amigavel", "cobranca"] as const;
 const POLISH = ["corrigir", "profissional", "encurtar", "consultivo", "humano", "cobranca_educada"] as const;
@@ -98,6 +101,7 @@ const INBOX_ACTIONS: ActionDef[] = [
 
 type Props = {
   token: string;
+  user?: SessionUser;
   conversationId?: string;
   composerDraft?: string;
   transferNote?: string;
@@ -107,8 +111,48 @@ type Props = {
   onApplyTransferSummary?: (text: string) => void;
 };
 
+function renderAccessGate(access: AtlasAiAccessState, children: ReactNode) {
+  if (access === "loading") {
+    return (
+      <div className="atlas-ai-inbox-root">
+        <AtlasAiHero />
+        <AtlasAiHubLoading label="Verificando Atlas AI…" />
+      </div>
+    );
+  }
+  if (access === "denied") {
+    return (
+      <div className="atlas-ai-inbox-root">
+        <AtlasAiHero />
+        <AtlasAiPermissionEmpty />
+      </div>
+    );
+  }
+  if (access === "unconfigured") {
+    return (
+      <div className="atlas-ai-inbox-root">
+        <AtlasAiHero />
+        <AtlasAiConfigureEmpty />
+      </div>
+    );
+  }
+  if (access === "error") {
+    return (
+      <div className="atlas-ai-inbox-root">
+        <AtlasAiHero />
+        <div className="atlas-ai-empty atlas-ai-empty-premium">
+          <p className="text-sm font-semibold text-slate-800">Não foi possível verificar agora</p>
+          <p className="mt-1.5 text-xs text-slate-500">Tente novamente em instantes ou recarregue a página.</p>
+        </div>
+      </div>
+    );
+  }
+  return children;
+}
+
 export function AtlasAiInboxPanel({
   token,
+  user,
   conversationId,
   composerDraft = "",
   transferNote,
@@ -117,7 +161,7 @@ export function AtlasAiInboxPanel({
   onApplyPolish,
   onApplyTransferSummary
 }: Props) {
-  const configured = useAtlasAiReady(token);
+  const access = useAtlasAiAccess(token, user);
   const { loadingKey, error, results, run } = useAiRunner(token);
   const [active, setActive] = useState<InboxFeature | null>(null);
   const [tone, setTone] = useState<ReplyTone>("comercial");
@@ -129,6 +173,10 @@ export function AtlasAiInboxPanel({
     setPolishDraft(composerDraft);
   }, [composerDraft]);
 
+  if (access !== "ready") {
+    return renderAccessGate(access, null);
+  }
+
   if (!conversationId) {
     return (
       <div className="atlas-ai-inbox-root">
@@ -138,24 +186,6 @@ export function AtlasAiInboxPanel({
           <p className="text-sm font-medium text-slate-700">Selecione uma conversa</p>
           <p className="text-xs text-slate-500">O copiloto analisa o histórico e sugere a melhor próxima jogada.</p>
         </div>
-      </div>
-    );
-  }
-
-  if (configured === false) {
-    return (
-      <div className="atlas-ai-inbox-root">
-        <AtlasAiHero />
-        <AtlasAiConfigureEmpty />
-      </div>
-    );
-  }
-
-  if (configured === null) {
-    return (
-      <div className="atlas-ai-inbox-root">
-        <AtlasAiHero />
-        <AtlasAiHubLoading label="Verificando Atlas AI…" />
       </div>
     );
   }

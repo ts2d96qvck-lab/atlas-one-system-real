@@ -35,6 +35,7 @@ export type AtlasAiStatus = {
   configured: boolean;
   ready?: boolean;
   version?: string;
+  canUse?: boolean;
 };
 
 const FRIENDLY_FALLBACK = "Não consegui gerar agora. Tente novamente em instantes.";
@@ -64,8 +65,15 @@ export async function getAtlasAiStatus(token: string): Promise<AtlasAiStatus> {
     headers: { authorization: `Bearer ${token}` }
   });
   const payload = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    throw new Error("Sessão expirada. Faça login novamente.");
+  }
   if (!response.ok) {
-    return { configured: false, ready: false };
+    const message =
+      (payload as { message?: string; error?: string })?.message ??
+      (payload as { error?: string })?.error ??
+      "Não foi possível verificar o Atlas AI agora.";
+    throw new Error(typeof message === "string" ? message : "Não foi possível verificar o Atlas AI agora.");
   }
   return payload as AtlasAiStatus;
 }
