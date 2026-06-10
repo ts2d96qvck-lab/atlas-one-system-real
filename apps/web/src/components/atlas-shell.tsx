@@ -953,7 +953,7 @@ export function AtlasShell() {
           className="fixed right-4 top-4 z-[60] lg:hidden"
         />
 
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 lg:pb-4 lg:pt-3">
+        <div className="atlas-main-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 lg:pb-4 lg:pt-3">
           <div className={view === "inbox" ? "flex h-full min-h-0 flex-col" : "hidden"} aria-hidden={view !== "inbox"}>
             <AtlasApp token={session.token} user={session.user} />
           </div>
@@ -974,7 +974,7 @@ export function AtlasShell() {
           ) : null}
         </div>
 
-        <div className="fixed bottom-3 left-1/2 z-50 flex w-[min(calc(100vw-1.5rem),920px)] -translate-x-1/2 flex-col items-center gap-1.5 px-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <div className="atlas-mobile-nav fixed bottom-3 left-1/2 z-50 flex w-[min(calc(100vw-1.5rem),920px)] -translate-x-1/2 flex-col items-center gap-1.5 px-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
           <div className="glass-panel flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl border border-white/50 bg-white/55 p-1 shadow-sm backdrop-blur-xl sm:gap-1">
             {visibleViews.map((item) => {
               const isActive = view === item.id;
@@ -984,13 +984,15 @@ export function AtlasShell() {
                   key={item.id}
                   type="button"
                   onClick={() => setView(item.id)}
-                  className={`relative flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-medium transition sm:px-3 sm:text-sm ${
+                  aria-label={item.label}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`relative flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-xl px-2.5 text-xs font-medium transition sm:px-3 sm:text-sm ${
                     isActive
                       ? "bg-white/90 text-slate-900 shadow-sm ring-1 ring-slate-200/80 dark:bg-white/12 dark:text-slate-100 dark:ring-slate-600/50"
                       : "text-slate-500 hover:bg-white/70 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
                   }`}
                 >
-                  <Icon size={14} />
+                  <Icon size={16} />
                   <span className="hidden sm:inline">{item.label}</span>
                 </button>
               );

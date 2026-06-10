@@ -487,6 +487,32 @@ export function AtlasApp({ token, user }: Props) {
 
   const mobileShowsChat = Boolean(activeId);
 
+  useEffect(() => {
+    // Lets the shell hide the mobile bottom nav while a conversation is open.
+    document.body.classList.toggle("inbox-chat-open", mobileShowsChat);
+    return () => document.body.classList.remove("inbox-chat-open");
+  }, [mobileShowsChat]);
+
+  const swipeStartRef = useRef<{ x: number; y: number; edge: boolean } | null>(null);
+
+  const handleChatTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY, edge: touch.clientX < 36 };
+  }, []);
+
+  const handleChatTouchEnd = useCallback((e: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start?.edge) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = Math.abs(touch.clientY - start.y);
+    // Edge swipe right = native "back" to the queue (mobile only).
+    if (deltaX > 70 && deltaY < 60 && window.innerWidth < 768) mobileBackToQueue();
+  }, []);
+
   async function runBulkAction(payload: Parameters<typeof bulkUpdateConversations>[1]) {
     if (!payload.ids.length) return;
     setBulkWorking(true);
@@ -1418,6 +1444,8 @@ export function AtlasApp({ token, user }: Props) {
             className={`min-w-0 flex-col ${INBOX_PANEL_CLASS} ${
               mobileShowsChat ? "flex min-h-0 flex-1" : "hidden min-h-0 flex-1 md:flex"
             }`}
+            onTouchStart={handleChatTouchStart}
+            onTouchEnd={handleChatTouchEnd}
           >
               {roleIsManager && managerAlertCount > 0 ? (
                 <div className="shrink-0 border-b border-rose-200/60 bg-rose-50/80 px-4 py-1.5 text-center text-[11px] font-medium text-rose-800">

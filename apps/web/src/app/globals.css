@@ -1713,3 +1713,25 @@ html.dark .inbox-v43-composer-inner {
   opacity: 0.45;
   box-shadow: none;
 }
+
+/* ---------- V6 mobile ergonomics ---------- */
+
+.inbox-v42-thread {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1023.98px) {
+  /* While a conversation is open the bottom nav hides so the composer owns the thumb zone. */
+  body.inbox-chat-open .atlas-mobile-nav {
+    display: none;
+  }
+
+  body.inbox-chat-open .atlas-main-scroll {
+    padding-bottom: 0.5rem;
+  }
+
+  body.inbox-chat-open .inbox-v42-composer {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}

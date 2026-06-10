@@ -109,9 +109,17 @@ export function ConversationDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex justify-end pt-14 sm:pt-16">
-      <button type="button" className="absolute inset-0 bg-slate-950/30" aria-label="Fechar painel" onClick={onClose} />
-      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl sm:max-w-[min(100vw-1rem,28rem)]">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-stretch sm:justify-end sm:pt-16">
+      <button
+        type="button"
+        className="absolute inset-0 animate-atlas-fade-in bg-slate-950/30"
+        aria-label="Fechar painel"
+        onClick={onClose}
+      />
+      <aside className="relative flex max-h-[88dvh] w-full animate-atlas-slide-in-bottom flex-col rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] shadow-xl sm:h-full sm:max-h-none sm:max-w-[min(100vw-1rem,28rem)] sm:animate-atlas-slide-in-right sm:rounded-none sm:border-l sm:border-slate-200 sm:pb-0">
+        <div className="flex justify-center pb-0.5 pt-2 sm:hidden" aria-hidden>
+          <span className="h-1 w-10 rounded-full bg-slate-300" />
+        </div>
         <div className="border-b border-slate-200 px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
