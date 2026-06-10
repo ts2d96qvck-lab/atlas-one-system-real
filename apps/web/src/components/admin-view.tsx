@@ -73,6 +73,8 @@ import {
 } from "../lib/api";
 import { EmptyState } from "./empty-state";
 import { OwnerClientsPanel } from "./owner-clients-panel";
+import { useAppDialogs } from "./ui/dialog-provider";
+import { notify } from "../lib/notify";
 import { tagChipStyle } from "../lib/inbox-tags";
 import {
   ADMIN_PERMISSION_OPTIONS,
@@ -227,6 +229,7 @@ function formatDateTime(value?: string | null) {
 }
 
 export function AdminView({ token, user }: Props) {
+  const { confirm } = useAppDialogs();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequestRow[]>([]);
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
@@ -250,7 +253,21 @@ export function AdminView({ token, user }: Props) {
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
   const [permissionsSaving, setPermissionsSaving] = useState(false);
   const [qrSrc, setQrSrc] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessageState] = useState("");
+  const messageRef = useRef("");
+  // Global admin feedback: keeps the inline message (WhatsApp card) and raises a visible toast.
+  const setMessage = useCallback((value: string | ((current: string) => string)) => {
+    const text = typeof value === "function" ? value(messageRef.current) : value;
+    messageRef.current = text;
+    setMessageState(text);
+    if (!text) return;
+    const isError = /^erro|falha|n[aã]o (foi|pode)|inv[aá]lid|preencha|informe|digite|obrigat[oó]ri/i.test(text.trim());
+    if (isError) {
+      notify.error(text);
+    } else {
+      notify.success(text);
+    }
+  }, []);
   const [billingBusyId, setBillingBusyId] = useState<string | null>(null);
   const [savingControlsId, setSavingControlsId] = useState<string | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
@@ -882,6 +899,13 @@ export function AdminView({ token, user }: Props) {
   }
 
   async function handleRevokeApiKey(id: string) {
+    const ok = await confirm({
+      title: "Revogar chave API?",
+      description: "Integrações que usam esta chave param de funcionar imediatamente.",
+      confirmLabel: "Revogar",
+      tone: "danger"
+    });
+    if (!ok) return;
     setIntegrationsBusy(true);
     try {
       await revokeApiKey(token, id);
@@ -918,6 +942,13 @@ export function AdminView({ token, user }: Props) {
   }
 
   async function handleDeleteWebhook(id: string) {
+    const ok = await confirm({
+      title: "Remover webhook?",
+      description: "Os eventos deixam de ser entregues para esta URL.",
+      confirmLabel: "Remover",
+      tone: "danger"
+    });
+    if (!ok) return;
     setIntegrationsBusy(true);
     try {
       await deleteWebhookEndpoint(token, id);
@@ -984,7 +1015,12 @@ export function AdminView({ token, user }: Props) {
   }
 
   async function removeShortcut(tag: string) {
-    const ok = window.confirm(`Excluir atalho ${tag}?`);
+    const ok = await confirm({
+      title: `Excluir atalho ${tag}?`,
+      description: "O atalho deixa de aparecer no menu de respostas rápidas do inbox.",
+      confirmLabel: "Excluir",
+      tone: "danger"
+    });
     if (!ok) return;
     try {
       await deleteShortcut(token, tag);
@@ -1016,7 +1052,12 @@ export function AdminView({ token, user }: Props) {
   }
 
   async function removeTagCatalogItem(name: string) {
-    const ok = window.confirm(`Remover tag ${name} do catalogo?`);
+    const ok = await confirm({
+      title: `Remover tag ${name}?`,
+      description: "A tag sai do catálogo, mas conversas já marcadas não são alteradas.",
+      confirmLabel: "Remover",
+      tone: "danger"
+    });
     if (!ok) return;
     try {
       const saved = await saveInboxTags(
@@ -1031,7 +1072,12 @@ export function AdminView({ token, user }: Props) {
   }
 
   async function removeDepartment(team: TeamRow) {
-    const ok = window.confirm(`Excluir departamento ${team.name}?`);
+    const ok = await confirm({
+      title: `Excluir departamento ${team.name}?`,
+      description: "Usuários e conversas vinculados perdem a associação com este departamento.",
+      confirmLabel: "Excluir",
+      tone: "danger"
+    });
     if (!ok) return;
     try {
       await deleteTeam(token, team.id);
@@ -1113,7 +1159,12 @@ export function AdminView({ token, user }: Props) {
       setMessage("O dono da empresa não pode ser excluído.");
       return;
     }
-    const ok = window.confirm(`Excluir usuário ${user.name}? Essa ação não pode ser desfeita.`);
+    const ok = await confirm({
+      title: `Excluir usuário ${user.name}?`,
+      description: "Essa ação não pode ser desfeita. O acesso é revogado imediatamente.",
+      confirmLabel: "Excluir usuário",
+      tone: "danger"
+    });
     if (!ok) return;
     try {
       await deleteUser(token, user.id);
@@ -1146,6 +1197,13 @@ export function AdminView({ token, user }: Props) {
   }
 
   async function removeInstance(name: string) {
+    const ok = await confirm({
+      title: `Remover número ${name}?`,
+      description: "A instância WhatsApp é desconectada e removida. Conversas existentes são preservadas.",
+      confirmLabel: "Remover número",
+      tone: "danger"
+    });
+    if (!ok) return;
     try {
       await deleteInstance(token, name);
       if (selectedInstance === name) setSelectedInstance("");
@@ -1161,9 +1219,13 @@ export function AdminView({ token, user }: Props) {
       setMessage('Digite "DESTRUIR DADOS" para confirmar o reset destrutivo da empresa.');
       return;
     }
-    const confirmed = window.confirm(
-      "ATENÇÃO: esta ação apaga permanentemente usuários, números, conversas, CRM e automações desta empresa.\n\nSomente o novo dono informado abaixo permanecerá. Deseja continuar?"
-    );
+    const confirmed = await confirm({
+      title: "Reset destrutivo da empresa",
+      description:
+        "Esta ação apaga permanentemente usuários, números, conversas, CRM e automações desta empresa. Somente o novo dono informado permanecerá.",
+      confirmLabel: "Apagar tudo",
+      tone: "danger"
+    });
     if (!confirmed) return;
     setResetLoading(true);
     try {

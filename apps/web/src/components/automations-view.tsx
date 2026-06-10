@@ -6,6 +6,8 @@ import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { AtlasViewHeader } from "./atlas-view-header";
 import { EmptyState } from "./empty-state";
+import { useAppDialogs } from "./ui/dialog-provider";
+import { notify } from "../lib/notify";
 
 const TRIGGER_LABEL: Record<string, string> = {
   "lead.stage.changed": "Lead mudou de etapa",
@@ -36,6 +38,7 @@ type Automation = {
 };
 
 export function AutomationsView({ token }: Props) {
+  const { confirm } = useAppDialogs();
   const [items, setItems] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -112,7 +115,8 @@ export function AutomationsView({ token }: Props) {
       scheduleTime: "",
       audioUrl: ""
     });
-    setInfo("Automação criada com sucesso.");
+    notify.success("Automação criada com sucesso.");
+    setInfo("");
     setError("");
     await load();
   }
@@ -125,23 +129,29 @@ export function AutomationsView({ token }: Props) {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao atualizar automação");
+      notify.error(body?.error ?? "Falha ao atualizar automação");
       return;
     }
-    setInfo(enabled ? "Automação pausada." : "Automação reativada.");
+    notify.success(enabled ? "Automação pausada." : "Automação reativada.");
     setError("");
     await load();
   }
 
   async function remove(id: string, name: string) {
-    if (!window.confirm(`Excluir automação "${name}"?`)) return;
+    const ok = await confirm({
+      title: `Excluir automação "${name}"?`,
+      description: "A regra deixa de rodar imediatamente. Esta ação não pode ser desfeita.",
+      confirmLabel: "Excluir",
+      tone: "danger"
+    });
+    if (!ok) return;
     const response = await fetch(`${apiUrl()}/automations/${id}`, { method: "DELETE", headers });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao excluir automação");
+      notify.error(body?.error ?? "Falha ao excluir automação");
       return;
     }
-    setInfo("Automação excluída.");
+    notify.success("Automação excluída.");
     setError("");
     await load();
   }

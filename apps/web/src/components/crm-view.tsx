@@ -23,6 +23,8 @@ import { AtlasViewHeader } from "./atlas-view-header";
 import { LeadAttachmentsPanel } from "./lead-attachments-panel";
 import { AtlasAiCrmPanel } from "./atlas-ai/atlas-ai-crm-panel";
 import { hasPermission } from "../lib/session-user";
+import { useAppDialogs } from "./ui/dialog-provider";
+import { notify } from "../lib/notify";
 
 type Props = { token: string; user: SessionUser };
 
@@ -92,6 +94,7 @@ function AgentAssigneeSelect({
 }
 
 export function CrmView({ token, user }: Props) {
+  const { confirm } = useAppDialogs();
   const [data, setData] = useState<PipelineData | null>(null);
   const [agents, setAgents] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,17 +156,21 @@ export function CrmView({ token, user }: Props) {
   }
 
   async function removeLead(lead: Lead) {
-    const ok = window.confirm(
-      `Excluir lead "${lead.company}" permanentemente?\n\nEsta ação não pode ser desfeita e remove o lead do CRM (não apaga o histórico de conversas).`
-    );
+    const ok = await confirm({
+      title: `Excluir lead "${lead.company}"?`,
+      description:
+        "Esta ação não pode ser desfeita e remove o lead do CRM. O histórico de conversas é preservado.",
+      confirmLabel: "Excluir lead",
+      tone: "danger"
+    });
     if (!ok) return;
     setDeletingLeadId(lead.id);
     try {
       await deleteLead(token, lead.id);
-      setFeedback({ type: "success", text: `Lead ${lead.company} excluído com sucesso.` });
+      notify.success(`Lead ${lead.company} excluído.`);
       await load();
     } catch (err) {
-      setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao excluir lead" });
+      notify.error(err instanceof Error ? err.message : "Falha ao excluir lead");
     } finally {
       setDeletingLeadId(null);
     }

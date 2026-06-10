@@ -73,6 +73,8 @@ import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { InboxBulkBar } from "./inbox-bulk-bar";
 import { AppCombobox } from "./ui/app-select";
+import { useAppDialogs } from "./ui/dialog-provider";
+import { notify } from "../lib/notify";
 import { apiUrl } from "../lib/config";
 import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
 import { computeConversationSla, defaultInboxSlaConfig, isConversationOverSla } from "../lib/inbox-sla";
@@ -866,6 +868,7 @@ function UserProfileModal({
 }
 
 export function AtlasApp({ token, user }: Props) {
+  const { confirm, prompt } = useAppDialogs();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -1424,15 +1427,21 @@ export function AtlasApp({ token, user }: Props) {
 
   async function handleHideMessage(message: Message) {
     if (!activeId || !roleCanHideMessages) return;
-    const reason = window.prompt("Motivo para ocultar esta mensagem (opcional):", "") ?? "";
+    const reason = await prompt({
+      title: "Ocultar mensagem",
+      description: "Supervisores ainda podem ver o conteúdo original.",
+      label: "Motivo (opcional)",
+      placeholder: "Ex.: conteúdo sensível",
+      confirmLabel: "Ocultar"
+    });
     if (reason === null) return;
     try {
       const updated = await hideMessage(token, activeId, message.id, reason);
       patchActiveMessage(updated);
-      setInfo("Mensagem oculta. Supervisores ainda podem ver o conteúdo original.");
+      notify.success("Mensagem oculta", "Supervisores ainda podem ver o conteúdo original.");
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível ocultar a mensagem");
+      notify.error(err instanceof Error ? err.message : "Não foi possível ocultar a mensagem");
     }
   }
 
@@ -1440,7 +1449,13 @@ export function AtlasApp({ token, user }: Props) {
     if (!activeId) return;
     const raw = (message.raw && typeof message.raw === "object" ? message.raw : {}) as Record<string, unknown>;
     const current = typeof raw.contentRaw === "string" ? raw.contentRaw : message.text ?? "";
-    const next = window.prompt("Editar mensagem (Atlas One + WhatsApp do cliente):", current);
+    const next = await prompt({
+      title: "Editar mensagem",
+      description: "A edição é aplicada no Atlas One e no WhatsApp do cliente.",
+      defaultValue: current,
+      multiline: true,
+      confirmLabel: "Salvar edição"
+    });
     if (next == null || next === current) return;
     try {
       const updated = await editMessage(token, activeId, message.id, next);
@@ -1448,13 +1463,13 @@ export function AtlasApp({ token, user }: Props) {
       const nextRaw = (updated.raw && typeof updated.raw === "object" ? updated.raw : {}) as Record<string, unknown>;
       const sync = nextRaw.whatsappSync && typeof nextRaw.whatsappSync === "object" ? (nextRaw.whatsappSync as Record<string, unknown>) : null;
       if (sync?.synced === true) {
-        setInfo("Mensagem editada no Atlas One e no WhatsApp do cliente.");
+        notify.success("Mensagem editada", "Atualizada no Atlas One e no WhatsApp do cliente.");
       } else {
-        setInfo("Mensagem editada no Atlas One. WhatsApp não sincronizado (sem ID do provedor).");
+        notify.info("Mensagem editada no Atlas One", "WhatsApp não sincronizado (sem ID do provedor).");
       }
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível editar a mensagem");
+      notify.error(err instanceof Error ? err.message : "Não foi possível editar a mensagem");
     }
   }
 
@@ -1679,7 +1694,11 @@ export function AtlasApp({ token, user }: Props) {
 
   async function handleArchiveActiveConversation() {
     if (!active) return;
-    const ok = window.confirm(`Arquivar conversa de ${active.customerName}? Ela permanece no histórico e pode ser buscada.`);
+    const ok = await confirm({
+      title: `Arquivar conversa de ${active.customerName}?`,
+      description: "Ela permanece no histórico e pode ser buscada a qualquer momento.",
+      confirmLabel: "Arquivar"
+    });
     if (!ok) return;
     try {
       await archiveConversation(token, active.id);
@@ -1688,10 +1707,10 @@ export function AtlasApp({ token, user }: Props) {
       const items = await refreshConversations();
       if (items[0]) await openConversation(items[0].id);
       setError("");
-      setInfo(`Conversa de ${active.customerName} arquivada.`);
+      notify.success(`Conversa de ${active.customerName} arquivada.`);
     } catch (err) {
       setInfo("");
-      setError(err instanceof Error ? err.message : "Falha ao arquivar conversa");
+      notify.error(err instanceof Error ? err.message : "Falha ao arquivar conversa");
     }
   }
 

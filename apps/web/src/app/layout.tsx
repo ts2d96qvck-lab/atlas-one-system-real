@@ -1,6 +1,15 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { Inter } from "next/font/google";
+import { AppToaster } from "../components/ui/app-toaster";
+import { DialogProvider } from "../components/ui/dialog-provider";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter"
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("http://app.atlasone.local.gd"),
@@ -17,9 +26,19 @@ export const metadata: Metadata = {
   }
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#eef2f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1220" }
+  ]
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning className={inter.variable}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -27,7 +46,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <DialogProvider>{children}</DialogProvider>
+        <AppToaster />
+      </body>
     </html>
   );
 }

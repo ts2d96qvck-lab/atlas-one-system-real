@@ -19,15 +19,32 @@ import {
   type InvitePreview,
   type SessionUser
 } from "../lib/api";
+import dynamic from "next/dynamic";
 import { friendlyError } from "../lib/friendly-errors";
 import { hasPermission, normalizeSessionUser, toAppSession, type AppSession } from "../lib/session-user";
 import { AtlasApp } from "./atlas-app";
-import { AdminView } from "./admin-view";
-import { AutomationsView } from "./automations-view";
-import { CampaignsView } from "./campaigns-view";
-import { CrmView } from "./crm-view";
-import { DashboardView } from "./dashboard-view";
 import { NAV, roleLabel } from "../lib/product-copy";
+
+function ViewLoading() {
+  return (
+    <div className="flex h-48 items-center justify-center">
+      <Loader2 size={20} className="animate-spin text-slate-400" />
+    </div>
+  );
+}
+
+// Inbox stays statically imported (it is the default view); the rest are code-split per tab.
+const AdminView = dynamic(() => import("./admin-view").then((m) => m.AdminView), { loading: ViewLoading });
+const AutomationsView = dynamic(() => import("./automations-view").then((m) => m.AutomationsView), {
+  loading: ViewLoading
+});
+const CampaignsView = dynamic(() => import("./campaigns-view").then((m) => m.CampaignsView), {
+  loading: ViewLoading
+});
+const CrmView = dynamic(() => import("./crm-view").then((m) => m.CrmView), { loading: ViewLoading });
+const DashboardView = dynamic(() => import("./dashboard-view").then((m) => m.DashboardView), {
+  loading: ViewLoading
+});
 
 const STORAGE_KEY = "atlas-one-session-v2";
 
@@ -937,7 +954,9 @@ export function AtlasShell() {
         />
 
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 lg:pb-4 lg:pt-3">
-          {view === "inbox" ? <AtlasApp token={session.token} user={session.user} /> : null}
+          <div className={view === "inbox" ? "flex h-full min-h-0 flex-col" : "hidden"} aria-hidden={view !== "inbox"}>
+            <AtlasApp token={session.token} user={session.user} />
+          </div>
           {view === "dashboard" && canAccessView(session.user, "dashboard") ? (
             <DashboardView token={session.token} user={session.user} />
           ) : null}

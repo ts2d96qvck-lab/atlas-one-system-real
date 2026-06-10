@@ -9,6 +9,8 @@ import { hasPermission } from "../lib/session-user";
 import { AtlasViewHeader } from "./atlas-view-header";
 import { EmptyState } from "./empty-state";
 import { AtlasAiCampaignsPanel } from "./atlas-ai/atlas-ai-campaigns-panel";
+import { useAppDialogs } from "./ui/dialog-provider";
+import { notify } from "../lib/notify";
 
 const MESSAGE_KIND_LABEL: Record<string, string> = {
   session: "Mensagem livre",
@@ -40,6 +42,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function CampaignsView({ token, user }: Props) {
+  const { confirm } = useAppDialogs();
   const [items, setItems] = useState<Campaign[]>([]);
   const [instances, setInstances] = useState<Instance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,13 +136,22 @@ export function CampaignsView({ token, user }: Props) {
       messagesPerMinute: "15",
       onlyBusinessHours: true
     });
-    setInfo("Campanha criada. Clique em Iniciar para disparar.");
+    notify.success("Campanha criada", "Clique em Iniciar para disparar os envios.");
+    setInfo("");
     setError("");
     await load();
   }
 
   async function action(id: string, kind: "start" | "pause" | "cancel" | "delete") {
-    if (kind === "delete" && !window.confirm("Excluir esta campanha?")) return;
+    if (kind === "delete") {
+      const ok = await confirm({
+        title: "Excluir campanha?",
+        description: "A campanha e suas estatísticas serão removidas. Esta ação não pode ser desfeita.",
+        confirmLabel: "Excluir",
+        tone: "danger"
+      });
+      if (!ok) return;
+    }
     const response = await fetch(`${apiUrl()}/campaigns/${id}${kind === "delete" ? "" : `/${kind}`}`, {
       method: kind === "delete" ? "DELETE" : "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -147,10 +159,10 @@ export function CampaignsView({ token, user }: Props) {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? body?.details ?? "Falha na ação");
+      notify.error(body?.error ?? body?.details ?? "Falha na ação");
       return;
     }
-    setInfo(
+    notify.success(
       kind === "start"
         ? "Campanha iniciada — envios em fila."
         : kind === "pause"
