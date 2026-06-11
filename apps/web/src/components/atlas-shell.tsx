@@ -19,15 +19,32 @@ import {
   type InvitePreview,
   type SessionUser
 } from "../lib/api";
+import dynamic from "next/dynamic";
 import { friendlyError } from "../lib/friendly-errors";
 import { hasPermission, normalizeSessionUser, toAppSession, type AppSession } from "../lib/session-user";
 import { AtlasApp } from "./atlas-app";
-import { AdminView } from "./admin-view";
-import { AutomationsView } from "./automations-view";
-import { CampaignsView } from "./campaigns-view";
-import { CrmView } from "./crm-view";
-import { DashboardView } from "./dashboard-view";
 import { NAV, roleLabel } from "../lib/product-copy";
+
+function ViewLoading() {
+  return (
+    <div className="flex h-48 items-center justify-center">
+      <Loader2 size={20} className="animate-spin text-slate-400" />
+    </div>
+  );
+}
+
+// Inbox stays statically imported (it is the default view); the rest are code-split per tab.
+const AdminView = dynamic(() => import("./admin-view").then((m) => m.AdminView), { loading: ViewLoading });
+const AutomationsView = dynamic(() => import("./automations-view").then((m) => m.AutomationsView), {
+  loading: ViewLoading
+});
+const CampaignsView = dynamic(() => import("./campaigns-view").then((m) => m.CampaignsView), {
+  loading: ViewLoading
+});
+const CrmView = dynamic(() => import("./crm-view").then((m) => m.CrmView), { loading: ViewLoading });
+const DashboardView = dynamic(() => import("./dashboard-view").then((m) => m.DashboardView), {
+  loading: ViewLoading
+});
 
 const STORAGE_KEY = "atlas-one-session-v2";
 
@@ -899,7 +916,7 @@ export function AtlasShell() {
             {session.user.name} · {roleLabel(session.user.role)}
           </p>
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2.5">
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2.5" aria-label="Navegação principal">
           {visibleViews.map((item) => {
             const isActive = view === item.id;
             const Icon = item.icon;
@@ -908,6 +925,8 @@ export function AtlasShell() {
                 key={item.id}
                 type="button"
                 onClick={() => setView(item.id)}
+                aria-label={item.label}
+                aria-current={isActive ? "page" : undefined}
                 className={`atlas-nav-item ${isActive ? "atlas-nav-item-active" : ""}`}
               >
                 <Icon size={16} className="shrink-0 opacity-70" />
@@ -920,6 +939,7 @@ export function AtlasShell() {
           <button
             type="button"
             className="atlas-nav-item w-full"
+            aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo noturno"}
             onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
           >
             {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
@@ -936,8 +956,10 @@ export function AtlasShell() {
           className="fixed right-4 top-4 z-[60] lg:hidden"
         />
 
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 lg:pb-4 lg:pt-3">
-          {view === "inbox" ? <AtlasApp token={session.token} user={session.user} /> : null}
+        <div className="atlas-main-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 lg:pb-4 lg:pt-3">
+          <div className={view === "inbox" ? "flex h-full min-h-0 flex-col" : "hidden"} aria-hidden={view !== "inbox"}>
+            <AtlasApp token={session.token} user={session.user} />
+          </div>
           {view === "dashboard" && canAccessView(session.user, "dashboard") ? (
             <DashboardView token={session.token} user={session.user} />
           ) : null}
@@ -955,7 +977,7 @@ export function AtlasShell() {
           ) : null}
         </div>
 
-        <div className="fixed bottom-3 left-1/2 z-50 flex w-[min(calc(100vw-1.5rem),920px)] -translate-x-1/2 flex-col items-center gap-1.5 px-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <div className="atlas-mobile-nav fixed bottom-3 left-1/2 z-50 flex w-[min(calc(100vw-1.5rem),920px)] -translate-x-1/2 flex-col items-center gap-1.5 px-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
           <div className="glass-panel flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl border border-white/50 bg-white/55 p-1 shadow-sm backdrop-blur-xl sm:gap-1">
             {visibleViews.map((item) => {
               const isActive = view === item.id;
@@ -965,13 +987,15 @@ export function AtlasShell() {
                   key={item.id}
                   type="button"
                   onClick={() => setView(item.id)}
-                  className={`relative flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-medium transition sm:px-3 sm:text-sm ${
+                  aria-label={item.label}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`relative flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-xl px-2.5 text-xs font-medium transition sm:px-3 sm:text-sm ${
                     isActive
                       ? "bg-white/90 text-slate-900 shadow-sm ring-1 ring-slate-200/80 dark:bg-white/12 dark:text-slate-100 dark:ring-slate-600/50"
                       : "text-slate-500 hover:bg-white/70 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
                   }`}
                 >
-                  <Icon size={14} />
+                  <Icon size={16} />
                   <span className="hidden sm:inline">{item.label}</span>
                 </button>
               );

@@ -1,29 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  AlertTriangle,
-  CheckCheck,
-  ChevronDown,
-  Clock3,
+  ArrowDown,
   CornerUpLeft,
-  FileText,
-  ChevronLeft,
   Filter,
+  Keyboard,
   ListChecks,
   Loader2,
-  LogOut,
-  MessageCircle,
   Mic,
-  MoreVertical,
   Paperclip,
   Plus,
   Send,
   Square,
-  Trash2,
   User,
-  Volume2,
-  VolumeX,
   X
 } from "lucide-react";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@atlas-one/ui";
@@ -57,27 +48,45 @@ import {
   type UserRow
 } from "../lib/api";
 import { connectRealtime, joinTenant } from "../lib/socket";
-import { SecureMedia } from "./secure-media";
 import { QuickRepliesMenu } from "./quick-replies-menu";
 import {
   conversationStatusLabel,
-  CONVERSATION_STATUS_SHORT,
-  INBOX_COPY,
+  EMPTY_COPY,
   INBOX_QUEUE_BUCKETS,
   INBOX_QUEUE_BUCKET_HELP,
-  LIFECYCLE_STATUSES,
-  roleLabel as productRoleLabel,
   type LifecycleStatus
 } from "../lib/product-copy";
-import { ConversationTagChips, TagFilterPopover } from "./conversation-tags";
+import { TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { InboxBulkBar } from "./inbox-bulk-bar";
+import { EmptyState } from "./empty-state";
 import { AppCombobox } from "./ui/app-select";
-import { apiUrl } from "../lib/config";
+import { useAppDialogs } from "./ui/dialog-provider";
+import { notify } from "../lib/notify";
 import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
 import { computeConversationSla, defaultInboxSlaConfig, isConversationOverSla } from "../lib/inbox-sla";
-import { mergeMessages, mediaSrc, messageDeliveryStatus, groupMessagesForThread, sanitizeMessageForViewer } from "../lib/messages";
+import { mergeMessages, groupMessagesForThread, sanitizeMessageForViewer } from "../lib/messages";
 import { hasPermission } from "../lib/session-user";
+import {
+  agentDepartment,
+  buildSignaturePreview,
+  compressImageFile,
+  CustomerAvatar,
+  mediaPreviewKind,
+  mediaUploadKey,
+  normalizeAvatarUrl,
+  normalizeWhatsAppNumber,
+  profilePhotoStorageKey,
+  resolveDisplayAvatar,
+  roleLabel,
+  statusLabel
+} from "./inbox/inbox-utils";
+import { MessageBubble } from "./inbox/message-bubble";
+import { ConversationHeaderBar } from "./inbox/conversation-header";
+import { ConversationRow } from "./inbox/conversation-row";
+import { NewContactModal, UserProfileModal } from "./inbox/inbox-modals";
+import { QueueSkeleton } from "./inbox/inbox-skeletons";
+import { ShortcutsHelpOverlay } from "./inbox/shortcuts-help";
 import {
   dispatchInboundNotification,
   getNotificationPermission,
@@ -90,782 +99,11 @@ import {
 } from "../lib/inbox-notifications";
 
 type Props = { token: string; user: SessionUser };
-const ROLE_TO_DEPARTMENT: Record<string, string> = {
-  owner: "Diretoria",
-  admin: "Gestão",
-  supervisor: "Supervisão",
-  agent: "Atendimento"
-};
-
-function formatTime(value: string | null | undefined) {
-  if (!value) return "";
-  return new Date(value).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-}
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function statusLabel(status: string) {
-  return conversationStatusLabel(status);
-}
-
-function statusShortLabel(status: string) {
-  return CONVERSATION_STATUS_SHORT[status] ?? status.slice(0, 8);
-}
-
-function statusMetaTone(status: string) {
-  if (status === "archived" || status === "closed") return "text-slate-500";
-  if (status === "resolved") return "text-emerald-600/90";
-  if (status === "waiting_customer") return "text-amber-600/90";
-  if (status === "waiting_internal") return "text-violet-600/90";
-  return "text-slate-600";
-}
 
 const INBOX_PANEL_CLASS = "overflow-hidden rounded-atlas-lg";
 
-function mediaUploadKey(conversationId: string, file: File) {
-  return `${conversationId}:${file.name}:${file.size}:${file.lastModified}:${file.type}`;
-}
-
-function avatarPalette(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) hash = (hash << 5) - hash + seed.charCodeAt(i);
-  const palettes = [
-    ["from-blue-300/80", "to-cyan-300/80"],
-    ["from-violet-300/80", "to-fuchsia-300/80"],
-    ["from-emerald-300/80", "to-teal-300/80"],
-    ["from-amber-300/80", "to-orange-300/80"]
-  ] as const;
-  return palettes[Math.abs(hash) % palettes.length];
-}
-
-function normalizeAvatarUrl(value?: string | null) {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-  if (trimmed.startsWith("data:image/")) return trimmed;
-  if (trimmed.startsWith("/media/")) return trimmed;
-  return null;
-}
-
-function resolveDisplayAvatar(value?: string | null, accessToken?: string) {
-  const normalized = normalizeAvatarUrl(value);
-  if (!normalized) return null;
-  if (normalized.startsWith("/media/")) return mediaSrc(normalized, apiUrl(), accessToken);
-  return normalized;
-}
-
-async function compressImageFile(file: File, maxSide = 512) {
-  const dataUrl = await readFileAsDataUrl(file);
-  if (!file.type.startsWith("image/")) return dataUrl;
-  const img = new Image();
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error("Imagem invalida"));
-    img.src = dataUrl;
-  });
-  const scale = Math.min(1, maxSide / Math.max(img.width, img.height, 1));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(img.width * scale));
-  canvas.height = Math.max(1, Math.round(img.height * scale));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return dataUrl;
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.85);
-}
-
-function formatPhoneDisplay(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 10) return `+${digits}`;
-  if (digits.length === 12) return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 8)}-${digits.slice(8)}`;
-  if (digits.length === 13) return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 9)}-${digits.slice(9)}`;
-  return `+${digits}`;
-}
-
-function normalizeWhatsAppNumber(raw: string) {
-  const digits = raw.replace(/\D/g, "");
-  if (!digits) return "";
-  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) return `55${digits}`;
-  return digits;
-}
-
-function CustomerAvatar({
-  name,
-  phone,
-  avatarUrl,
-  size = "md",
-  accessToken
-}: {
-  name: string;
-  phone: string;
-  avatarUrl?: string | null;
-  size?: "sm" | "md";
-  accessToken?: string;
-}) {
-  const initialsLabel = initials(name || phone || "?");
-  const [from, to] = avatarPalette(`${name}-${phone}`) ?? ["from-blue-300/80", "to-cyan-300/80"];
-  const classes = size === "sm" ? "h-9 w-9 text-[11px]" : "h-10 w-10 text-xs";
-  const [broken, setBroken] = useState(false);
-  const safeAvatarUrl = resolveDisplayAvatar(avatarUrl, accessToken);
-
-  if (safeAvatarUrl && !broken) {
-    return (
-      <img
-        src={safeAvatarUrl}
-        alt={`Foto de ${name}`}
-        onError={() => setBroken(true)}
-        className={`${classes} shrink-0 rounded-full border border-white/70 object-cover`}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={`grid ${classes} shrink-0 place-items-center rounded-full border border-white/70 bg-gradient-to-br ${from} ${to} font-semibold text-slate-700`}
-      title={name}
-      aria-label={`Avatar de ${name}`}
-    >
-      {initialsLabel}
-    </div>
-  );
-}
-
-function roleLabel(role?: string) {
-  if (!role) return "Atendimento";
-  return ROLE_TO_DEPARTMENT[role] ?? productRoleLabel(role);
-}
-
-function agentDepartment(agent: UserRow) {
-  return agent.team?.name || roleLabel(agent.role);
-}
-
-function normalizeMediaLabel(text: string) {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[[\]]/g, "");
-}
-
-function genericMediaText(text?: string | null) {
-  if (!text) return false;
-  const normalized = normalizeMediaLabel(text);
-  return (
-    ["audio", "image", "video", "document", "mídia", "media", "arquivo", "figurinha", "sticker"].includes(normalized) ||
-    /^(audio|video|imagem|documento|mídia)\s*$/i.test(text.trim())
-  );
-}
-
-function shouldShowMessageText(message: Message) {
-  if (!message.text?.trim()) return false;
-  if (message.type === "text") return true;
-  if (message.mediaUrl && genericMediaText(message.text)) return false;
-  return !genericMediaText(message.text);
-}
-
-function fileNameFromMessage(message: Message) {
-  if (message.text && !genericMediaText(message.text)) return message.text;
-  if (!message.mediaUrl) return "Arquivo";
-  const parts = message.mediaUrl.split("/");
-  return decodeURIComponent(parts[parts.length - 1] || "Arquivo");
-}
-
-function mediaPreviewKind(file: File) {
-  if (file.type.startsWith("image/")) return "image" as const;
-  if (file.type.startsWith("video/")) return "video" as const;
-  if (file.type.startsWith("audio/")) return "audio" as const;
-  return "document" as const;
-}
-
-function MediaMessageRenderer({ message, token }: { message: Message; token: string }) {
-  if (!message.mediaUrl) return null;
-
-  if (message.type === "image") {
-    return (
-      <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white/70">
-        <SecureMedia path={message.mediaUrl} token={token} type="image" alt="Imagem enviada" />
-      </div>
-    );
-  }
-
-  if (message.type === "audio") {
-    return <SecureMedia path={message.mediaUrl} token={token} type="audio" />;
-  }
-
-  if (message.type === "video") {
-    return <SecureMedia path={message.mediaUrl} token={token} type="video" />;
-  }
-
-  if (message.type === "document") {
-    return (
-      <SecureMedia
-        path={message.mediaUrl}
-        token={token}
-        type="document"
-        fileName={fileNameFromMessage(message)}
-      />
-    );
-  }
-
-  return null;
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
-    reader.readAsDataURL(file);
-  });
-}
-
-function profilePhotoStorageKey(tenantId: string, userId: string) {
-  return `atlas-one-internal-avatar:${tenantId}:${userId}`;
-}
-
-function messageSenderLabel(raw: Record<string, unknown>, outgoing: boolean) {
-  const sentByName = typeof raw.sentByName === "string" ? raw.sentByName : null;
-  const senderType = typeof raw.senderType === "string" ? raw.senderType : outgoing ? "agent" : "customer";
-  if (senderType === "bot") return sentByName ? `Robo · ${sentByName}` : "Robo";
-  if (senderType === "system") return sentByName ?? "Sistema";
-  if (outgoing) return sentByName ?? "Atendente";
-  return "Cliente";
-}
-
-function buildSignaturePreview(
-  draft: string,
-  user: SessionUser,
-  messaging?: CompanySettings["messaging"]
-) {
-  if (!draft || !messaging || messaging.signaturePlacement === "disabled" || !messaging.showAgentNameToCustomer) {
-    return null;
-  }
-  const signature = (messaging.agentSignatureFormat || "Atendente {{agentName}}:").replace(/\{\{agentName\}\}/g, user.name);
-  if (messaging.signaturePlacement === "before") return `${signature}\n${draft}`;
-  return `${draft}\n${signature}`;
-}
-
-function messageStatusView(status: string, edited: boolean) {
-  const normalized = status.toLowerCase();
-  if (normalized.includes("read")) {
-    return { icon: <CheckCheck size={12} />, label: "Lida", tone: "text-sky-600", badge: "bg-sky-100 text-sky-800" };
-  }
-  if (normalized.includes("deliver")) {
-    return { icon: <CheckCheck size={12} />, label: "Entregue", tone: "text-slate-600", badge: "bg-slate-100 text-slate-700" };
-  }
-  if (normalized.includes("fail") || normalized.includes("error") || normalized.includes("undeliver")) {
-    return { icon: <AlertTriangle size={12} />, label: "Falhou", tone: "text-rose-600", badge: "bg-rose-100 text-rose-800" };
-  }
-  if (normalized.includes("queue") || normalized.includes("pending") || normalized.includes("sending")) {
-    return { icon: <Clock3 size={12} />, label: "Enviando", tone: "text-amber-600", badge: "bg-amber-100 text-amber-900" };
-  }
-  if (normalized.includes("received")) {
-    return { icon: <MessageCircle size={12} />, label: "Recebida", tone: "text-slate-600", badge: "bg-slate-100 text-slate-700" };
-  }
-  return {
-    icon: <Send size={12} />,
-    label: edited ? "Enviada · editada" : "Enviada",
-    tone: "text-slate-600",
-    badge: "bg-slate-100 text-slate-700"
-  };
-}
-
-function MessageBubble({
-  message,
-  token,
-  onReply,
-  canManage,
-  canHide,
-  onHide,
-  onEdit,
-  onTranscribe,
-  clustered,
-  clusterFirst,
-  clusterLast
-}: {
-  message: Message;
-  token: string;
-  onReply: (message: Message) => void;
-  canManage?: boolean;
-  canHide?: boolean;
-  onHide?: (message: Message) => void;
-  onEdit?: (message: Message) => void;
-  onTranscribe?: (message: Message) => void;
-  clustered?: boolean;
-  clusterFirst?: boolean;
-  clusterLast?: boolean;
-}) {
-  const outgoing = message.direction === "out";
-  const raw = (message.raw && typeof message.raw === "object" ? message.raw : {}) as Record<string, unknown>;
-  const deleted = Boolean(raw.deletedAt) || message.status === "deleted";
-  const hidden = Boolean(raw.hiddenAt) || message.status === "hidden";
-  const hiddenVisible = Boolean(raw.hiddenVisibleToSupervisor);
-  const edited = Boolean(raw.editedAt) || message.status === "edited";
-  const [menuOpen, setMenuOpen] = useState(false);
-  const showText = shouldShowMessageText(message);
-  const displayText =
-    typeof raw.contentRaw === "string" && raw.contentRaw.length > 0 ? raw.contentRaw : message.text ?? "";
-  const replyTo = (raw.replyTo && typeof raw.replyTo === "object" ? raw.replyTo : null) as Record<string, unknown> | null;
-  const replyText = replyTo && typeof replyTo.text === "string" ? replyTo.text : "";
-  const transcription = typeof raw.transcription === "string" ? raw.transcription : "";
-  const transcriptionStatus = typeof raw.transcriptionStatus === "string" ? raw.transcriptionStatus : "";
-  const transcriptionError = typeof raw.transcriptionError === "string" ? raw.transcriptionError : "";
-  const reactionList = Array.isArray(raw.reactions) ? raw.reactions : [];
-  const reactionMap = new Map<string, number>();
-  for (const item of reactionList) {
-    if (!item || typeof item !== "object") continue;
-    const emoji = typeof (item as Record<string, unknown>).emoji === "string" ? String((item as Record<string, unknown>).emoji).trim() : "";
-    if (!emoji) continue;
-    reactionMap.set(emoji, (reactionMap.get(emoji) ?? 0) + 1);
-  }
-  const reactions = Array.from(reactionMap.entries());
-  const deliveryStatus = messageDeliveryStatus(message);
-  const statusView = deleted
-    ? { icon: <Trash2 size={12} />, label: "Apagada", tone: "text-slate-400", badge: "bg-slate-100 text-slate-500" }
-    : hidden && !hiddenVisible
-      ? { icon: <Trash2 size={12} />, label: "Oculta", tone: "text-slate-400", badge: "bg-slate-100 text-slate-500" }
-      : messageStatusView(deliveryStatus, edited);
-  const failureReason = typeof raw.failureReason === "string" ? raw.failureReason : typeof raw.lastProviderStatus === "string" ? raw.lastProviderStatus : "";
-
-  if (deleted || (hidden && !hiddenVisible)) {
-    return (
-      <div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}>
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs italic text-slate-500">
-          {hidden ? "Mensagem oculta" : "Mensagem apagada"}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`group flex ${outgoing ? "justify-end" : "justify-start"} ${clustered && !clusterFirst ? "-mt-1" : ""}`}>
-      <div
-        onDoubleClick={() => onReply(message)}
-        className={`relative z-10 max-w-[min(88%,26rem)] overflow-hidden break-words rounded-[1.125rem] px-3.5 py-2.5 text-[13px] leading-[1.45] sm:max-w-[min(82%,24rem)] ${
-          outgoing
-            ? `inbox-v43-bubble-out ${clusterLast === false ? "rounded-br-md" : "rounded-br-[1.125rem]"} ${clustered && !clusterFirst ? "rounded-tr-md" : ""}`
-            : `inbox-v43-bubble-in ${clusterLast === false ? "rounded-bl-md" : "rounded-bl-[1.125rem]"} ${clustered && !clusterFirst ? "rounded-tl-md" : ""}`
-        }`}
-      >
-        {hiddenVisible ? (
-          <p className="mb-1 text-[10px] font-medium text-amber-700">Conteúdo oculto (visível para supervisão)</p>
-        ) : null}
-        {clustered && !clusterFirst ? null : !outgoing || messageSenderLabel(raw, outgoing) !== "Atendente" ? (
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <p className="text-[10px] font-semibold text-slate-500">{messageSenderLabel(raw, outgoing)}</p>
-          {(canManage && outgoing) || canHide ? (
-            <div className="relative">
-              <button
-                type="button"
-                className="rounded-md p-0.5 text-slate-400 opacity-70 transition hover:bg-white/70 hover:text-slate-600 group-hover:opacity-100"
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-label={INBOX_COPY.messageActions}
-              >
-                <MoreVertical size={12} />
-              </button>
-              {menuOpen ? (
-                <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-                  {message.type === "text" && onEdit && canManage && outgoing ? (
-                    <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] hover:bg-slate-50" onClick={() => { onEdit(message); setMenuOpen(false); }}>
-                      Editar
-                    </button>
-                  ) : null}
-                  {onHide && canHide ? (
-                    <button type="button" className="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-rose-600 hover:bg-rose-50" onClick={() => { onHide(message); setMenuOpen(false); }}>
-                      Ocultar
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-        ) : null}
-        {replyTo ? (
-          <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
-            <p className="text-[10px] font-semibold text-slate-600">Resposta direcionada</p>
-            <p className="truncate whitespace-pre-wrap text-[11px] text-slate-500">{replyText || "[Mensagem]"}</p>
-          </div>
-        ) : null}
-        {message.type !== "text" ? (
-          <div className="mb-2">
-            <MediaMessageRenderer message={message} token={token} />
-          </div>
-        ) : null}
-        {showText ? <p className="whitespace-pre-wrap break-words">{displayText}</p> : null}
-        {message.type === "audio" ? (
-          <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2">
-            {transcriptionStatus === "processing" ? (
-              <p className="text-[11px] text-slate-500">Transcrevendo áudio...</p>
-            ) : transcription ? (
-              <p className="whitespace-pre-wrap text-[11px] text-slate-700">{transcription}</p>
-            ) : transcriptionError ? (
-              <p className="text-[11px] text-rose-600">{transcriptionError}</p>
-            ) : onTranscribe ? (
-              <button type="button" className="text-[11px] font-medium text-blue-700 hover:underline" onClick={() => onTranscribe(message)}>
-                Transcrever áudio
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        <div className="mt-1.5 flex flex-wrap items-center justify-end gap-2 text-[10px] text-slate-400">
-          {edited ? <span className="font-medium text-violet-600/80">editada</span> : null}
-          {outgoing ? (
-            <span
-              className="inbox-v43-bubble-status inline-flex items-center gap-0.5"
-              title={statusView.label}
-              aria-label={`Status: ${statusView.label}`}
-            >
-              <span className={statusView.tone}>{statusView.icon}</span>
-              <span>{statusView.label}</span>
-            </span>
-          ) : null}
-          <span className="tabular-nums">{formatTime(message.createdAt)}</span>
-        </div>
-        {failureReason && deliveryStatus.includes("fail") ? (
-          <p className="mt-1 text-[10px] text-rose-600">Falha: {failureReason}</p>
-        ) : null}
-        {reactions.length ? (
-          <div className="mt-2 flex flex-wrap justify-end gap-1">
-            {reactions.map(([emoji, count]) => (
-              <span key={emoji} className="rounded-full border border-slate-200 bg-white/80 px-1.5 py-0.5 text-[10px] text-slate-700">
-                {emoji} {count}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-type ConversationHeaderBarProps = {
-  active: Conversation;
-  customerAvatarUrl?: string | null;
-  accessToken: string;
-  onSetStatus: (status: LifecycleStatus) => void;
-  onOpenDrawer: () => void;
-  onMobileBack?: () => void;
-};
-
-function statusDotClass(status: string) {
-  if (status === "archived" || status === "closed") return "bg-slate-400";
-  if (status === "resolved") return "bg-emerald-500";
-  if (status === "waiting_customer") return "bg-amber-400";
-  if (status === "waiting_internal") return "bg-violet-500";
-  return "bg-sky-500";
-}
-
-function ConversationHeaderBar({
-  active,
-  customerAvatarUrl,
-  accessToken,
-  onSetStatus,
-  onOpenDrawer,
-  onMobileBack
-}: ConversationHeaderBarProps) {
-  const assignee = active.assignedTo?.name ?? "Sem atendente";
-  const teamName = active.team?.name ?? "Sem departamento";
-  const instanceLabel = active.instance?.label || active.instance?.name || "WhatsApp";
-
-  return (
-    <div className="inbox-v42-chat-header flex items-center gap-2.5 px-3 py-3.5 sm:gap-3 sm:px-5">
-      {onMobileBack ? (
-        <button
-          type="button"
-          className="shrink-0 rounded-full border border-slate-200/80 bg-white/80 p-2 text-slate-600 shadow-sm hover:bg-white md:hidden"
-          onClick={onMobileBack}
-          aria-label="Voltar para a fila"
-        >
-          <ChevronLeft size={18} />
-        </button>
-      ) : null}
-      <CustomerAvatar
-        name={active.customerName}
-        phone={active.customerPhone}
-        avatarUrl={customerAvatarUrl}
-        accessToken={accessToken}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-semibold tracking-tight text-slate-900">{active.customerName}</p>
-        <p className="truncate text-[12px] text-slate-500">
-          {formatPhoneDisplay(active.customerPhone)} · {teamName} · {assignee}
-        </p>
-      </div>
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="inbox-v43-header-pill inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-white/80"
-            title="Alterar status"
-          >
-            <span className={`h-2 w-2 rounded-full ${statusDotClass(active.status)}`} />
-            {statusLabel(active.status)}
-            <ChevronDown size={12} className="text-slate-400" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-          {LIFECYCLE_STATUSES.map((status) => (
-            <button
-              key={status}
-              type="button"
-              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs ${
-                active.status === status ? "bg-slate-100 font-medium text-slate-900" : "text-slate-600 hover:bg-slate-50"
-              }`}
-              onClick={() => onSetStatus(status)}
-            >
-              <span className={`h-2 w-2 rounded-full ${statusDotClass(status)}`} />
-              {statusLabel(status)}
-            </button>
-          ))}
-        </PopoverContent>
-      </Popover>
-      <button
-        type="button"
-        className="inbox-v43-header-pill rounded-full p-2.5 text-slate-600 hover:bg-white/80"
-        onClick={onOpenDrawer}
-        aria-label="Detalhes da conversa"
-        title={`Detalhes · ${teamName} · ${instanceLabel}`}
-      >
-        <MoreVertical size={16} />
-      </button>
-    </div>
-  );
-}
-
-type NewContactModalProps = {
-  open: boolean;
-  onClose: () => void;
-  name: string;
-  phone: string;
-  onNameChange: (value: string) => void;
-  onPhoneChange: (value: string) => void;
-  onSubmit: () => void | Promise<void>;
-  disabled: boolean;
-};
-
-function NewContactModal({
-  open,
-  onClose,
-  name,
-  phone,
-  onNameChange,
-  onPhoneChange,
-  onSubmit,
-  disabled
-}: NewContactModalProps) {
-  if (!open) return null;
-
-  return (
-    <div className="atlas-v5-modal-backdrop">
-      <div className="atlas-v5-modal-panel max-w-md">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-base font-semibold">Novo contato</p>
-            <p className="text-xs text-slate-500">Inicie uma conversa com um cliente</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-1 text-slate-500 hover:bg-slate-50">
-            <X size={14} />
-          </button>
-        </div>
-        <div className="mt-4 space-y-3">
-          <input
-            className="atlas-field w-full rounded-lg px-3 py-2 text-sm outline-none"
-            placeholder="Nome do cliente"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-          />
-          <input
-            className="atlas-field w-full rounded-lg px-3 py-2 text-sm outline-none"
-            placeholder="WhatsApp com DDD"
-            value={phone}
-            onChange={(e) => onPhoneChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !disabled) void onSubmit();
-            }}
-          />
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="glass" className="h-9 px-3 text-xs" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button className="h-9 px-3 text-xs" disabled={disabled} onClick={() => void onSubmit()}>
-            Criar conversa
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type UserProfileModalProps = {
-  open: boolean;
-  onClose: () => void;
-  user: SessionUser;
-  userPhone?: string | null;
-  activeInstanceLabel?: string;
-  activeDepartment?: string;
-  internalPhoto?: string | null;
-  onUploadPhoto: (file: File) => Promise<void>;
-  onLogout: () => void;
-  notificationPrefs: InboxNotificationPrefs;
-  onNotificationPrefsChange: (patch: Partial<InboxNotificationPrefs>) => void;
-  canMonitorQueue: boolean;
-  notifyPermission: NotificationPermission | "unsupported";
-  onRequestNotificationPermission: () => void | Promise<void>;
-};
-
-function UserProfileModal({
-  open,
-  onClose,
-  user,
-  userPhone,
-  activeInstanceLabel,
-  activeDepartment,
-  internalPhoto,
-  onUploadPhoto,
-  onLogout,
-  notificationPrefs,
-  onNotificationPrefsChange,
-  canMonitorQueue,
-  notifyPermission,
-  onRequestNotificationPermission
-}: UserProfileModalProps) {
-  const [uploading, setUploading] = useState(false);
-
-  if (!open) return null;
-
-  return (
-    <div className="atlas-v5-modal-backdrop">
-      <div className="atlas-v5-modal-panel max-w-md">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-base font-semibold">Perfil do atendente</p>
-            <p className="text-xs text-slate-500">Dados internos da equipe</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-full border border-slate-200 p-1 text-slate-500 hover:bg-slate-50">
-            <X size={14} />
-          </button>
-        </div>
-
-        <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-          {internalPhoto ? (
-            <img src={internalPhoto} alt="Foto interna" className="h-12 w-12 rounded-full object-cover" />
-          ) : (
-            <CustomerAvatar name={user.name} phone={user.email} />
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{user.name}</p>
-            <p className="truncate text-xs text-slate-500">{user.email}</p>
-          </div>
-        </div>
-
-        <div className="mt-3 grid gap-2 text-xs">
-          <div className="rounded-lg border border-slate-200 px-3 py-2">
-            <p className="text-slate-500">Cargo</p>
-            <p className="font-semibold text-slate-800">{roleLabel(user.role)}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 px-3 py-2">
-            <p className="text-slate-500">Telefone de cadastro</p>
-            <p className="font-semibold text-slate-800">{userPhone ? `+${userPhone}` : "Não informado"}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 px-3 py-2">
-            <p className="text-slate-500">Departamento atual</p>
-            <p className="font-semibold text-slate-800">{activeDepartment || roleLabel(user.role)}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 px-3 py-2">
-            <p className="text-slate-500">Numero/instancia em uso</p>
-            <p className="font-semibold text-slate-800">{activeInstanceLabel || "Sem instancia ativa"}</p>
-          </div>
-        </div>
-
-        <label className="mt-3 block cursor-pointer rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
-          {uploading ? "Enviando foto interna..." : "Enviar foto interna (somente validação da equipe)"}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (!file) return;
-              setUploading(true);
-              try {
-                await onUploadPhoto(file);
-              } finally {
-                setUploading(false);
-              }
-            }}
-          />
-        </label>
-
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-          <p className="text-xs font-semibold text-slate-800">Notificacoes do Inbox</p>
-          <p className="mt-1 text-[11px] text-slate-500">Alertas locais para novas mensagens recebidas.</p>
-          {notifyPermission === "unsupported" ? (
-            <p className="mt-2 text-[11px] text-amber-700">Este navegador não suporta notificacoes.</p>
-          ) : notifyPermission === "denied" ? (
-            <p className="mt-2 text-[11px] text-amber-700">
-              Notificacoes bloqueadas no navegador. Libere nas configuracoes do site.
-            </p>
-          ) : notifyPermission === "default" ? (
-            <Button
-              variant="glass"
-              className="mt-2 h-8 px-3 text-xs"
-              onClick={() => void onRequestNotificationPermission()}
-            >
-              Ativar notificacoes
-            </Button>
-          ) : (
-            <p className="mt-2 text-[11px] text-emerald-700">Notificacoes ativas neste navegador.</p>
-          )}
-          <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
-            <span className="inline-flex items-center gap-2 text-slate-700">
-              {notificationPrefs.soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-              Som ao receber mensagem
-            </span>
-            <input
-              type="checkbox"
-              checked={notificationPrefs.soundEnabled}
-              onChange={(e) => onNotificationPrefsChange({ soundEnabled: e.target.checked })}
-            />
-          </label>
-          {canMonitorQueue ? (
-            <label className="mt-2 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
-              <span className="text-slate-700">Alertar fila sem atendente</span>
-              <input
-                type="checkbox"
-                checked={notificationPrefs.supervisorQueueAlerts}
-                onChange={(e) => onNotificationPrefsChange({ supervisorQueueAlerts: e.target.checked })}
-              />
-            </label>
-          ) : null}
-        </div>
-
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="glass" className="h-8 px-3 text-xs" onClick={onClose}>
-            Fechar
-          </Button>
-          <Button className="h-8 px-3 text-xs" onClick={onLogout}>
-            <LogOut size={13} />
-            Sair da conta
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function AtlasApp({ token, user }: Props) {
+  const { confirm, prompt } = useAppDialogs();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -914,11 +152,20 @@ export function AtlasApp({ token, user }: Props) {
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [bulkWorking, setBulkWorking] = useState(false);
   const [slaTick, setSlaTick] = useState(0);
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeIdRef = useRef<string | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const threadScrollRef = useRef<HTMLDivElement | null>(null);
+  const stickToBottomRef = useRef(true);
+  const queueScrollRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const draftsRef = useRef<Map<string, string>>(new Map());
+  const draftRef = useRef("");
   const notifyCtxRef = useRef({
     userId: user.id,
     canMonitorQueue: false,
@@ -943,9 +190,25 @@ export function AtlasApp({ token, user }: Props) {
   );
 
   useEffect(() => {
-    const timer = window.setInterval(() => setSlaTick((value) => value + 1), 30_000);
+    // Pause the SLA clock while the tab is hidden to avoid useless re-renders.
+    const timer = window.setInterval(() => {
+      if (document.hidden) return;
+      setSlaTick((value) => value + 1);
+    }, 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  useEffect(() => {
+    // Auto-grow composer up to its CSS max-height.
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [draft]);
 
   const slaConfig = useMemo(
     () =>
@@ -982,6 +245,12 @@ export function AtlasApp({ token, user }: Props) {
     async (id: string) => {
       try {
         const detail = await getConversation(token, id);
+        const previousId = activeIdRef.current;
+        if (previousId && previousId !== id) {
+          // Preserve unsent draft per conversation.
+          draftsRef.current.set(previousId, draftRef.current);
+          setDraft(draftsRef.current.get(id) ?? "");
+        }
         setActiveId(id);
         setActiveConversation(detail);
         setContactDraft({
@@ -1200,11 +469,11 @@ export function AtlasApp({ token, user }: Props) {
     return filters;
   }, [agents, departmentOptions, instanceFilterOptions, queueDepartmentId, queueInstanceId, queueOwnerId, queueStatusFilter]);
 
-  function toggleConversationSelection(id: string) {
+  const toggleConversationSelection = useCallback((id: string) => {
     setSelectedConversationIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
     );
-  }
+  }, []);
 
   function clearConversationSelection() {
     setSelectedConversationIds([]);
@@ -1218,6 +487,32 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   const mobileShowsChat = Boolean(activeId);
+
+  useEffect(() => {
+    // Lets the shell hide the mobile bottom nav while a conversation is open.
+    document.body.classList.toggle("inbox-chat-open", mobileShowsChat);
+    return () => document.body.classList.remove("inbox-chat-open");
+  }, [mobileShowsChat]);
+
+  const swipeStartRef = useRef<{ x: number; y: number; edge: boolean } | null>(null);
+
+  const handleChatTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY, edge: touch.clientX < 36 };
+  }, []);
+
+  const handleChatTouchEnd = useCallback((e: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start?.edge) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = Math.abs(touch.clientY - start.y);
+    // Edge swipe right = native "back" to the queue (mobile only).
+    if (deltaX > 70 && deltaY < 60 && window.innerWidth < 768) mobileBackToQueue();
+  }, []);
 
   async function runBulkAction(payload: Parameters<typeof bulkUpdateConversations>[1]) {
     if (!payload.ids.length) return;
@@ -1269,8 +564,47 @@ export function AtlasApp({ token, user }: Props) {
   }, [activeId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [activeConversation?.id, activeConversation?.messages?.length]);
+    // New conversation opened: jump straight to the latest message.
+    const el = threadScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    stickToBottomRef.current = true;
+    setShowJumpToLatest(false);
+    // Keep pinned to bottom while late-loading content (media) grows the thread.
+    const content = el.firstElementChild ?? el;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [activeConversation?.id]);
+
+  useEffect(() => {
+    // New messages: follow only if the user is already at the bottom.
+    const el = threadScrollRef.current;
+    if (!el) return;
+    if (stickToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    } else {
+      setShowJumpToLatest(true);
+    }
+  }, [activeConversation?.messages?.length]);
+
+  const handleThreadScroll = useCallback(() => {
+    const el = threadScrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distance < 120;
+    if (distance < 120) setShowJumpToLatest(false);
+  }, []);
+
+  const jumpToLatest = useCallback(() => {
+    const el = threadScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    stickToBottomRef.current = true;
+    setShowJumpToLatest(false);
+  }, []);
 
   useEffect(() => {
     if (!activeId || !shortcuts.length) return;
@@ -1348,13 +682,6 @@ export function AtlasApp({ token, user }: Props) {
     return isConversationOverSla(item, slaConfig);
   }
 
-  function slaToneClass(tone: ReturnType<typeof computeConversationSla>["tone"]) {
-    if (tone === "danger") return "border-rose-200 bg-rose-50 text-rose-700";
-    if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-800";
-    if (tone === "ok") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    return "border-slate-200 bg-slate-50 text-slate-600";
-  }
-
   const managerAlertCount = visibleConversations.filter((item) => isOverdueConversation(item)).length;
 
   const filtered = useMemo(() => {
@@ -1382,6 +709,68 @@ export function AtlasApp({ token, user }: Props) {
     }
     return rows;
   }, [visibleConversations, search, tagFilter, activeId, conversations]);
+
+  const filteredRef = useRef(filtered);
+  useEffect(() => {
+    filteredRef.current = filtered;
+  }, [filtered]);
+
+  const queueVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => queueScrollRef.current,
+    estimateSize: () => 74,
+    overscan: 8,
+    getItemKey: (index) => filtered[index]?.id ?? index
+  });
+
+  useEffect(() => {
+    function isTypingTarget(el: EventTarget | null) {
+      if (!(el instanceof HTMLElement)) return false;
+      return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      // Inbox stays mounted while other views are shown; ignore keys when hidden.
+      if (!mainRef.current || mainRef.current.offsetParent === null) return;
+      if (e.key === "Escape") {
+        if (shortcutsHelpOpen) {
+          setShortcutsHelpOpen(false);
+          return;
+        }
+        if (drawerOpen) {
+          setDrawerOpen(false);
+          return;
+        }
+        return;
+      }
+      if (isTypingTarget(e.target)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+      if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsHelpOpen((value) => !value);
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "j" || e.key === "ArrowUp" || e.key === "k") {
+        const rows = filteredRef.current;
+        if (!rows.length) return;
+        e.preventDefault();
+        const forward = e.key === "ArrowDown" || e.key === "j";
+        const currentIndex = rows.findIndex((item) => item.id === activeIdRef.current);
+        const nextIndex =
+          currentIndex === -1
+            ? 0
+            : Math.min(rows.length - 1, Math.max(0, currentIndex + (forward ? 1 : -1)));
+        const next = rows[nextIndex];
+        if (next && next.id !== activeIdRef.current) void openConversation(next.id);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [drawerOpen, shortcutsHelpOpen, openConversation]);
 
   async function sendCurrentDraft() {
     if (sendingTextRef.current) return;
@@ -1424,15 +813,21 @@ export function AtlasApp({ token, user }: Props) {
 
   async function handleHideMessage(message: Message) {
     if (!activeId || !roleCanHideMessages) return;
-    const reason = window.prompt("Motivo para ocultar esta mensagem (opcional):", "") ?? "";
+    const reason = await prompt({
+      title: "Ocultar mensagem",
+      description: "Supervisores ainda podem ver o conteúdo original.",
+      label: "Motivo (opcional)",
+      placeholder: "Ex.: conteúdo sensível",
+      confirmLabel: "Ocultar"
+    });
     if (reason === null) return;
     try {
       const updated = await hideMessage(token, activeId, message.id, reason);
       patchActiveMessage(updated);
-      setInfo("Mensagem oculta. Supervisores ainda podem ver o conteúdo original.");
+      notify.success("Mensagem oculta", "Supervisores ainda podem ver o conteúdo original.");
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível ocultar a mensagem");
+      notify.error(err instanceof Error ? err.message : "Não foi possível ocultar a mensagem");
     }
   }
 
@@ -1440,7 +835,13 @@ export function AtlasApp({ token, user }: Props) {
     if (!activeId) return;
     const raw = (message.raw && typeof message.raw === "object" ? message.raw : {}) as Record<string, unknown>;
     const current = typeof raw.contentRaw === "string" ? raw.contentRaw : message.text ?? "";
-    const next = window.prompt("Editar mensagem (Atlas One + WhatsApp do cliente):", current);
+    const next = await prompt({
+      title: "Editar mensagem",
+      description: "A edição é aplicada no Atlas One e no WhatsApp do cliente.",
+      defaultValue: current,
+      multiline: true,
+      confirmLabel: "Salvar edição"
+    });
     if (next == null || next === current) return;
     try {
       const updated = await editMessage(token, activeId, message.id, next);
@@ -1448,13 +849,13 @@ export function AtlasApp({ token, user }: Props) {
       const nextRaw = (updated.raw && typeof updated.raw === "object" ? updated.raw : {}) as Record<string, unknown>;
       const sync = nextRaw.whatsappSync && typeof nextRaw.whatsappSync === "object" ? (nextRaw.whatsappSync as Record<string, unknown>) : null;
       if (sync?.synced === true) {
-        setInfo("Mensagem editada no Atlas One e no WhatsApp do cliente.");
+        notify.success("Mensagem editada", "Atualizada no Atlas One e no WhatsApp do cliente.");
       } else {
-        setInfo("Mensagem editada no Atlas One. WhatsApp não sincronizado (sem ID do provedor).");
+        notify.info("Mensagem editada no Atlas One", "WhatsApp não sincronizado (sem ID do provedor).");
       }
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível editar a mensagem");
+      notify.error(err instanceof Error ? err.message : "Não foi possível editar a mensagem");
     }
   }
 
@@ -1679,7 +1080,11 @@ export function AtlasApp({ token, user }: Props) {
 
   async function handleArchiveActiveConversation() {
     if (!active) return;
-    const ok = window.confirm(`Arquivar conversa de ${active.customerName}? Ela permanece no histórico e pode ser buscada.`);
+    const ok = await confirm({
+      title: `Arquivar conversa de ${active.customerName}?`,
+      description: "Ela permanece no histórico e pode ser buscada a qualquer momento.",
+      confirmLabel: "Arquivar"
+    });
     if (!ok) return;
     try {
       await archiveConversation(token, active.id);
@@ -1688,10 +1093,10 @@ export function AtlasApp({ token, user }: Props) {
       const items = await refreshConversations();
       if (items[0]) await openConversation(items[0].id);
       setError("");
-      setInfo(`Conversa de ${active.customerName} arquivada.`);
+      notify.success(`Conversa de ${active.customerName} arquivada.`);
     } catch (err) {
       setInfo("");
-      setError(err instanceof Error ? err.message : "Falha ao arquivar conversa");
+      notify.error(err instanceof Error ? err.message : "Falha ao arquivar conversa");
     }
   }
 
@@ -1781,7 +1186,7 @@ export function AtlasApp({ token, user }: Props) {
   }
 
   return (
-    <main className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-1.5 sm:p-2.5">
+    <main ref={mainRef} className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-1.5 sm:p-2.5">
       <section className="inbox-v42-shell atlas-v5-module-shell flex h-full min-h-0 flex-col overflow-hidden">
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]">
           <div
@@ -1806,6 +1211,14 @@ export function AtlasApp({ token, user }: Props) {
                   >
                     <ListChecks size={13} />
                     {bulkSelectMode ? "Cancelar" : "Selecionar"}
+                  </button>
+                  <button
+                    type="button"
+                    className="hidden rounded-lg p-1.5 text-slate-500 hover:bg-white/70 md:inline-flex"
+                    title="Atalhos de teclado ( ? )"
+                    onClick={() => setShortcutsHelpOpen(true)}
+                  >
+                    <Keyboard size={15} />
                   </button>
                   <button
                     type="button"
@@ -1836,10 +1249,17 @@ export function AtlasApp({ token, user }: Props) {
                 ))}
               </div>
               <input
+                ref={searchInputRef}
                 className="inbox-v42-search"
-                placeholder="Buscar..."
+                placeholder="Buscar...  ( / )"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.currentTarget.blur();
+                    if (search) setSearch("");
+                  }
+                }}
               />
             {activeQueueFilters.length ? (
               <div className="flex flex-wrap gap-1 px-0.5">
@@ -1961,102 +1381,56 @@ export function AtlasApp({ token, user }: Props) {
               </div>
             </div>
             {loading && !filtered.length ? (
-              <div className="mt-8 flex justify-center">
-                <Loader2 className="animate-spin" />
-              </div>
+              <QueueSkeleton />
             ) : !filtered.length ? (
-              <div className="mt-6 px-2 text-center text-xs text-slate-500">
-                {queueBucket === "history"
-                  ? "Nenhuma conversa no histórico com estes filtros. Tente Todas ou limpe a busca."
-                  : "Nenhuma conversa encontrada com os filtros atuais."}
-              </div>
+              <EmptyState
+                className="mx-2 my-4"
+                title={EMPTY_COPY.inboxQueue.title}
+                description={
+                  queueBucket === "history"
+                    ? EMPTY_COPY.inboxQueue.descriptionHistory
+                    : queueBucket === "active"
+                      ? EMPTY_COPY.inboxQueue.descriptionActive
+                      : EMPTY_COPY.inboxQueue.descriptionDefault
+                }
+                actionLabel="Novo contato"
+                onAction={() => setNewContactModalOpen(true)}
+              />
             ) : null}
-              <div className="atlas-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 py-1.5">
-                {filtered.map((item) => {
-                  const last = item.messages?.[0];
-                  const selected = item.id === activeId;
-                  const checked = selectedConversationIds.includes(item.id);
-                  const unread = isUnreadConversation(item);
-                  const overdue = isOverdueConversation(item);
-                  const slaState = computeConversationSla(item, slaConfig);
-                  const dotClass = overdue ? "bg-rose-500" : unread ? "bg-blue-500" : statusDotClass(item.status);
-                  const assigneeName = item.assignedTo?.name ?? "Sem atendente";
-                  const teamName = item.team?.name ?? "Sem departamento";
-                  const preview = last?.text?.trim() || "Sem mensagens";
-                  return (
-                    <div
-                      key={item.id}
-                      className="inbox-v42-row group"
-                      data-active={selected}
-                      data-selected={checked}
-                    >
-                      {bulkSelectMode ? (
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 shrink-0 rounded border-slate-300"
-                          checked={checked}
-                          onChange={() => toggleConversationSelection(item.id)}
-                          aria-label={`Selecionar ${item.customerName}`}
-                        />
-                      ) : null}
-                      <button
-                        type="button"
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                        onClick={() => (bulkSelectMode ? toggleConversationSelection(item.id) : openConversation(item.id))}
+              <div ref={queueScrollRef} className="atlas-scroll min-h-0 flex-1 overflow-y-auto px-2 py-1.5">
+                <div className="relative w-full" style={{ height: `${queueVirtualizer.getTotalSize()}px` }}>
+                  {queueVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const item = filtered[virtualRow.index];
+                    if (!item) return null;
+                    const slaState = computeConversationSla(item, slaConfig);
+                    return (
+                      <div
+                        key={item.id}
+                        ref={queueVirtualizer.measureElement}
+                        data-index={virtualRow.index}
+                        className="absolute left-0 top-0 w-full pb-0.5"
+                        style={{ transform: `translateY(${virtualRow.start}px)` }}
                       >
-                        <div className="relative shrink-0">
-                          <CustomerAvatar
-                            name={item.customerName}
-                            phone={item.customerPhone}
-                            avatarUrl={getAvatarUrl(item.tags)}
-                            size="sm"
-                            accessToken={token}
-                          />
-                          <span
-                            className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white ${dotClass}`}
-                            title={overdue ? slaState.detailLabel : unread ? "Não lida" : statusLabel(item.status)}
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <p
-                              className={`inbox-v43-row-title truncate ${unread ? "font-semibold text-slate-900" : "font-medium text-slate-800"}`}
-                            >
-                              {item.customerName}
-                            </p>
-                            <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
-                              {formatTime(item.lastMessageAt ?? last?.createdAt)}
-                            </span>
-                          </div>
-                          <p className={`inbox-v43-row-preview truncate ${unread ? "text-slate-600" : "text-slate-500"}`}>{preview}</p>
-                          <div className="mt-0.5 flex items-center justify-between gap-2">
-                            <p className="inbox-v43-row-meta min-w-0 flex-1 truncate text-slate-400">
-                              <span className={`font-medium ${statusMetaTone(item.status)}`}>{statusShortLabel(item.status)}</span>
-                              {overdue ? (
-                                <>
-                                  <span className="text-slate-300"> · </span>
-                                  <span className={`font-medium ${slaToneClass(slaState.tone)}`} title={slaState.detailLabel}>
-                                    {slaState.summaryLabel}
-                                  </span>
-                                </>
-                              ) : null}
-                              <span className="text-slate-400">
-                                {" "}
-                                · {teamName} · {assigneeName}
-                              </span>
-                            </p>
-                            <ConversationTagChips
-                              tags={item.tags}
-                              catalog={tagCatalog}
-                              compact
-                              className="inbox-v43-row-tags shrink-0"
-                            />
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  );
-                })}
+                        <ConversationRow
+                          item={item}
+                          token={token}
+                          avatarUrl={getAvatarUrl(item.tags)}
+                          selected={item.id === activeId}
+                          checked={selectedConversationIds.includes(item.id)}
+                          bulkSelectMode={bulkSelectMode}
+                          unread={isUnreadConversation(item)}
+                          overdue={isOverdueConversation(item)}
+                          slaSummary={slaState.summaryLabel}
+                          slaDetail={slaState.detailLabel}
+                          slaTone={slaState.tone}
+                          tagCatalog={tagCatalog}
+                          onOpen={openConversation}
+                          onToggleSelect={toggleConversationSelection}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <InboxBulkBar
                 count={selectedConversationIds.length}
@@ -2079,6 +1453,8 @@ export function AtlasApp({ token, user }: Props) {
             className={`min-w-0 flex-col ${INBOX_PANEL_CLASS} ${
               mobileShowsChat ? "flex min-h-0 flex-1" : "hidden min-h-0 flex-1 md:flex"
             }`}
+            onTouchStart={handleChatTouchStart}
+            onTouchEnd={handleChatTouchEnd}
           >
               {roleIsManager && managerAlertCount > 0 ? (
                 <div className="shrink-0 border-b border-rose-200/60 bg-rose-50/80 px-4 py-1.5 text-center text-[11px] font-medium text-rose-800">
@@ -2095,7 +1471,11 @@ export function AtlasApp({ token, user }: Props) {
                     onOpenDrawer={() => setDrawerOpen(true)}
                     onMobileBack={mobileBackToQueue}
                   />
-                  <div className="inbox-v42-thread atlas-scroll relative isolate flex-1 overflow-auto py-5 sm:py-6">
+                  <div
+                    ref={threadScrollRef}
+                    onScroll={handleThreadScroll}
+                    className="inbox-v42-thread atlas-scroll relative isolate flex-1 overflow-auto py-5 sm:py-6"
+                  >
                     <div className="inbox-v43-thread-column px-4 sm:px-5">
                       {groupMessagesForThread(active.messages ?? []).map((group) => (
                         <section key={group.dateKey} className="mb-5 last:mb-0">
@@ -2128,9 +1508,20 @@ export function AtlasApp({ token, user }: Props) {
                           </div>
                         </section>
                       ))}
-                      <div ref={messagesEndRef} />
                     </div>
                   </div>
+                  {showJumpToLatest ? (
+                    <div className="pointer-events-none relative z-20">
+                      <button
+                        type="button"
+                        onClick={jumpToLatest}
+                        className="pointer-events-auto absolute -top-12 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-lg backdrop-blur transition hover:bg-white"
+                      >
+                        <ArrowDown size={13} />
+                        Novas mensagens
+                      </button>
+                    </div>
+                  ) : null}
                   {pendingAudioFile ? (
                     <div className="mx-4 mb-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
                       <p className="mb-2 text-xs font-semibold text-blue-700">
@@ -2209,7 +1600,7 @@ export function AtlasApp({ token, user }: Props) {
                         <div className="min-w-0">
                           <p className="inline-flex items-center gap-1 font-semibold text-slate-700">
                             <CornerUpLeft size={12} />
-                            Respondendo mensagem especifica
+                            Respondendo mensagem específica
                           </p>
                           <p className="truncate text-slate-500">{replyToMessage.text ?? `[${replyToMessage.type}]`}</p>
                         </div>
@@ -2272,6 +1663,8 @@ export function AtlasApp({ token, user }: Props) {
                         </button>
                       </div>
                       <textarea
+                        ref={composerRef}
+                        rows={1}
                         className="inbox-v43-composer-input"
                         placeholder="Escreva uma mensagem..."
                         value={draft}
@@ -2297,9 +1690,12 @@ export function AtlasApp({ token, user }: Props) {
                 </>
               ) : (
                 <div className="inbox-v42-thread grid flex-1 place-items-center gap-2 px-6 text-center text-slate-500">
-                  <MessageCircle size={36} className="text-slate-300" strokeWidth={1.25} />
-                  <p className="text-sm font-medium text-slate-600">Selecione uma conversa</p>
-                  <p className="max-w-xs text-xs text-slate-400">Escolha um contato na fila para responder ou use + para iniciar um novo.</p>
+                  <EmptyState
+                    title={EMPTY_COPY.inboxThread.title}
+                    description={EMPTY_COPY.inboxThread.description}
+                    actionLabel="Novo contato"
+                    onAction={() => setNewContactModalOpen(true)}
+                  />
                 </div>
               )}
             </div>
@@ -2358,6 +1754,7 @@ export function AtlasApp({ token, user }: Props) {
         notifyPermission={notifyPermission}
         onRequestNotificationPermission={() => void handleRequestNotificationPermission()}
       />
+      <ShortcutsHelpOverlay open={shortcutsHelpOpen} onClose={() => setShortcutsHelpOpen(false)} />
     </main>
   );
 }

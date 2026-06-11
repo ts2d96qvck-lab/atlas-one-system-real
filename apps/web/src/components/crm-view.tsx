@@ -1,8 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from "@dnd-kit/core";
 import { Loader2, Pencil, Plus, Trash2, Users, X } from "lucide-react";
-import { Badge, Button, Card } from "@atlas-one/ui";
+import { Badge, Button, Card, Skeleton } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import {
   createLead,
@@ -17,12 +27,14 @@ import {
   type SessionUser,
   type UserRow
 } from "../lib/api";
-import { crmStageLabel } from "../lib/product-copy";
+import { crmStageLabel, EMPTY_COPY } from "../lib/product-copy";
 import { EmptyState } from "./empty-state";
 import { AtlasViewHeader } from "./atlas-view-header";
 import { LeadAttachmentsPanel } from "./lead-attachments-panel";
 import { AtlasAiCrmPanel } from "./atlas-ai/atlas-ai-crm-panel";
 import { hasPermission } from "../lib/session-user";
+import { useAppDialogs } from "./ui/dialog-provider";
+import { notify } from "../lib/notify";
 
 type Props = { token: string; user: SessionUser };
 
@@ -66,6 +78,56 @@ function agentInitials(name: string) {
     .toUpperCase();
 }
 
+function DroppableStage({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex min-h-0 flex-1 flex-col rounded-xl transition-shadow ${
+        isOver ? "bg-blue-50/50 ring-2 ring-blue-300/60" : ""
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DraggableLead({ id, className, children }: { id: string; className?: string; children: React.ReactNode }) {
+  const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={`${className ?? ""} ${isDragging ? "relative z-20 opacity-80 shadow-xl" : ""}`}
+      style={{
+        touchAction: "manipulation",
+        transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function CrmBoardSkeleton() {
+  return (
+    <div className="flex gap-3 overflow-hidden pb-10 pt-1">
+      {Array.from({ length: 4 }).map((_, column) => (
+        <Card key={column} className="atlas-v5-card-pad-sm min-h-[420px] min-w-[272px] flex-shrink-0">
+          <Skeleton className="mb-2 h-4 w-28" />
+          <Skeleton className="mb-4 h-3 w-16" />
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, row) => (
+              <Skeleton key={row} className="h-24 w-full rounded-xl" />
+            ))}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 function AgentAssigneeSelect({
   value,
   agents,
@@ -92,12 +154,11 @@ function AgentAssigneeSelect({
 }
 
 export function CrmView({ token, user }: Props) {
+  const { confirm } = useAppDialogs();
   const [data, setData] = useState<PipelineData | null>(null);
   const [agents, setAgents] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dragId, setDragId] = useState<string | null>(null);
   const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [leadAttachments, setLeadAttachments] = useState<LeadAttachment[]>([]);
   const [attachmentUploading, setAttachmentUploading] = useState(false);
@@ -140,30 +201,58 @@ export function CrmView({ token, user }: Props) {
     load();
   }, [token]);
 
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } })
+  );
+
   async function moveLead(leadId: string, status: string) {
-    await fetch(`${apiUrl()}/crm/leads/${leadId}`, {
+    // Optimistic move: the card lands instantly and reverts only on failure.
+    const previous = data;
+    setData((current) =>
+      current
+        ? { ...current, leads: current.leads.map((lead) => (lead.id === leadId ? { ...lead, status } : lead)) }
+        : current
+    );
+    const res = await fetch(`${apiUrl()}/crm/leads/${leadId}`, {
       method: "PATCH",
       headers: {
         authorization: `Bearer ${token}`,
         "content-type": "application/json"
       },
       body: JSON.stringify({ status })
-    });
-    await load();
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      setData(previous);
+      notify.error("Não foi possível mover o lead. Tente novamente.");
+    }
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const leadId = String(event.active.id);
+    const stageName = event.over ? String(event.over.id) : null;
+    if (!stageName) return;
+    const lead = data?.leads.find((item) => item.id === leadId);
+    if (!lead || lead.status === stageName) return;
+    void moveLead(leadId, stageName);
   }
 
   async function removeLead(lead: Lead) {
-    const ok = window.confirm(
-      `Excluir lead "${lead.company}" permanentemente?\n\nEsta ação não pode ser desfeita e remove o lead do CRM (não apaga o histórico de conversas).`
-    );
+    const ok = await confirm({
+      title: `Excluir lead "${lead.company}"?`,
+      description:
+        "Esta ação não pode ser desfeita e remove o lead do CRM. O histórico de conversas é preservado.",
+      confirmLabel: "Excluir lead",
+      tone: "danger"
+    });
     if (!ok) return;
     setDeletingLeadId(lead.id);
     try {
       await deleteLead(token, lead.id);
-      setFeedback({ type: "success", text: `Lead ${lead.company} excluído com sucesso.` });
+      notify.success(`Lead ${lead.company} excluído.`);
       await load();
     } catch (err) {
-      setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao excluir lead" });
+      notify.error(err instanceof Error ? err.message : "Falha ao excluir lead");
     } finally {
       setDeletingLeadId(null);
     }
@@ -197,7 +286,7 @@ export function CrmView({ token, user }: Props) {
   async function saveLeadEdit() {
     if (!editingLead) return;
     if (!editForm.company.trim() || !editForm.contact.trim() || !editForm.phone.trim() || !editForm.status.trim()) {
-      setFeedback({ type: "error", text: "Preencha os campos obrigatórios do lead." });
+      notify.error("Preencha os campos obrigatórios do lead.");
       return;
     }
     setSavingLead(true);
@@ -213,10 +302,10 @@ export function CrmView({ token, user }: Props) {
         assignedToId: editForm.assignedToId || null
       });
       setEditingLead(null);
-      setFeedback({ type: "success", text: "Lead atualizado com sucesso." });
+      notify.success("Lead atualizado com sucesso.");
       await load();
     } catch (err) {
-      setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao atualizar lead" });
+      notify.error(err instanceof Error ? err.message : "Falha ao atualizar lead");
     } finally {
       setSavingLead(false);
     }
@@ -224,7 +313,7 @@ export function CrmView({ token, user }: Props) {
 
   async function saveNewLead() {
     if (!createForm.company.trim() || !createForm.contact.trim() || !createForm.phone.trim()) {
-      setFeedback({ type: "error", text: "Preencha empresa, contato e telefone." });
+      notify.error("Preencha empresa, contato e telefone.");
       return;
     }
     setSavingCreate(true);
@@ -248,10 +337,10 @@ export function CrmView({ token, user }: Props) {
         value: "",
         assignedToId: ""
       });
-      setFeedback({ type: "success", text: "Lead criado com sucesso." });
+      notify.success("Lead criado com sucesso.");
       await load();
     } catch (err) {
-      setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao criar lead" });
+      notify.error(err instanceof Error ? err.message : "Falha ao criar lead");
     } finally {
       setSavingCreate(false);
     }
@@ -259,9 +348,14 @@ export function CrmView({ token, user }: Props) {
 
   if (loading) {
     return (
-      <div className="grid min-h-[40vh] place-items-center py-16">
-        <Loader2 className="animate-spin" />
-      </div>
+      <main className="atlas-page">
+        <div className="atlas-page-inner w-full min-w-0">
+          <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
+            <AtlasViewHeader icon={Users} section="Comercial" title="CRM · Funil de vendas" />
+            <CrmBoardSkeleton />
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -303,93 +397,85 @@ export function CrmView({ token, user }: Props) {
           }
         />
 
-        {feedback ? (
-          <p className={`mb-3 text-sm ${feedback.type === "error" ? "text-red-600" : "text-emerald-700"}`}>{feedback.text}</p>
-        ) : null}
-
-        <div className="flex gap-3 overflow-x-auto pb-10 pt-1">
-          {stages.map((stage) => {
-            const column = leads.filter((l) => l.status === stage.name);
-            const columnValue = column.reduce((s, l) => s + Number(l.value), 0);
-            return (
-              <Card
-                key={stage.id}
-                className="atlas-v5-card-pad-sm flex min-h-[420px] min-w-[272px] flex-shrink-0 flex-col"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (dragId) moveLead(dragId, stage.name);
-                  setDragId(null);
-                }}
-              >
-                <div className="mb-3 border-b border-slate-100 pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{crmStageLabel(stage.name)}</p>
-                    <Badge className="h-5 px-2 text-[10px]">{column.length}</Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">{formatMoney(columnValue)}</p>
-                </div>
-                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                  {!column.length ? (
-                    <EmptyState
-                      title="Coluna vazia"
-                      description="Arraste um lead para cá ou crie um novo lead."
-                      actionLabel="Novo lead"
-                      onAction={() => setCreatingLead(true)}
-                    />
-                  ) : null}
-                  {column.map((lead) => (
-                    <div
-                      key={lead.id}
-                      draggable
-                      onDragStart={() => setDragId(lead.id)}
-                      className="atlas-v5-list-row cursor-grab active:cursor-grabbing"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900">{lead.company}</p>
-                          <p className="truncate text-xs text-slate-500">{lead.contact || "Sem contato definido"}</p>
-                        </div>
-                        <Button
-                          variant="glass"
-                          className="h-8 w-8 shrink-0 px-0"
-                          onClick={() => openEditor(lead)}
-                          title="Editar lead"
-                          aria-label={`Editar lead ${lead.company}`}
-                        >
-                          <Pencil size={14} />
-                        </Button>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="grid h-7 w-7 place-items-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700">
-                          {lead.assignedTo?.name ? agentInitials(lead.assignedTo.name) : "—"}
-                        </span>
-                        <p className="truncate text-[11px] text-slate-600">{lead.assignedTo?.name ?? "Sem responsável"}</p>
-                      </div>
-                      <p className="mt-1 text-[11px] text-slate-500">{lead.phone ? lead.phone : "Telefone não informado"}</p>
-                      <p className="text-[11px] text-slate-500">
-                        Fechamento previsto: {lead.expectedCloseDate ? formatDate(lead.expectedCloseDate) : "Sem previsão"}
-                      </p>
-                      <p className="mt-2 text-sm font-semibold text-blue-700">{formatMoney(Number(lead.value))}</p>
-                      {stages.findIndex((s) => s.id === stage.id) < stages.length - 1 ? (
-                        <Button
-                          variant="glass"
-                          className="mt-3 h-8 w-full text-xs"
-                          onClick={() => {
-                            const idx = stages.findIndex((s) => s.id === stage.id);
-                            const next = stages[idx + 1];
-                            if (next) moveLead(lead.id, next.name);
-                          }}
-                        >
-                          Avançar etapa
-                        </Button>
-                      ) : null}
+        <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
+          <div className="flex gap-3 overflow-x-auto pb-10 pt-1">
+            {stages.map((stage) => {
+              const column = leads.filter((l) => l.status === stage.name);
+              const columnValue = column.reduce((s, l) => s + Number(l.value), 0);
+              return (
+                <Card
+                  key={stage.id}
+                  className="atlas-v5-card-pad-sm flex min-h-[420px] min-w-[272px] flex-shrink-0 flex-col"
+                >
+                  <div className="mb-3 border-b border-slate-100 pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{crmStageLabel(stage.name)}</p>
+                      <Badge className="h-5 px-2 text-[10px]">{column.length}</Badge>
                     </div>
-                  ))}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                    <p className="mt-1 text-xs text-slate-500">{formatMoney(columnValue)}</p>
+                  </div>
+                  <DroppableStage id={stage.name}>
+                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                      {!column.length ? (
+                        <EmptyState
+                          title={EMPTY_COPY.crmColumn.title}
+                          description={EMPTY_COPY.crmColumn.description}
+                          actionLabel={EMPTY_COPY.crmColumn.action}
+                          onAction={() => setCreatingLead(true)}
+                        />
+                      ) : null}
+                      {column.map((lead) => (
+                        <DraggableLead key={lead.id} id={lead.id} className="atlas-v5-list-row cursor-grab active:cursor-grabbing">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-slate-900">{lead.company}</p>
+                              <p className="truncate text-xs text-slate-500">{lead.contact || "Sem contato definido"}</p>
+                            </div>
+                            <Button
+                              variant="glass"
+                              className="h-8 w-8 shrink-0 px-0"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={() => openEditor(lead)}
+                              title="Editar lead"
+                              aria-label={`Editar lead ${lead.company}`}
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="grid h-7 w-7 place-items-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700">
+                              {lead.assignedTo?.name ? agentInitials(lead.assignedTo.name) : "—"}
+                            </span>
+                            <p className="truncate text-[11px] text-slate-600">{lead.assignedTo?.name ?? "Sem responsável"}</p>
+                          </div>
+                          <p className="mt-1 text-[11px] text-slate-500">{lead.phone ? lead.phone : "Telefone não informado"}</p>
+                          <p className="text-[11px] text-slate-500">
+                            Fechamento previsto: {lead.expectedCloseDate ? formatDate(lead.expectedCloseDate) : "Sem previsão"}
+                          </p>
+                          <p className="mt-2 text-sm font-semibold text-blue-700">{formatMoney(Number(lead.value))}</p>
+                          {stages.findIndex((s) => s.id === stage.id) < stages.length - 1 ? (
+                            <Button
+                              variant="glass"
+                              className="mt-3 h-8 w-full text-xs"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={() => {
+                                const idx = stages.findIndex((s) => s.id === stage.id);
+                                const next = stages[idx + 1];
+                                if (next) void moveLead(lead.id, next.name);
+                              }}
+                            >
+                              Avançar etapa
+                            </Button>
+                          ) : null}
+                        </DraggableLead>
+                      ))}
+                    </div>
+                  </DroppableStage>
+                </Card>
+              );
+            })}
+          </div>
+        </DndContext>
         </div>
       </div>
       {editingLead ? (
@@ -460,7 +546,7 @@ export function CrmView({ token, user }: Props) {
                     return uploadLeadAttachment(token, editingLead.id, file)
                       .then(() => openEditor(editingLead))
                       .catch((err) =>
-                        setFeedback({ type: "error", text: err instanceof Error ? err.message : "Falha ao anexar arquivo" })
+                        notify.error(err instanceof Error ? err.message : "Falha ao anexar arquivo")
                       )
                       .finally(() => setAttachmentUploading(false));
                   }}
@@ -475,10 +561,9 @@ export function CrmView({ token, user }: Props) {
                   user={user}
                   leadId={editingLead.id}
                   onApplyTask={(task) =>
-                    setFeedback({
-                      type: "success",
-                      text: `Tarefa sugerida: ${task.titulo}${task.descricao ? ` — ${task.descricao}` : ""}`
-                    })
+                    notify.success(
+                      `Tarefa sugerida: ${task.titulo}${task.descricao ? ` — ${task.descricao}` : ""}`
+                    )
                   }
                 />
               ) : null}

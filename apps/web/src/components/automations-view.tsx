@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, Loader2, Plus, Trash2 } from "lucide-react";
+import { Bot, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { AtlasViewHeader } from "./atlas-view-header";
 import { EmptyState } from "./empty-state";
+import { ModuleListSkeleton } from "./ui/module-list-skeleton";
+import { ViewStateBanner } from "./ui/view-state-banner";
+import { useAppDialogs } from "./ui/dialog-provider";
+import { notify } from "../lib/notify";
+import { EMPTY_COPY, MODULE_COPY } from "../lib/product-copy";
 
 const TRIGGER_LABEL: Record<string, string> = {
   "lead.stage.changed": "Lead mudou de etapa",
@@ -36,10 +41,10 @@ type Automation = {
 };
 
 export function AutomationsView({ token }: Props) {
+  const { confirm } = useAppDialogs();
   const [items, setItems] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState({
     name: "",
     trigger: "lead.stage.changed",
@@ -56,13 +61,14 @@ export function AutomationsView({ token }: Props) {
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
 
   async function load() {
+    setLoading(true);
     const res = await fetch(`${apiUrl()}/automations`, { headers });
     if (res.ok) {
       setItems(await res.json());
-      setError("");
+      setLoadError("");
     } else {
       const body = await res.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao carregar automações");
+      setLoadError(body?.error ?? MODULE_COPY.loadFailed.automations);
     }
     setLoading(false);
   }
@@ -73,7 +79,7 @@ export function AutomationsView({ token }: Props) {
 
   async function create() {
     if (!form.name.trim()) {
-      setError("Informe um nome para a automação.");
+      notify.error("Informe um nome para a automação.");
       return;
     }
     const response = await fetch(`${apiUrl()}/automations`, {
@@ -97,7 +103,7 @@ export function AutomationsView({ token }: Props) {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao criar automação");
+      notify.error(body?.error ?? "Falha ao criar automação");
       return;
     }
     setForm({
@@ -112,8 +118,7 @@ export function AutomationsView({ token }: Props) {
       scheduleTime: "",
       audioUrl: ""
     });
-    setInfo("Automação criada com sucesso.");
-    setError("");
+    notify.success("Automação criada com sucesso.");
     await load();
   }
 
@@ -125,24 +130,30 @@ export function AutomationsView({ token }: Props) {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao atualizar automação");
+      notify.error(body?.error ?? "Falha ao atualizar automação");
       return;
     }
-    setInfo(enabled ? "Automação pausada." : "Automação reativada.");
-    setError("");
+    notify.success(enabled ? "Automação pausada." : "Automação reativada.");
+    setLoadError("");
     await load();
   }
 
   async function remove(id: string, name: string) {
-    if (!window.confirm(`Excluir automação "${name}"?`)) return;
+    const ok = await confirm({
+      title: `Excluir automação "${name}"?`,
+      description: "A regra deixa de rodar imediatamente. Esta ação não pode ser desfeita.",
+      confirmLabel: "Excluir",
+      tone: "danger"
+    });
+    if (!ok) return;
     const response = await fetch(`${apiUrl()}/automations/${id}`, { method: "DELETE", headers });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao excluir automação");
+      notify.error(body?.error ?? "Falha ao excluir automação");
       return;
     }
-    setInfo("Automação excluída.");
-    setError("");
+    notify.success("Automação excluída.");
+    setLoadError("");
     await load();
   }
 
@@ -249,17 +260,17 @@ export function AutomationsView({ token }: Props) {
           <Button className="mt-4" onClick={create}>
             <Plus size={16} /> Criar
           </Button>
-          {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
-          {!error && info ? <p className="mt-2 text-xs text-emerald-700">{info}</p> : null}
         </Card>
 
+        {loadError ? <ViewStateBanner message={loadError} onRetry={() => void load()} tone="danger" /> : null}
+
         {loading ? (
-          <Loader2 className="animate-spin" />
+          <ModuleListSkeleton rows={3} />
         ) : !items.length ? (
           <EmptyState
-            title="Nenhuma automação"
-            description="Crie regras para disparar mensagens ou auditoria quando leads ou conversas mudarem."
-            actionLabel="Nova automação"
+            title={EMPTY_COPY.automations.title}
+            description={EMPTY_COPY.automations.description}
+            actionLabel={EMPTY_COPY.automations.action}
             onAction={() => {
               const first = document.querySelector<HTMLInputElement>('input[placeholder="Nome da automação"]');
               first?.focus();

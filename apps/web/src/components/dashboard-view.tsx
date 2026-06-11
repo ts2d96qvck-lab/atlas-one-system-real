@@ -2,10 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { Activity, BarChart3, ChevronDown, Download, Gauge, Loader2, Target, Timer, TrendingUp, Zap } from "lucide-react";
-import { Button, Card } from "@atlas-one/ui";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
+import { Button, Card, KpiStat } from "@atlas-one/ui";
 import { apiUrl } from "../lib/config";
 import { downloadOpsExport } from "../lib/api";
+import { MODULE_COPY } from "../lib/product-copy";
 import { AtlasViewHeader } from "./atlas-view-header";
+import { ModuleListSkeleton } from "./ui/module-list-skeleton";
+import { ViewStateBanner } from "./ui/view-state-banner";
 import { AtlasAiAskPanel } from "./atlas-ai/atlas-ai-ask-panel";
 import { hasPermission } from "../lib/session-user";
 import type { SessionUser } from "../lib/api";
@@ -14,6 +26,7 @@ type Props = { token: string; user: SessionUser };
 
 export function DashboardView({ token, user }: Props) {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -81,33 +94,46 @@ export function DashboardView({ token, user }: Props) {
     try {
       await downloadOpsExport(token, kind);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao exportar");
+      setError(err instanceof Error ? err.message : MODULE_COPY.dashboard.exportFailed);
     } finally {
       setExporting(null);
     }
   }
 
-  useEffect(() => {
-    fetch(`${apiUrl()}/dashboard`, { headers: { authorization: `Bearer ${token}` } })
-      .then(async (r) => {
-        if (!r.ok) {
-          setError("Painel indisponível no momento. Exibindo dados padrao.");
-          return emptyDashboard();
-        }
-        return r.json();
-      })
-      .then((payload) => setData(payload ?? emptyDashboard()))
-      .catch(() => {
-        setError("Painel indisponível no momento. Exibindo dados padrao.");
+  async function loadDashboard() {
+    setLoading(true);
+    try {
+      const r = await fetch(`${apiUrl()}/dashboard`, { headers: { authorization: `Bearer ${token}` } });
+      if (!r.ok) {
+        setError(MODULE_COPY.dashboard.unavailable);
         setData(emptyDashboard());
-      });
+        return;
+      }
+      const payload = await r.json();
+      setData(payload ?? emptyDashboard());
+      setError("");
+    } catch {
+      setError(MODULE_COPY.dashboard.unavailable);
+      setData(emptyDashboard());
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadDashboard();
   }, [token]);
 
-  if (!data) {
+  if (loading || !data) {
     return (
-      <div className="grid min-h-[40vh] place-items-center py-16">
-        <Loader2 className="animate-spin" />
-      </div>
+      <main className="atlas-page">
+        <div className="atlas-page-inner w-full min-w-0">
+          <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
+            <AtlasViewHeader icon={BarChart3} section="Operação e vendas" title="Painel de performance" />
+            <ModuleListSkeleton rows={4} />
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -187,34 +213,13 @@ export function DashboardView({ token, user }: Props) {
   }).length;
 
   const lineSeries = [
-    Math.max(closedRevenue * 0.32, 0),
-    Math.max(closedRevenue * 0.55, 0),
-    closedRevenue,
-    Number(salesForecast.runRateRevenue ?? 0),
-    Number(salesForecast.realistic ?? projectedRevenueByTeamInput),
-    Number(salesForecast.optimistic ?? projectedRevenueByTeamInput * 1.2)
-  ].map((value) => Math.max(0, Number(value || 0)));
-
-  const chartWidth = 620;
-  const chartHeight = 230;
-  const chartPadding = 24;
-  const chartUsableHeight = chartHeight - chartPadding * 2;
-  const chartUsableWidth = chartWidth - chartPadding * 2;
-  const chartMax = Math.max(...lineSeries, 1);
-  const chartPoints = lineSeries.map((value, index) => {
-    const x = chartPadding + (index / Math.max(lineSeries.length - 1, 1)) * chartUsableWidth;
-    const y = chartHeight - chartPadding - (value / chartMax) * chartUsableHeight;
-    return { x, y, value };
-  });
-  const chartLine = chartPoints.map((point) => `${point.x},${point.y}`).join(" ");
-  const firstPoint = chartPoints[0];
-  const lastPoint = chartPoints[chartPoints.length - 1];
-  const chartArea =
-    chartPoints.length > 1 && firstPoint && lastPoint
-      ? `M ${firstPoint.x} ${chartHeight - chartPadding} L ${chartLine.replaceAll(",", " ")} L ${lastPoint.x} ${
-          chartHeight - chartPadding
-        } Z`
-      : "";
+    { label: "Base", value: Math.max(closedRevenue * 0.32, 0) },
+    { label: "Meio", value: Math.max(closedRevenue * 0.55, 0) },
+    { label: "Fechado", value: closedRevenue },
+    { label: "Run rate", value: Number(salesForecast.runRateRevenue ?? 0) },
+    { label: "Realista", value: Number(salesForecast.realistic ?? projectedRevenueByTeamInput) },
+    { label: "Otimista", value: Number(salesForecast.optimistic ?? projectedRevenueByTeamInput * 1.2) }
+  ].map((point) => ({ ...point, value: Math.max(0, Number(point.value || 0)) }));
 
   return (
     <main className="atlas-page">
@@ -267,8 +272,9 @@ export function DashboardView({ token, user }: Props) {
             </div>
           }
         />
-        {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
-
+        {error ? (
+          <ViewStateBanner message={error} onRetry={() => void loadDashboard()} tone="warning" />
+        ) : null}
         {hasPermission(user, "ai:use") ? <AtlasAiAskPanel token={token} user={user} /> : null}
 
         <div className="mb-5 grid gap-3 lg:grid-cols-4">
@@ -286,28 +292,24 @@ export function DashboardView({ token, user }: Props) {
               <p className="text-xs text-slate-500">{sla.conversationsAnalyzed ?? 0} conversas (30 dias)</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="atlas-v5-stat">
-                <p className="text-xs text-slate-500">Tempo médio 1ª resposta</p>
-                <p className="text-2xl font-semibold text-slate-900">
-                  {sla.avgFirstResponseMinutes != null ? `${sla.avgFirstResponseMinutes} min` : "—"}
-                </p>
-              </div>
-              <div className="atlas-v5-stat">
-                <p className="text-xs text-slate-500">Dentro do SLA (1ª resposta)</p>
-                <p className="text-2xl font-semibold text-emerald-700">
-                  {toPercent(Number(sla.firstResponseWithinSlaPercent ?? 0))}
-                </p>
-              </div>
-              <div className="atlas-v5-stat">
-                <p className="text-xs text-slate-500">Tempo médio resolução</p>
-                <p className="text-2xl font-semibold text-slate-900">
-                  {sla.avgResolutionHours != null ? `${sla.avgResolutionHours} h` : "—"}
-                </p>
-              </div>
-              <div className="atlas-v5-stat">
-                <p className="text-xs text-slate-500">Abertas fora do SLA</p>
-                <p className="text-2xl font-semibold text-rose-700">{Number(sla.openOverSlaCount ?? 0)}</p>
-              </div>
+              <KpiStat
+                label="Tempo médio 1ª resposta"
+                value={sla.avgFirstResponseMinutes != null ? `${sla.avgFirstResponseMinutes} min` : "—"}
+              />
+              <KpiStat
+                label="Dentro do SLA (1ª resposta)"
+                value={toPercent(Number(sla.firstResponseWithinSlaPercent ?? 0))}
+                tone="success"
+              />
+              <KpiStat
+                label="Tempo médio resolução"
+                value={sla.avgResolutionHours != null ? `${sla.avgResolutionHours} h` : "—"}
+              />
+              <KpiStat
+                label="Abertas fora do SLA"
+                value={Number(sla.openOverSlaCount ?? 0)}
+                tone="danger"
+              />
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-cyan-100 bg-cyan-50/50 p-3">
@@ -351,31 +353,38 @@ export function DashboardView({ token, user }: Props) {
                 {toMoney(Number(salesForecast.realistic ?? 0))} realista
               </div>
             </div>
-            <div className="mt-3 rounded-2xl border border-white/80 bg-white/80 p-2">
-              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-56 w-full">
-                <defs>
-                  <linearGradient id="dashboard-line" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563eb" stopOpacity="0.32" />
-                    <stop offset="100%" stopColor="#2563eb" stopOpacity="0.03" />
-                  </linearGradient>
-                </defs>
-                {[0, 1, 2, 3].map((index) => (
-                  <line
-                    key={index}
-                    x1={chartPadding}
-                    x2={chartWidth - chartPadding}
-                    y1={chartPadding + (chartUsableHeight / 3) * index}
-                    y2={chartPadding + (chartUsableHeight / 3) * index}
-                    stroke="rgba(148,163,184,0.25)"
-                    strokeWidth="1"
+            <div className="mt-3 h-56 w-full rounded-2xl border border-white/80 bg-white/80 p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={lineSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="dashboardRevenueFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.28} />
+                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(148,163,184,0.2)" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => `R$ ${Math.round(Number(value) / 1000)}k`}
+                    width={48}
                   />
-                ))}
-                {chartArea ? <path d={chartArea} fill="url(#dashboard-line)" /> : null}
-                <polyline points={chartLine} fill="none" stroke="#2563eb" strokeWidth="2.5" />
-                {chartPoints.map((point, index) => (
-                  <circle key={index} cx={point.x} cy={point.y} r="3.5" fill="#3b82f6" />
-                ))}
-              </svg>
+                  <Tooltip
+                    formatter={(value: number) => [toMoney(value), "Receita"]}
+                    contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#2563eb"
+                    strokeWidth={2.5}
+                    fill="url(#dashboardRevenueFill)"
+                    dot={{ r: 3, fill: "#3b82f6" }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
             <p className="mt-3 text-xs text-slate-500">
               Real fechado {toMoney(closedRevenue)} · Meta {toMoney(targetRevenue)} · Previsão realista{" "}
@@ -495,7 +504,7 @@ export function DashboardView({ token, user }: Props) {
                   </div>
                 </div>
               ))}
-              {!stageRows.length ? <p className="text-xs text-slate-500">Sem dados de pipeline ainda.</p> : null}
+              {!stageRows.length ? <p className="text-xs text-atlas-muted">{MODULE_COPY.dashboard.noPipeline}</p> : null}
             </div>
           </Card>
 
@@ -555,7 +564,7 @@ export function DashboardView({ token, user }: Props) {
                   </div>
                 );
               })}
-              {!instances.length ? <p className="text-xs text-slate-500">Sem números cadastrados.</p> : null}
+              {!instances.length ? <p className="text-xs text-atlas-muted">{MODULE_COPY.dashboard.noInstances}</p> : null}
             </div>
           </Card>
         </div>
@@ -573,7 +582,7 @@ export function DashboardView({ token, user }: Props) {
               <div key={row.name} className="rounded-xl border border-white bg-white/90 p-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-slate-800">{row.name}</p>
-                  <p className="text-xs text-slate-500">{toPercent(Number(row.conversionRate ?? 0))} conversao</p>
+                  <p className="text-xs text-atlas-muted">{toPercent(Number(row.conversionRate ?? 0))} {MODULE_COPY.dashboard.conversion}</p>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {row.leads} leads · {row.closed} fechados · {toMoney(Number(row.revenue ?? 0))}
@@ -586,7 +595,7 @@ export function DashboardView({ token, user }: Props) {
                 </div>
               </div>
             ))}
-            {!teamRows.length ? <p className="text-xs text-slate-500">Sem dados de desempenho ainda.</p> : null}
+            {!teamRows.length ? <p className="text-xs text-atlas-muted">{MODULE_COPY.dashboard.noTeam}</p> : null}
           </div>
         </Card>
         </div>
