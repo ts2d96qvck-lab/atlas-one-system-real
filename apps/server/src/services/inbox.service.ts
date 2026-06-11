@@ -124,12 +124,154 @@ export const createConversationSchema = z.object({
 export const sendMessageSchema = z.object({
   text: z.string().min(1).max(4096).optional(),
   replyToMessageId: z.string().optional(),
+  clientMessageId: z.string().min(8).max(64).optional(),
   mediatype: z.enum(["image", "video", "audio", "document"]).optional(),
   mimetype: z.string().optional(),
   media: z.string().optional(),
   caption: z.string().optional(),
   fileName: z.string().optional()
 });
+
+const OUTBOUND_SUCCESS_STATUSES = new Set(["sent", "delivered", "read"]);
+const PENDING_RESUME_MS = 120_000;
+
+const conversationEmitInclude = {
+  assignedTo: { select: { id: true, name: true, role: true } },
+  team: { select: { id: true, name: true } },
+  instance: { select: { id: true, name: true, label: true, status: true } },
+  lead: { select: { id: true, company: true, status: true, value: true } },
+  messages: { orderBy: { createdAt: "desc" as const }, take: 1 }
+};
+
+function messageRawRecord(raw: unknown): Record<string, unknown> {
+  return raw && typeof raw === "object" ? ({ ...(raw as Record<string, unknown>) } as Record<string, unknown>) : {};
+}
+
+function outboundActorRaw(actor?: MessageActor) {
+  return {
+    sentById: actor?.id ?? null,
+    sentByName: actor?.name ?? null,
+    sentByRole: actor?.role ?? null,
+    senderType: actor?.id === "menu-bot" ? "bot" : "agent"
+  };
+}
+
+async function findOutboundByClientMessageId(conversationId: string, clientMessageId: string) {
+  return prisma.message.findFirst({ where: { conversationId, clientMessageId } });
+}
+
+async function resolveIdempotentOutbound(conversationId: string, clientMessageId?: string) {
+  if (!clientMessageId) return { action: "create" as const };
+  const existing = await findOutboundByClientMessageId(conversationId, clientMessageId);
+  if (!existing) return { action: "create" as const };
+  const status = existing.status.toLowerCase();
+  if (OUTBOUND_SUCCESS_STATUSES.has(status)) return { action: "return" as const, message: existing };
+  if (status === "failed") return { action: "resume" as const, message: existing };
+  if (status === "pending") {
+    const age = Date.now() - existing.createdAt.getTime();
+    if (age < PENDING_RESUME_MS) return { action: "return" as const, message: existing };
+    return { action: "resume" as const, message: existing };
+  }
+  return { action: "return" as const, message: existing };
+}
+
+async function resetMessageToPending(messageId: string, raw: Record<string, unknown>) {
+  return prisma.message.update({
+    where: { id: messageId },
+    data: {
+      status: "pending",
+      raw: {
+        ...raw,
+        deliveryStatus: "pending",
+        failureReason: null
+      } as Prisma.InputJsonValue
+    }
+  });
+}
+
+async function markMessageFailed(messageId: string, raw: Record<string, unknown>, reason: string) {
+  return prisma.message.update({
+    where: { id: messageId },
+    data: {
+      status: "failed",
+      raw: {
+        ...raw,
+        deliveryStatus: "failed",
+        failureReason: reason.slice(0, 500)
+      } as Prisma.InputJsonValue
+    }
+  });
+}
+
+async function markMessageSent(
+  messageId: string,
+  providerId: string | null,
+  raw: Record<string, unknown>,
+  providerResult: unknown
+) {
+  return prisma.message.update({
+    where: { id: messageId },
+    data: {
+      status: "sent",
+      providerId,
+      raw: {
+        ...raw,
+        deliveryStatus: "sent",
+        failureReason: null,
+        provider: (providerResult ?? null) as Prisma.InputJsonValue
+      } as Prisma.InputJsonValue
+    }
+  });
+}
+
+async function emitOutboundMessage(
+  tenantId: string,
+  conversation: { id: string; tags: unknown },
+  message: { id: string; status: string; direction: string; type: string; text: string | null; mediaUrl: string | null; providerId: string | null; raw: unknown; createdAt: Date; conversationId: string; clientMessageId?: string | null },
+  actor?: MessageActor
+) {
+  const nextTags = conversationTagsWithMenuDone(conversation.tags, actor);
+  const updatedConversation = await prisma.conversation.update({
+    where: { id: conversation.id },
+    data: {
+      status: "waiting_customer",
+      lastMessageAt: new Date(),
+      ...(nextTags ? { tags: nextTags } : {})
+    },
+    include: conversationEmitInclude
+  });
+  emitToTenant(tenantId, "inbox:message", { conversation: updatedConversation, message });
+  if (message.status === "sent") {
+    emitIntegrationEvent(tenantId, "message.created", publicMessagePayload(message));
+  }
+  return message;
+}
+
+async function resolveReplyContext(conversationId: string, customerPhone: string, replyToMessageId?: string) {
+  let replyTo: Prisma.InputJsonValue | null = null;
+  let quotedForSend: { providerId: string; remoteJid: string; fromMe: boolean } | undefined;
+  if (!replyToMessageId) return { replyTo, quotedForSend };
+
+  const quoted = await prisma.message.findFirst({
+    where: { conversationId, id: replyToMessageId }
+  });
+  if (!quoted) return { replyTo, quotedForSend };
+
+  replyTo = {
+    id: quoted.id,
+    type: quoted.type,
+    text: quoted.text ?? `[${quoted.type}]`,
+    direction: quoted.direction
+  } as Prisma.InputJsonValue;
+  if (quoted.providerId) {
+    quotedForSend = {
+      providerId: quoted.providerId,
+      remoteJid: whatsappJid(customerPhone),
+      fromMe: quoted.direction === "out"
+    };
+  }
+  return { replyTo, quotedForSend };
+}
 
 const ACTIVE_CONVERSATION_STATUSES = ["open", "waiting_customer", "waiting_internal"];
 const HISTORY_CONVERSATION_STATUSES = ["resolved", "closed", "archived"];
@@ -395,46 +537,48 @@ export async function sendMessage(tenantId: string, conversationId: string, inpu
   const outbound = await prepareOutboundInstance(tenantId, conversationId, sendingInstance);
   const { provider, instance: evolutionInstance, sendName: evolutionName } = outbound;
 
-  let result: unknown;
-  let type = "text";
-  let text: string | null = payload.text ?? null;
-  let mediaUrl: string | undefined;
   const numberOptions = outboundNumberCandidates(conversation.customerPhone);
-  let lastSendError: unknown = null;
-  const attemptedNumbers: string[] = [];
-  let replyTo: Prisma.InputJsonValue | null = null;
-  let quotedForSend: { providerId: string; remoteJid: string; fromMe: boolean } | undefined;
+  const { replyTo, quotedForSend } = await resolveReplyContext(
+    conversation.id,
+    conversation.customerPhone,
+    payload.replyToMessageId
+  );
 
-  if (payload.replyToMessageId) {
-    const quoted = await prisma.message.findFirst({
-      where: {
-        conversationId: conversation.id,
-        id: payload.replyToMessageId
-      }
-    });
-    if (quoted) {
-      replyTo = {
-        id: quoted.id,
-        type: quoted.type,
-        text: quoted.text ?? `[${quoted.type}]`,
-        direction: quoted.direction
-      } as Prisma.InputJsonValue;
-      if (quoted.providerId) {
-        quotedForSend = {
-          providerId: quoted.providerId,
-          remoteJid: whatsappJid(conversation.customerPhone),
-          fromMe: quoted.direction === "out"
-        };
-      }
-    }
-  }
+  const idem = await resolveIdempotentOutbound(conversation.id, payload.clientMessageId);
+  if (idem.action === "return") return idem.message;
 
-  let mediaBase64Raw: string | undefined;
+  const baseRaw = {
+    ...outboundActorRaw(actor),
+    deliveryStatus: "pending",
+    remoteJid: whatsappJid(conversation.customerPhone),
+    recipientName: conversation.customerName,
+    recipientPhone: conversation.customerPhone,
+    replyTo,
+    ...(payload.clientMessageId ? { clientMessageId: payload.clientMessageId } : {})
+  };
 
   if (payload.mediatype && payload.media && payload.mimetype) {
-    type = payload.mediatype;
-    text = payload.caption?.trim() || null;
-    mediaBase64Raw = payload.media.replace(/^data:[^;]+;base64,/, "");
+    const mediaBase64Raw = payload.media.replace(/^data:[^;]+;base64,/, "");
+    let pending =
+      idem.action === "resume"
+        ? await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw))
+        : await prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              clientMessageId: payload.clientMessageId ?? null,
+              direction: "out",
+              type: payload.mediatype,
+              text: payload.caption?.trim() || null,
+              status: "pending",
+              raw: baseRaw as Prisma.InputJsonValue
+            }
+          });
+
+    await emitOutboundMessage(tenantId, conversation, pending, actor);
+
+    const attemptedNumbers: string[] = [];
+    let lastSendError: unknown = null;
+    let result: unknown = null;
     for (const number of numberOptions) {
       try {
         attemptedNumbers.push(number);
@@ -454,14 +598,59 @@ export async function sendMessage(tenantId: string, conversationId: string, inpu
         lastSendError = error;
       }
     }
-    if (lastSendError) throw lastSendError;
-    if (!result) throw new Error("Nao foi possivel enviar midia para este numero");
-  } else if (payload.text != null && payload.text.length > 0) {
+
+    const pendingRaw = messageRawRecord(pending.raw);
+    if (lastSendError || !result) {
+      const base = lastSendError instanceof Error ? lastSendError.message : "Nao foi possivel enviar midia para este numero";
+      const failed = await markMessageFailed(pending.id, pendingRaw, base);
+      await emitOutboundMessage(tenantId, conversation, failed, actor);
+      return failed;
+    }
+
+    let sent = await markMessageSent(pending.id, extractProviderId(result), pendingRaw, result);
+    const { saveMediaBase64 } = await import("../lib/media-storage");
+    const mediaUrl = await saveMediaBase64(tenantId, sent.id, mediaBase64Raw, payload.mimetype);
+    sent = await prisma.message.update({ where: { id: sent.id }, data: { mediaUrl } });
+    await emitOutboundMessage(tenantId, conversation, sent, actor);
+    return sent;
+  }
+
+  if (payload.text != null && payload.text.length > 0) {
     const contentRaw = payload.text;
     const messagingSettings = await getMessagingSettings(tenantId);
     const actorInfo = actor ?? { id: "system", name: "Sistema", role: "system" };
-    const { providerText, signatureApplied, signatureLine } = applyOutgoingSignature(contentRaw, actorInfo, messagingSettings);
+    const { providerText, signatureApplied, signatureLine } = applyOutgoingSignature(
+      contentRaw,
+      actorInfo,
+      messagingSettings
+    );
 
+    let pending =
+      idem.action === "resume"
+        ? await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw))
+        : await prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              clientMessageId: payload.clientMessageId ?? null,
+              direction: "out",
+              type: "text",
+              text: contentRaw,
+              status: "pending",
+              raw: {
+                ...baseRaw,
+                contentRaw,
+                providerText,
+                signatureApplied: signatureApplied ?? false,
+                signatureLine: signatureLine ?? null
+              } as Prisma.InputJsonValue
+            }
+          });
+
+    await emitOutboundMessage(tenantId, conversation, pending, actor);
+
+    const attemptedNumbers: string[] = [];
+    let lastSendError: unknown = null;
+    let result: unknown = null;
     for (const number of numberOptions) {
       try {
         attemptedNumbers.push(number);
@@ -478,128 +667,22 @@ export async function sendMessage(tenantId: string, conversationId: string, inpu
         lastSendError = error;
       }
     }
-    if (lastSendError) {
-      const base = lastSendError instanceof Error ? lastSendError.message : String(lastSendError);
-      throw new Error(
-        `Falha no envio via ${evolutionName}. Numeros testados: ${attemptedNumbers.join(", ")}. Detalhe: ${base}`
-      );
+
+    const pendingRaw = messageRawRecord(pending.raw);
+    if (lastSendError || !result) {
+      const base = lastSendError instanceof Error ? lastSendError.message : String(lastSendError ?? "Erro desconhecido");
+      const reason = `Falha no envio via ${evolutionName}. Numeros testados: ${attemptedNumbers.join(", ")}. Detalhe: ${base}`;
+      const failed = await markMessageFailed(pending.id, pendingRaw, reason);
+      await emitOutboundMessage(tenantId, conversation, failed, actor);
+      return failed;
     }
-    if (!result) throw new Error("Nao foi possivel enviar mensagem para este numero");
-    text = contentRaw;
-    const message = await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        direction: "out",
-        type,
-        text,
-        mediaUrl,
-        providerId: extractProviderId(result),
-        status: "sent",
-        raw: {
-          provider: (result ?? null) as Prisma.InputJsonValue,
-          contentRaw,
-          providerText,
-          signatureApplied: signatureApplied ?? false,
-          signatureLine: signatureLine ?? null,
-          sentById: actor?.id ?? null,
-          sentByName: actor?.name ?? null,
-          sentByRole: actor?.role ?? null,
-          senderType: actor?.id === "menu-bot" ? "bot" : "agent",
-          deliveryStatus: "sent",
-          remoteJid: whatsappJid(conversation.customerPhone),
-          recipientName: conversation.customerName,
-          recipientPhone: conversation.customerPhone,
-          replyTo
-        }
-      }
-    });
 
-    const nextTags = conversationTagsWithMenuDone(conversation.tags, actor);
-    const updatedConversation = await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: {
-        status: "waiting_customer",
-        lastMessageAt: new Date(),
-        ...(nextTags ? { tags: nextTags } : {})
-      },
-      include: {
-        assignedTo: { select: { id: true, name: true, role: true } },
-        team: { select: { id: true, name: true } },
-        instance: { select: { id: true, name: true, label: true, status: true } },
-        lead: { select: { id: true, company: true, status: true, value: true } },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 }
-      }
-    });
-
-    emitToTenant(tenantId, "inbox:message", {
-      conversation: updatedConversation,
-      message
-    });
-
-    emitIntegrationEvent(tenantId, "message.created", publicMessagePayload(message));
-
-    return message;
-  } else {
-    throw new Error("Informe texto ou midia");
+    const sent = await markMessageSent(pending.id, extractProviderId(result), pendingRaw, result);
+    await emitOutboundMessage(tenantId, conversation, sent, actor);
+    return sent;
   }
 
-  const providerId = extractProviderId(result);
-
-  const message = await prisma.message.create({
-    data: {
-      conversationId: conversation.id,
-      direction: "out",
-      type,
-      text,
-      mediaUrl,
-      providerId,
-      status: "sent",
-      raw: {
-        provider: (result ?? null) as Prisma.InputJsonValue,
-        sentById: actor?.id ?? null,
-        sentByName: actor?.name ?? null,
-        sentByRole: actor?.role ?? null,
-        deliveryStatus: "sent",
-        remoteJid: whatsappJid(conversation.customerPhone),
-        recipientName: conversation.customerName,
-        recipientPhone: conversation.customerPhone,
-        replyTo
-      }
-    }
-  });
-
-  if (mediaBase64Raw) {
-    const { saveMediaBase64 } = await import("../lib/media-storage");
-    mediaUrl = await saveMediaBase64(tenantId, message.id, mediaBase64Raw, payload.mimetype);
-    await prisma.message.update({ where: { id: message.id }, data: { mediaUrl } });
-    message.mediaUrl = mediaUrl;
-  }
-
-  const nextTags = conversationTagsWithMenuDone(conversation.tags, actor);
-  const updatedConversation = await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: {
-      status: "waiting_customer",
-      lastMessageAt: new Date(),
-      ...(nextTags ? { tags: nextTags } : {})
-    },
-    include: {
-      assignedTo: { select: { id: true, name: true, role: true } },
-      team: { select: { id: true, name: true } },
-      instance: { select: { id: true, name: true, label: true, status: true } },
-      lead: { select: { id: true, company: true, status: true, value: true } },
-      messages: { orderBy: { createdAt: "desc" }, take: 1 }
-    }
-  });
-
-  emitToTenant(tenantId, "inbox:message", {
-    conversation: updatedConversation,
-    message
-  });
-
-  emitIntegrationEvent(tenantId, "message.created", publicMessagePayload(message));
-
-  return message;
+  throw new Error("Informe texto ou midia");
 }
 
 export async function sendMediaMessage(
@@ -607,7 +690,8 @@ export async function sendMediaMessage(
   conversationId: string,
   file: { buffer: Buffer; mimetype: string; filename?: string },
   caption?: string,
-  actor?: MessageActor
+  actor?: MessageActor,
+  options?: { clientMessageId?: string }
 ) {
   const normalized = normalizeInboxUpload(file);
 
@@ -626,9 +710,42 @@ export async function sendMediaMessage(
   const { mediatype, mimetype, filename, buffer, sizeBytes } = normalized;
   const base64 = buffer.toString("base64");
   const numberOptions = outboundNumberCandidates(conversation.customerPhone);
-  let result: unknown;
-  let lastSendError: unknown = null;
+  const clientMessageId = options?.clientMessageId;
+
+  const idem = await resolveIdempotentOutbound(conversation.id, clientMessageId);
+  if (idem.action === "return") return idem.message;
+
+  const baseRaw = {
+    ...outboundActorRaw(actor),
+    deliveryStatus: "pending",
+    remoteJid: whatsappJid(conversation.customerPhone),
+    recipientName: conversation.customerName,
+    recipientPhone: conversation.customerPhone,
+    fileName: filename,
+    mimeType: mimetype,
+    ...(clientMessageId ? { clientMessageId } : {})
+  };
+
+  let pending =
+    idem.action === "resume"
+      ? await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw))
+      : await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            clientMessageId: clientMessageId ?? null,
+            direction: "out",
+            type: mediatype,
+            text: caption?.trim() || null,
+            status: "pending",
+            raw: baseRaw as Prisma.InputJsonValue
+          }
+        });
+
+  await emitOutboundMessage(tenantId, conversation, pending, actor);
+
   const attemptedNumbers: string[] = [];
+  let lastSendError: unknown = null;
+  let result: unknown = null;
   for (const number of numberOptions) {
     try {
       attemptedNumbers.push(number);
@@ -648,8 +765,10 @@ export async function sendMediaMessage(
       lastSendError = error;
     }
   }
-  if (lastSendError) {
-    const base = lastSendError instanceof Error ? lastSendError.message : String(lastSendError);
+
+  const pendingRaw = messageRawRecord(pending.raw);
+  if (lastSendError || !result) {
+    const base = lastSendError instanceof Error ? lastSendError.message : String(lastSendError ?? "Erro desconhecido");
     appLog.error("inbox_media_send_failed", {
       tenantId,
       conversationId,
@@ -660,63 +779,17 @@ export async function sendMediaMessage(
       attemptedNumbers,
       error: base
     });
-    throw new Error(
-      `Falha no envio de midia via ${evolutionName}. Numeros testados: ${attemptedNumbers.join(", ")}. Detalhe: ${base}`
-    );
+    const reason = `Falha no envio de midia via ${evolutionName}. Numeros testados: ${attemptedNumbers.join(", ")}. Detalhe: ${base}`;
+    const failed = await markMessageFailed(pending.id, pendingRaw, reason);
+    await emitOutboundMessage(tenantId, conversation, failed, actor);
+    return failed;
   }
-  if (!result) throw new Error("Nao foi possivel enviar midia para este numero");
 
-  const providerId = extractProviderId(result);
-
-  const message = await prisma.message.create({
-    data: {
-      conversationId: conversation.id,
-      direction: "out",
-      type: mediatype,
-      text: caption?.trim() || null,
-      providerId,
-      status: "sent",
-      raw: {
-        provider: (result ?? null) as Prisma.InputJsonValue,
-        sentById: actor?.id ?? null,
-        sentByName: actor?.name ?? null,
-        sentByRole: actor?.role ?? null,
-        deliveryStatus: "sent",
-        remoteJid: whatsappJid(conversation.customerPhone),
-        recipientName: conversation.customerName,
-        recipientPhone: conversation.customerPhone,
-        fileName: filename,
-        mimeType: mimetype
-      }
-    }
-  });
-
+  let sent = await markMessageSent(pending.id, extractProviderId(result), pendingRaw, result);
   const { saveMediaBase64 } = await import("../lib/media-storage");
-  const mediaUrl = await saveMediaBase64(tenantId, message.id, base64, mimetype);
-  const stored = await prisma.message.update({
-    where: { id: message.id },
-    data: { mediaUrl }
-  });
-
-  const nextTags = conversationTagsWithMenuDone(conversation.tags, actor);
-  const updatedConversation = await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: {
-      status: "waiting_customer",
-      lastMessageAt: new Date(),
-      ...(nextTags ? { tags: nextTags } : {})
-    },
-    include: {
-      assignedTo: { select: { id: true, name: true, role: true } },
-      team: { select: { id: true, name: true } },
-      instance: { select: { id: true, name: true, label: true, status: true } },
-      lead: { select: { id: true, company: true, status: true, value: true } },
-      messages: { orderBy: { createdAt: "desc" }, take: 1 }
-    }
-  });
-
-  emitToTenant(tenantId, "inbox:message", { conversation: updatedConversation, message: stored });
-  emitIntegrationEvent(tenantId, "message.created", publicMessagePayload(stored));
-  return stored;
+  const mediaUrl = await saveMediaBase64(tenantId, sent.id, base64, mimetype);
+  sent = await prisma.message.update({ where: { id: sent.id }, data: { mediaUrl } });
+  await emitOutboundMessage(tenantId, conversation, sent, actor);
+  return sent;
 }
 

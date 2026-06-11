@@ -385,6 +385,11 @@ export async function inboxRoutes(app: FastifyInstance) {
       captionField && typeof captionField === "object" && "value" in captionField
         ? String(captionField.value)
         : undefined;
+    const clientMessageIdField = file.fields?.clientMessageId;
+    const clientMessageId =
+      clientMessageIdField && typeof clientMessageIdField === "object" && "value" in clientMessageIdField
+        ? String(clientMessageIdField.value).trim() || undefined
+        : undefined;
     try {
       const message = await sendMediaMessage(
         user.tenantId,
@@ -395,7 +400,8 @@ export async function inboxRoutes(app: FastifyInstance) {
           id: user.id,
           name: user.name,
           role: user.role
-        }
+        },
+        { clientMessageId }
       );
       await auditLog({
         tenantId: user.tenantId,
