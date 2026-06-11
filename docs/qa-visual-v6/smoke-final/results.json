@@ -1,0 +1,126 @@
+{
+  "passed": 20,
+  "failed": 0,
+  "results": [
+    {
+      "id": 1,
+      "name": "Login/logout (login)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 2,
+      "name": "Inbox loads",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 3,
+      "name": "Open conversation",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 4,
+      "name": "Send text message",
+      "pass": true,
+      "detail": "v6-smoke-1781199817571"
+    },
+    {
+      "id": 5,
+      "name": "Send attachment if possible",
+      "pass": true,
+      "detail": "file input present"
+    },
+    {
+      "id": 6,
+      "name": "Quick replies open",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 7,
+      "name": "Drawer opens/closes",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 8,
+      "name": "Atlas AI panel opens (provider may be disabled)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 9,
+      "name": "Search conversations",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 10,
+      "name": "Switch buckets active/history/all",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 11,
+      "name": "Mobile inbox list/thread split",
+      "pass": true,
+      "detail": "list-only ↔ thread-only"
+    },
+    {
+      "id": 12,
+      "name": "CRM loads",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 13,
+      "name": "Move lead between stages (dnd-kit)",
+      "pass": true,
+      "detail": "drag executed"
+    },
+    {
+      "id": 14,
+      "name": "CRM edit modal opens/saves",
+      "pass": true,
+      "detail": "modal opened + closed"
+    },
+    {
+      "id": 15,
+      "name": "Dashboard loads charts without fake data",
+      "pass": true,
+      "detail": "API metrics + recharts"
+    },
+    {
+      "id": 16,
+      "name": "Admin loads",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 17,
+      "name": "WhatsApp card loads",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 18,
+      "name": "Campaigns loads",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 19,
+      "name": "Automations loads",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": 20,
+      "name": "Dark mode toggle",
+      "pass": true,
+      "detail": ""
+    }
+  ]
+}
