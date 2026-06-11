@@ -75,6 +75,7 @@ export interface MessageBubbleProps {
   onHide?: (message: Message) => void;
   onEdit?: (message: Message) => void;
   onTranscribe?: (message: Message) => void;
+  onRetrySend?: (message: Message) => void;
   clustered?: boolean;
   clusterFirst?: boolean;
   clusterLast?: boolean;
@@ -89,6 +90,7 @@ function MessageBubbleBase({
   onHide,
   onEdit,
   onTranscribe,
+  onRetrySend,
   clustered,
   clusterFirst,
   clusterLast
@@ -248,6 +250,15 @@ function MessageBubbleBase({
         </div>
         {failureReason && deliveryStatus.includes("fail") ? (
           <p className="mt-1 text-[10px] text-rose-600">Falha: {failureReason}</p>
+        ) : null}
+        {onRetrySend && deliveryStatus.includes("fail") ? (
+          <button
+            type="button"
+            className="mt-2 text-[11px] font-medium text-rose-700 underline-offset-2 hover:underline"
+            onClick={() => onRetrySend(message)}
+          >
+            Tentar novamente
+          </button>
         ) : null}
         {reactions.length ? (
           <div className="mt-2 flex flex-wrap justify-end gap-1">

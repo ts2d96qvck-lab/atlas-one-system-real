@@ -47,7 +47,7 @@ import {
   type TeamRow,
   type UserRow
 } from "../lib/api";
-import { connectRealtime, joinTenant } from "../lib/socket";
+import { connectRealtime, joinTenant, setSocketLifecycleHandlers } from "../lib/socket";
 import { QuickRepliesMenu } from "./quick-replies-menu";
 import {
   conversationStatusLabel,
@@ -65,7 +65,15 @@ import { useAppDialogs } from "./ui/dialog-provider";
 import { notify } from "../lib/notify";
 import { conversationDisplayTags, mergeConversationTags } from "../lib/inbox-tags";
 import { computeConversationSla, defaultInboxSlaConfig, isConversationOverSla } from "../lib/inbox-sla";
-import { mergeMessages, groupMessagesForThread, sanitizeMessageForViewer } from "../lib/messages";
+import {
+  createClientMessageId,
+  getClientMessageId,
+  groupMessagesForThread,
+  isOutboundSendFailed,
+  mergeMessageLists,
+  mergeMessages,
+  sanitizeMessageForViewer
+} from "../lib/messages";
 import { hasPermission } from "../lib/session-user";
 import {
   agentDepartment,
@@ -87,6 +95,7 @@ import { ConversationRow } from "./inbox/conversation-row";
 import { NewContactModal, UserProfileModal } from "./inbox/inbox-modals";
 import { QueueSkeleton } from "./inbox/inbox-skeletons";
 import { ShortcutsHelpOverlay } from "./inbox/shortcuts-help";
+import { ViewStateBanner } from "./ui/view-state-banner";
 import {
   dispatchInboundNotification,
   getNotificationPermission,
@@ -176,6 +185,8 @@ export function AtlasApp({ token, user }: Props) {
   const sendingMediaRef = useRef<string | null>(null);
   const [sendingText, setSendingText] = useState(false);
   const [sendingMediaKey, setSendingMediaKey] = useState<string | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const reconcileTimerRef = useRef<number | null>(null);
 
   const selfUser = agents.find((agent) => agent.id === user.id) ?? null;
 
@@ -233,13 +244,40 @@ export function AtlasApp({ token, user }: Props) {
       const bucket = search.trim() ? "all" : queueBucket;
       const items = await listConversations(token, bucket);
       setConversations(items);
+      setSyncNotice(null);
       return items;
     } catch {
       setConversations([]);
-      setError("Caixa de entrada temporariamente indisponível. Tentando reconectar...");
+      setSyncNotice("Caixa de entrada temporariamente indisponível. Reconectando…");
       return [];
     }
   }, [token, queueBucket, search]);
+
+  const syncActiveConversation = useCallback(
+    async (id: string) => {
+      const detail = await getConversation(token, id);
+      setActiveConversation((current) => {
+        if (!current || current.id !== id) return detail;
+        return {
+          ...detail,
+          messages: mergeMessageLists(current.messages ?? [], detail.messages ?? [])
+        };
+      });
+      return detail;
+    },
+    [token]
+  );
+
+  const reconcileInbox = useCallback(async () => {
+    try {
+      await refreshConversations();
+      const active = activeIdRef.current;
+      if (active) await syncActiveConversation(active);
+      setSyncNotice(null);
+    } catch {
+      setSyncNotice("Não foi possível sincronizar agora. Tentando novamente…");
+    }
+  }, [refreshConversations, syncActiveConversation]);
 
   const openConversation = useCallback(
     async (id: string) => {
@@ -384,12 +422,39 @@ export function AtlasApp({ token, user }: Props) {
       }
     };
 
+    const onConversations = (payload: { action?: string; conversation: Conversation }) => {
+      if (!payload?.conversation?.id) return;
+      setConversations((current) => {
+        const others = current.filter((item) => item.id !== payload.conversation.id);
+        return [payload.conversation, ...others].sort((a, b) => {
+          const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+          const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+          return bt - at;
+        });
+      });
+    };
+
+    setSocketLifecycleHandlers({
+      onDisconnect: () => setSyncNotice("Conexão instável. Reconectando…"),
+      onReconnect: () => {
+        joinTenant(user.tenantId, token);
+        if (reconcileTimerRef.current) window.clearTimeout(reconcileTimerRef.current);
+        reconcileTimerRef.current = window.setTimeout(() => {
+          void reconcileInbox();
+        }, 400);
+      }
+    });
+
     socket.on("inbox:message", onMessage);
+    socket.on("inbox:conversations", onConversations);
     return () => {
       cancelled = true;
       socket.off("inbox:message", onMessage);
+      socket.off("inbox:conversations", onConversations);
+      setSocketLifecycleHandlers({});
+      if (reconcileTimerRef.current) window.clearTimeout(reconcileTimerRef.current);
     };
-  }, [token, user.tenantId, user.role, openConversation, refreshConversations]);
+  }, [token, user.tenantId, user.role, openConversation, refreshConversations, reconcileInbox]);
 
   const roleIsAgent = user.role === "agent";
   const roleIsManager = user.role === "owner" || user.role === "admin" || user.role === "supervisor";
@@ -772,7 +837,7 @@ export function AtlasApp({ token, user }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [drawerOpen, shortcutsHelpOpen, openConversation]);
 
-  async function sendCurrentDraft() {
+  async function sendCurrentDraft(reuseClientMessageId?: string) {
     if (sendingTextRef.current) return;
     if (!activeId) {
       setError("Aguarde a conversa abrir para enviar a mensagem.");
@@ -780,6 +845,7 @@ export function AtlasApp({ token, user }: Props) {
     }
     if (!draft.trim()) return;
 
+    const clientMessageId = reuseClientMessageId ?? createClientMessageId();
     sendingTextRef.current = true;
     setSendingText(true);
     const textRaw = draft;
@@ -787,12 +853,77 @@ export function AtlasApp({ token, user }: Props) {
     const text = shortcutMatch ? shortcutMatch.text : textRaw;
     setDraft("");
     try {
-      await sendMessage(token, activeId, { text, replyToMessageId: replyToMessage?.id });
+      const message = await sendMessage(token, activeId, {
+        text,
+        replyToMessageId: replyToMessage?.id,
+        clientMessageId
+      });
+      patchActiveMessage(message);
       setReplyToMessage(null);
-      await openConversation(activeId);
+      setConversations((current) => {
+        const row = current.find((item) => item.id === activeId);
+        if (!row) return current;
+        const updated: Conversation = { ...row, lastMessageAt: message.createdAt, messages: [message] };
+        const others = current.filter((item) => item.id !== activeId);
+        return [updated, ...others].sort((a, b) => {
+          const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+          const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+          return bt - at;
+        });
+      });
+      if (isOutboundSendFailed(message)) {
+        const raw = (message.raw ?? {}) as Record<string, unknown>;
+        notify.error("Mensagem não enviada", String(raw.failureReason ?? "Falha no envio"));
+      } else {
+        setError("");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar");
-      setDraft(textRaw);
+      try {
+        const message = await sendMessage(token, activeId, {
+          text,
+          replyToMessageId: replyToMessage?.id,
+          clientMessageId
+        });
+        patchActiveMessage(message);
+        setReplyToMessage(null);
+        if (isOutboundSendFailed(message)) {
+          const raw = (message.raw ?? {}) as Record<string, unknown>;
+          notify.error("Mensagem não enviada", String(raw.failureReason ?? err));
+        } else {
+          setError("");
+        }
+      } catch {
+        setError(err instanceof Error ? err.message : "Falha ao enviar");
+        setDraft(textRaw);
+      }
+    } finally {
+      sendingTextRef.current = false;
+      setSendingText(false);
+    }
+  }
+
+  async function handleRetryFailedSend(message: Message) {
+    if (!activeId || sendingTextRef.current) return;
+    const clientMessageId = getClientMessageId(message);
+    if (!clientMessageId) return;
+    const raw = (message.raw ?? {}) as Record<string, unknown>;
+    const text = typeof raw.contentRaw === "string" ? raw.contentRaw : message.text ?? "";
+    if (!text.trim()) return;
+
+    sendingTextRef.current = true;
+    setSendingText(true);
+    try {
+      const retried = await sendMessage(token, activeId, { text, clientMessageId });
+      patchActiveMessage(retried);
+      if (isOutboundSendFailed(retried)) {
+        const nextRaw = (retried.raw ?? {}) as Record<string, unknown>;
+        notify.error("Ainda não foi possível enviar", String(nextRaw.failureReason ?? "Falha no envio"));
+      } else {
+        notify.success("Mensagem enviada");
+        setError("");
+      }
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : "Falha ao reenviar");
     } finally {
       sendingTextRef.current = false;
       setSendingText(false);
@@ -906,17 +1037,41 @@ export function AtlasApp({ token, user }: Props) {
 
     sendingMediaRef.current = uploadKey;
     setSendingMediaKey(uploadKey);
+    const clientMessageId = createClientMessageId();
     try {
-      await sendMediaFile(token, activeId, pendingUploadFile, pendingUploadCaption.trim() || undefined);
+      const message = await sendMediaFile(
+        token,
+        activeId,
+        pendingUploadFile,
+        pendingUploadCaption.trim() || undefined,
+        clientMessageId
+      );
+      patchActiveMessage(message);
       if (pendingUploadUrl) URL.revokeObjectURL(pendingUploadUrl);
       setPendingUploadFile(null);
       setPendingUploadUrl("");
       setPendingUploadCaption("");
-      setError("");
-      await openConversation(activeId);
+      if (isOutboundSendFailed(message)) {
+        const raw = (message.raw ?? {}) as Record<string, unknown>;
+        notify.error("Arquivo não enviado", String(raw.failureReason ?? "Falha no envio"));
+      } else {
+        setError("");
+      }
       await refreshConversations();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar arquivo");
+      try {
+        const message = await sendMediaFile(
+          token,
+          activeId,
+          pendingUploadFile,
+          pendingUploadCaption.trim() || undefined,
+          clientMessageId
+        );
+        patchActiveMessage(message);
+        if (!isOutboundSendFailed(message)) setError("");
+      } catch {
+        setError(err instanceof Error ? err.message : "Falha ao enviar arquivo");
+      }
     } finally {
       if (sendingMediaRef.current === uploadKey) {
         sendingMediaRef.current = null;
@@ -970,16 +1125,28 @@ export function AtlasApp({ token, user }: Props) {
 
     sendingMediaRef.current = uploadKey;
     setSendingMediaKey(uploadKey);
+    const clientMessageId = createClientMessageId();
     try {
-      await sendMediaFile(token, activeId, pendingAudioFile);
+      const message = await sendMediaFile(token, activeId, pendingAudioFile, undefined, clientMessageId);
+      patchActiveMessage(message);
       if (pendingAudioUrl) URL.revokeObjectURL(pendingAudioUrl);
       setPendingAudioFile(null);
       setPendingAudioUrl("");
-      setError("");
-      await openConversation(activeId);
+      if (isOutboundSendFailed(message)) {
+        const raw = (message.raw ?? {}) as Record<string, unknown>;
+        notify.error("Áudio não enviado", String(raw.failureReason ?? "Falha no envio"));
+      } else {
+        setError("");
+      }
       await refreshConversations();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar áudio");
+      try {
+        const message = await sendMediaFile(token, activeId, pendingAudioFile, undefined, clientMessageId);
+        patchActiveMessage(message);
+        if (!isOutboundSendFailed(message)) setError("");
+      } catch {
+        setError(err instanceof Error ? err.message : "Falha ao enviar áudio");
+      }
     } finally {
       if (sendingMediaRef.current === uploadKey) {
         sendingMediaRef.current = null;
@@ -1188,6 +1355,11 @@ export function AtlasApp({ token, user }: Props) {
   return (
     <main ref={mainRef} className="mx-auto h-full w-full max-w-[1920px] overflow-hidden p-1.5 sm:p-2.5">
       <section className="inbox-v42-shell atlas-v5-module-shell flex h-full min-h-0 flex-col overflow-hidden">
+        {syncNotice ? (
+          <div className="shrink-0 border-b border-slate-200/40 px-2 py-2 sm:px-3">
+            <ViewStateBanner message={syncNotice} onRetry={() => void reconcileInbox()} retryLabel="Sincronizar" />
+          </div>
+        ) : null}
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]">
           <div
             className={`inbox-v42-queue relative min-w-0 flex-col ${INBOX_PANEL_CLASS} ${
@@ -1501,6 +1673,9 @@ export function AtlasApp({ token, user }: Props) {
                                     onHide={(message) => void handleHideMessage(message)}
                                     onEdit={(message) => void handleEditMessage(message)}
                                     onTranscribe={(message) => void handleTranscribeMessage(message)}
+                                    onRetrySend={
+                                      isOutboundSendFailed(m) ? (msg) => void handleRetryFailedSend(msg) : undefined
+                                    }
                                   />
                                 ))}
                               </div>
