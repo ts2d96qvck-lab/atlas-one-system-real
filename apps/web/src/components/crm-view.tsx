@@ -30,6 +30,7 @@ import {
 import { crmStageLabel, EMPTY_COPY } from "../lib/product-copy";
 import { EmptyState } from "./empty-state";
 import { AtlasViewHeader } from "./atlas-view-header";
+import { ViewStateBanner } from "./ui/view-state-banner";
 import { LeadAttachmentsPanel } from "./lead-attachments-panel";
 import { AtlasAiCrmPanel } from "./atlas-ai/atlas-ai-crm-panel";
 import { hasPermission } from "../lib/session-user";
@@ -184,15 +185,23 @@ export function CrmView({ token, user }: Props) {
     assignedToId: ""
   });
   const [savingCreate, setSavingCreate] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function load() {
+    setLoading(true);
     const [pipelineRes, usersRes] = await Promise.all([
       fetch(`${apiUrl()}/crm/pipeline`, {
         headers: { authorization: `Bearer ${token}` }
       }),
       listUsers(token).catch(() => [] as UserRow[])
     ]);
-    if (pipelineRes.ok) setData(await pipelineRes.json());
+    if (pipelineRes.ok) {
+      setData(await pipelineRes.json());
+      setLoadError(null);
+    } else {
+      setData(null);
+      setLoadError("Não foi possível carregar o funil agora. Verifique a conexão e tente novamente.");
+    }
     setAgents(usersRes);
     setLoading(false);
   }
@@ -353,6 +362,19 @@ export function CrmView({ token, user }: Props) {
           <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
             <AtlasViewHeader icon={Users} section="Comercial" title="CRM · Funil de vendas" />
             <CrmBoardSkeleton />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="atlas-page">
+        <div className="atlas-page-inner w-full min-w-0">
+          <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
+            <AtlasViewHeader icon={Users} section="Comercial" title="CRM · Funil de vendas" />
+            <ViewStateBanner message={loadError} onRetry={() => void load()} tone="danger" />
           </div>
         </div>
       </main>
