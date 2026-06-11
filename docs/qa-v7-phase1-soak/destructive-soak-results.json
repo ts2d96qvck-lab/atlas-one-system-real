@@ -1,0 +1,100 @@
+{
+  "at": "2026-06-11T20:35:57.696Z",
+  "api": "http://127.0.0.1:4000",
+  "web": "http://127.0.0.1:3001",
+  "passed": 13,
+  "failed": 0,
+  "results": [
+    {
+      "id": "T1",
+      "name": "Parallel duplicate clientMessageId (idempotency)",
+      "pass": true,
+      "detail": "single message cmq9yhx2c0005ce74a2jrkher, statuses failed/pending",
+      "severity": "—"
+    },
+    {
+      "id": "T1b",
+      "name": "Parallel idempotency — single DB row per clientMessageId",
+      "pass": true,
+      "detail": "rows=1",
+      "severity": "—"
+    },
+    {
+      "id": "T2",
+      "name": "Sequential retry same clientMessageId after send",
+      "pass": true,
+      "detail": "returned cmq9yhx2c0005ce74a2jrkher, status failed",
+      "severity": "—"
+    },
+    {
+      "id": "T3",
+      "name": "DB-first send returns persisted message (201 + id + status)",
+      "pass": true,
+      "detail": "HTTP 201, status=failed, delivery=failed",
+      "severity": "—"
+    },
+    {
+      "id": "T4",
+      "name": "Rapid sends with distinct clientMessageIds (3 messages created)",
+      "pass": true,
+      "detail": "unique ids=3 (expected 3 distinct WhatsApp sends if provider OK)",
+      "severity": "—"
+    },
+    {
+      "id": "T5",
+      "name": "Invalid send rejected before provider",
+      "pass": true,
+      "detail": "HTTP 400",
+      "severity": "—"
+    },
+    {
+      "id": "T6",
+      "name": "Socket disconnect/reconnect receives inbox:message",
+      "pass": true,
+      "detail": "events=2",
+      "severity": "—"
+    },
+    {
+      "id": "T7",
+      "name": "CRM pipeline auth failure is explicit (401)",
+      "pass": true,
+      "detail": "ok=200 bad=401",
+      "severity": "—"
+    },
+    {
+      "id": "T8-api",
+      "name": "Provider failure persisted with failureReason (no silent drop)",
+      "pass": true,
+      "detail": "Falha no envio via Atlas one. Numeros testados: 5517991579854, 17991579854, 1791",
+      "severity": "—"
+    },
+    {
+      "id": "T8",
+      "name": "Browser refresh preserves sent message in thread",
+      "pass": true,
+      "detail": "after refresh count=1",
+      "severity": "—"
+    },
+    {
+      "id": "T9",
+      "name": "Second tab queue shows sent message preview (multi-tab sync)",
+      "pass": true,
+      "detail": "row match=1",
+      "severity": "—"
+    },
+    {
+      "id": "T10",
+      "name": "Send shows status label in bubble (user understands state)",
+      "pass": true,
+      "detail": "status=\"Falhou\"",
+      "severity": "—"
+    },
+    {
+      "id": "T11",
+      "name": "CRM pipeline load failure shows visible banner",
+      "pass": true,
+      "detail": "Não foi possível carregar o funil agora. Verifique a conexão e tente novamente.\n",
+      "severity": "—"
+    }
+  ]
+}

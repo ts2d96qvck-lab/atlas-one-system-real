@@ -189,21 +189,28 @@ export function CrmView({ token, user }: Props) {
 
   async function load() {
     setLoading(true);
-    const [pipelineRes, usersRes] = await Promise.all([
-      fetch(`${apiUrl()}/crm/pipeline`, {
-        headers: { authorization: `Bearer ${token}` }
-      }),
-      listUsers(token).catch(() => [] as UserRow[])
-    ]);
-    if (pipelineRes.ok) {
-      setData(await pipelineRes.json());
-      setLoadError(null);
-    } else {
+    setLoadError(null);
+    try {
+      const [pipelineRes, usersRes] = await Promise.all([
+        fetch(`${apiUrl()}/crm/pipeline`, {
+          headers: { authorization: `Bearer ${token}` }
+        }).catch(() => null),
+        listUsers(token).catch(() => [] as UserRow[])
+      ]);
+      if (!pipelineRes?.ok) {
+        setData(null);
+        setLoadError("Não foi possível carregar o funil agora. Verifique a conexão e tente novamente.");
+      } else {
+        setData(await pipelineRes.json());
+        setLoadError(null);
+      }
+      setAgents(usersRes);
+    } catch {
       setData(null);
       setLoadError("Não foi possível carregar o funil agora. Verifique a conexão e tente novamente.");
+    } finally {
+      setLoading(false);
     }
-    setAgents(usersRes);
-    setLoading(false);
   }
 
   useEffect(() => {

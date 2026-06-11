@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { Message } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { normalizeInboxUpload } from "../lib/media-upload";
 import { appLog } from "../lib/app-log";
@@ -158,6 +159,27 @@ function outboundActorRaw(actor?: MessageActor) {
 
 async function findOutboundByClientMessageId(conversationId: string, clientMessageId: string) {
   return prisma.message.findFirst({ where: { conversationId, clientMessageId } });
+}
+
+function isClientMessageIdConflict(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+async function createOutboundPendingMessage(
+  conversationId: string,
+  clientMessageId: string | undefined,
+  data: Parameters<typeof prisma.message.create>[0]["data"]
+): Promise<{ message: Message; created: boolean }> {
+  try {
+    const message = await prisma.message.create({ data });
+    return { message, created: true };
+  } catch (error) {
+    if (clientMessageId && isClientMessageIdConflict(error)) {
+      const existing = await findOutboundByClientMessageId(conversationId, clientMessageId);
+      if (existing) return { message: existing, created: false };
+    }
+    throw error;
+  }
 }
 
 async function resolveIdempotentOutbound(conversationId: string, clientMessageId?: string) {
@@ -559,20 +581,24 @@ export async function sendMessage(tenantId: string, conversationId: string, inpu
 
   if (payload.mediatype && payload.media && payload.mimetype) {
     const mediaBase64Raw = payload.media.replace(/^data:[^;]+;base64,/, "");
-    let pending =
-      idem.action === "resume"
-        ? await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw))
-        : await prisma.message.create({
-            data: {
-              conversationId: conversation.id,
-              clientMessageId: payload.clientMessageId ?? null,
-              direction: "out",
-              type: payload.mediatype,
-              text: payload.caption?.trim() || null,
-              status: "pending",
-              raw: baseRaw as Prisma.InputJsonValue
-            }
-          });
+    let pending: Message;
+    let created = true;
+    if (idem.action === "resume") {
+      pending = await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw));
+    } else {
+      const createdRow = await createOutboundPendingMessage(conversation.id, payload.clientMessageId, {
+        conversationId: conversation.id,
+        clientMessageId: payload.clientMessageId ?? null,
+        direction: "out",
+        type: payload.mediatype,
+        text: payload.caption?.trim() || null,
+        status: "pending",
+        raw: baseRaw as Prisma.InputJsonValue
+      });
+      pending = createdRow.message;
+      created = createdRow.created;
+    }
+    if (!created) return pending;
 
     await emitOutboundMessage(tenantId, conversation, pending, actor);
 
@@ -625,26 +651,30 @@ export async function sendMessage(tenantId: string, conversationId: string, inpu
       messagingSettings
     );
 
-    let pending =
-      idem.action === "resume"
-        ? await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw))
-        : await prisma.message.create({
-            data: {
-              conversationId: conversation.id,
-              clientMessageId: payload.clientMessageId ?? null,
-              direction: "out",
-              type: "text",
-              text: contentRaw,
-              status: "pending",
-              raw: {
-                ...baseRaw,
-                contentRaw,
-                providerText,
-                signatureApplied: signatureApplied ?? false,
-                signatureLine: signatureLine ?? null
-              } as Prisma.InputJsonValue
-            }
-          });
+    let pending: Message;
+    let created = true;
+    if (idem.action === "resume") {
+      pending = await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw));
+    } else {
+      const createdRow = await createOutboundPendingMessage(conversation.id, payload.clientMessageId, {
+        conversationId: conversation.id,
+        clientMessageId: payload.clientMessageId ?? null,
+        direction: "out",
+        type: "text",
+        text: contentRaw,
+        status: "pending",
+        raw: {
+          ...baseRaw,
+          contentRaw,
+          providerText,
+          signatureApplied: signatureApplied ?? false,
+          signatureLine: signatureLine ?? null
+        } as Prisma.InputJsonValue
+      });
+      pending = createdRow.message;
+      created = createdRow.created;
+    }
+    if (!created) return pending;
 
     await emitOutboundMessage(tenantId, conversation, pending, actor);
 
@@ -726,20 +756,24 @@ export async function sendMediaMessage(
     ...(clientMessageId ? { clientMessageId } : {})
   };
 
-  let pending =
-    idem.action === "resume"
-      ? await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw))
-      : await prisma.message.create({
-          data: {
-            conversationId: conversation.id,
-            clientMessageId: clientMessageId ?? null,
-            direction: "out",
-            type: mediatype,
-            text: caption?.trim() || null,
-            status: "pending",
-            raw: baseRaw as Prisma.InputJsonValue
-          }
-        });
+  let pending: Message;
+  let created = true;
+  if (idem.action === "resume") {
+    pending = await resetMessageToPending(idem.message.id, messageRawRecord(idem.message.raw));
+  } else {
+    const createdRow = await createOutboundPendingMessage(conversation.id, clientMessageId, {
+      conversationId: conversation.id,
+      clientMessageId: clientMessageId ?? null,
+      direction: "out",
+      type: mediatype,
+      text: caption?.trim() || null,
+      status: "pending",
+      raw: baseRaw as Prisma.InputJsonValue
+    });
+    pending = createdRow.message;
+    created = createdRow.created;
+  }
+  if (!created) return pending;
 
   await emitOutboundMessage(tenantId, conversation, pending, actor);
 
