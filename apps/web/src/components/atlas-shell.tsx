@@ -916,7 +916,7 @@ export function AtlasShell() {
             {session.user.name} · {roleLabel(session.user.role)}
           </p>
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2.5">
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2.5" aria-label="Navegação principal">
           {visibleViews.map((item) => {
             const isActive = view === item.id;
             const Icon = item.icon;
@@ -925,6 +925,8 @@ export function AtlasShell() {
                 key={item.id}
                 type="button"
                 onClick={() => setView(item.id)}
+                aria-label={item.label}
+                aria-current={isActive ? "page" : undefined}
                 className={`atlas-nav-item ${isActive ? "atlas-nav-item-active" : ""}`}
               >
                 <Icon size={16} className="shrink-0 opacity-70" />
@@ -937,6 +939,7 @@ export function AtlasShell() {
           <button
             type="button"
             className="atlas-nav-item w-full"
+            aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo noturno"}
             onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
           >
             {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}

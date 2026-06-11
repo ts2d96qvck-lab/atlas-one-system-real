@@ -100,3 +100,47 @@ export const INBOX_QUEUE_BUCKET_HELP = {
   history: "Encerradas, resolvidas e arquivadas — nada desaparece, fica aqui.",
   all: "Todas as conversas, inclusive arquivadas."
 } as const;
+
+/** Empty states e mensagens operacionais compartilhadas. */
+export const EMPTY_COPY = {
+  inboxQueue: {
+    title: "Nenhuma conversa",
+    descriptionActive: "Nenhuma conversa ativa com estes filtros. Limpe a busca ou mude a fila.",
+    descriptionHistory: "Nenhuma conversa no histórico. Tente Todas ou limpe a busca.",
+    descriptionDefault: "Nenhuma conversa encontrada. Ajuste os filtros ou inicie um novo contato."
+  },
+  inboxThread: {
+    title: "Selecione uma conversa",
+    description: "Escolha um contato na fila para responder ou use + para iniciar um novo."
+  },
+  crmColumn: {
+    title: "Coluna vazia",
+    description: "Arraste um lead para cá ou crie um novo lead.",
+    action: "Novo lead"
+  },
+  campaigns: {
+    title: "Nenhuma campanha",
+    description: "Crie uma campanha para disparar mensagens em massa pelo WhatsApp.",
+    action: "Ir para o formulário"
+  },
+  automations: {
+    title: "Nenhuma automação",
+    description: "Configure regras para leads e conversas sem trabalho manual repetitivo.",
+    action: "Criar automação"
+  }
+} as const;
+
+export const MODULE_COPY = {
+  dashboard: {
+    unavailable: "Painel indisponível no momento. Exibindo dados padrão.",
+    exportFailed: "Falha ao exportar",
+    noPipeline: "Sem dados de pipeline ainda.",
+    noInstances: "Sem números cadastrados.",
+    noTeam: "Sem dados de desempenho ainda.",
+    conversion: "conversão"
+  },
+  loadFailed: {
+    campaigns: "Não foi possível carregar campanhas.",
+    automations: "Não foi possível carregar automações."
+  }
+} as const;

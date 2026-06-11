@@ -27,7 +27,7 @@ import {
   type SessionUser,
   type UserRow
 } from "../lib/api";
-import { crmStageLabel } from "../lib/product-copy";
+import { crmStageLabel, EMPTY_COPY } from "../lib/product-copy";
 import { EmptyState } from "./empty-state";
 import { AtlasViewHeader } from "./atlas-view-header";
 import { LeadAttachmentsPanel } from "./lead-attachments-panel";
@@ -418,9 +418,9 @@ export function CrmView({ token, user }: Props) {
                     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                       {!column.length ? (
                         <EmptyState
-                          title="Coluna vazia"
-                          description="Arraste um lead para cá ou crie um novo lead."
-                          actionLabel="Novo lead"
+                          title={EMPTY_COPY.crmColumn.title}
+                          description={EMPTY_COPY.crmColumn.description}
+                          actionLabel={EMPTY_COPY.crmColumn.action}
                           onAction={() => setCreatingLead(true)}
                         />
                       ) : null}

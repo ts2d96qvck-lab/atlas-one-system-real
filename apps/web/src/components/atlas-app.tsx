@@ -9,7 +9,6 @@ import {
   Keyboard,
   ListChecks,
   Loader2,
-  MessageCircle,
   Mic,
   Paperclip,
   Plus,
@@ -52,6 +51,7 @@ import { connectRealtime, joinTenant } from "../lib/socket";
 import { QuickRepliesMenu } from "./quick-replies-menu";
 import {
   conversationStatusLabel,
+  EMPTY_COPY,
   INBOX_QUEUE_BUCKETS,
   INBOX_QUEUE_BUCKET_HELP,
   type LifecycleStatus
@@ -59,6 +59,7 @@ import {
 import { TagFilterPopover } from "./conversation-tags";
 import { ConversationDrawer, type ConversationDrawerTab } from "./conversation-drawer";
 import { InboxBulkBar } from "./inbox-bulk-bar";
+import { EmptyState } from "./empty-state";
 import { AppCombobox } from "./ui/app-select";
 import { useAppDialogs } from "./ui/dialog-provider";
 import { notify } from "../lib/notify";
@@ -1382,11 +1383,19 @@ export function AtlasApp({ token, user }: Props) {
             {loading && !filtered.length ? (
               <QueueSkeleton />
             ) : !filtered.length ? (
-              <div className="mt-6 px-2 text-center text-xs text-slate-500">
-                {queueBucket === "history"
-                  ? "Nenhuma conversa no histórico com estes filtros. Tente Todas ou limpe a busca."
-                  : "Nenhuma conversa encontrada com os filtros atuais."}
-              </div>
+              <EmptyState
+                className="mx-2 my-4"
+                title={EMPTY_COPY.inboxQueue.title}
+                description={
+                  queueBucket === "history"
+                    ? EMPTY_COPY.inboxQueue.descriptionHistory
+                    : queueBucket === "active"
+                      ? EMPTY_COPY.inboxQueue.descriptionActive
+                      : EMPTY_COPY.inboxQueue.descriptionDefault
+                }
+                actionLabel="Novo contato"
+                onAction={() => setNewContactModalOpen(true)}
+              />
             ) : null}
               <div ref={queueScrollRef} className="atlas-scroll min-h-0 flex-1 overflow-y-auto px-2 py-1.5">
                 <div className="relative w-full" style={{ height: `${queueVirtualizer.getTotalSize()}px` }}>
@@ -1591,7 +1600,7 @@ export function AtlasApp({ token, user }: Props) {
                         <div className="min-w-0">
                           <p className="inline-flex items-center gap-1 font-semibold text-slate-700">
                             <CornerUpLeft size={12} />
-                            Respondendo mensagem especifica
+                            Respondendo mensagem específica
                           </p>
                           <p className="truncate text-slate-500">{replyToMessage.text ?? `[${replyToMessage.type}]`}</p>
                         </div>
@@ -1681,9 +1690,12 @@ export function AtlasApp({ token, user }: Props) {
                 </>
               ) : (
                 <div className="inbox-v42-thread grid flex-1 place-items-center gap-2 px-6 text-center text-slate-500">
-                  <MessageCircle size={36} className="text-slate-300" strokeWidth={1.25} />
-                  <p className="text-sm font-medium text-slate-600">Selecione uma conversa</p>
-                  <p className="max-w-xs text-xs text-slate-400">Escolha um contato na fila para responder ou use + para iniciar um novo.</p>
+                  <EmptyState
+                    title={EMPTY_COPY.inboxThread.title}
+                    description={EMPTY_COPY.inboxThread.description}
+                    actionLabel="Novo contato"
+                    onAction={() => setNewContactModalOpen(true)}
+                  />
                 </div>
               )}
             </div>

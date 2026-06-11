@@ -2013,7 +2013,7 @@ export function AdminView({ token, user }: Props) {
                 <p className="text-xs text-atlas-muted">
                   {activeInstance
                     ? `Instância: ${activeInstance.name}${activeInstance.phone ? ` · Telefone: ${activeInstance.phone}` : ""}`
-                    : "Crie ou selecione uma instancia"}
+                    : "Crie ou selecione uma instância"}
                 </p>
                 <span className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${statusTone}`}>
                   <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : activeStatus === "connecting" || activeStatus === "created" || activeStatus === "qrcode" ? "bg-amber-500" : "bg-slate-400"}`} />
@@ -2064,7 +2064,7 @@ export function AdminView({ token, user }: Props) {
             <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
               <p className="text-[11px] font-semibold text-atlas-muted">Contexto da sessao</p>
               <p className="mt-1 text-xs text-slate-700">
-                {activeInstance ? `${activeInstance.label} (${activeInstance.name})` : "Nenhuma instancia selecionada"}
+                {activeInstance ? `${activeInstance.label} (${activeInstance.name})` : "Nenhuma instância selecionada"}
               </p>
             </div>
           </div>

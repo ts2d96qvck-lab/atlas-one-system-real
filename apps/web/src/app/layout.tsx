@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     default: "Atlas One",
     template: "%s · Atlas One"
   },
-  description: "WhatsApp, CRM, SDR e operacao comercial em uma plataforma premium.",
+  description: "WhatsApp, CRM, SDR e operação comercial em uma plataforma premium.",
   applicationName: "Atlas One",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],

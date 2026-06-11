@@ -11,9 +11,13 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { Button, Card, KpiStat } from "@atlas-one/ui";import { apiUrl } from "../lib/config";
+import { Button, Card, KpiStat } from "@atlas-one/ui";
+import { apiUrl } from "../lib/config";
 import { downloadOpsExport } from "../lib/api";
+import { MODULE_COPY } from "../lib/product-copy";
 import { AtlasViewHeader } from "./atlas-view-header";
+import { ModuleListSkeleton } from "./ui/module-list-skeleton";
+import { ViewStateBanner } from "./ui/view-state-banner";
 import { AtlasAiAskPanel } from "./atlas-ai/atlas-ai-ask-panel";
 import { hasPermission } from "../lib/session-user";
 import type { SessionUser } from "../lib/api";
@@ -22,6 +26,7 @@ type Props = { token: string; user: SessionUser };
 
 export function DashboardView({ token, user }: Props) {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -89,33 +94,46 @@ export function DashboardView({ token, user }: Props) {
     try {
       await downloadOpsExport(token, kind);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao exportar");
+      setError(err instanceof Error ? err.message : MODULE_COPY.dashboard.exportFailed);
     } finally {
       setExporting(null);
     }
   }
 
-  useEffect(() => {
-    fetch(`${apiUrl()}/dashboard`, { headers: { authorization: `Bearer ${token}` } })
-      .then(async (r) => {
-        if (!r.ok) {
-          setError("Painel indisponível no momento. Exibindo dados padrao.");
-          return emptyDashboard();
-        }
-        return r.json();
-      })
-      .then((payload) => setData(payload ?? emptyDashboard()))
-      .catch(() => {
-        setError("Painel indisponível no momento. Exibindo dados padrao.");
+  async function loadDashboard() {
+    setLoading(true);
+    try {
+      const r = await fetch(`${apiUrl()}/dashboard`, { headers: { authorization: `Bearer ${token}` } });
+      if (!r.ok) {
+        setError(MODULE_COPY.dashboard.unavailable);
         setData(emptyDashboard());
-      });
+        return;
+      }
+      const payload = await r.json();
+      setData(payload ?? emptyDashboard());
+      setError("");
+    } catch {
+      setError(MODULE_COPY.dashboard.unavailable);
+      setData(emptyDashboard());
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadDashboard();
   }, [token]);
 
-  if (!data) {
+  if (loading || !data) {
     return (
-      <div className="grid min-h-[40vh] place-items-center py-16">
-        <Loader2 className="animate-spin" />
-      </div>
+      <main className="atlas-page">
+        <div className="atlas-page-inner w-full min-w-0">
+          <div className="atlas-v5-module-shell atlas-v5-stack min-h-0">
+            <AtlasViewHeader icon={BarChart3} section="Operação e vendas" title="Painel de performance" />
+            <ModuleListSkeleton rows={4} />
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -254,8 +272,9 @@ export function DashboardView({ token, user }: Props) {
             </div>
           }
         />
-        {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
-
+        {error ? (
+          <ViewStateBanner message={error} onRetry={() => void loadDashboard()} tone="warning" />
+        ) : null}
         {hasPermission(user, "ai:use") ? <AtlasAiAskPanel token={token} user={user} /> : null}
 
         <div className="mb-5 grid gap-3 lg:grid-cols-4">
@@ -485,7 +504,7 @@ export function DashboardView({ token, user }: Props) {
                   </div>
                 </div>
               ))}
-              {!stageRows.length ? <p className="text-xs text-slate-500">Sem dados de pipeline ainda.</p> : null}
+              {!stageRows.length ? <p className="text-xs text-atlas-muted">{MODULE_COPY.dashboard.noPipeline}</p> : null}
             </div>
           </Card>
 
@@ -545,7 +564,7 @@ export function DashboardView({ token, user }: Props) {
                   </div>
                 );
               })}
-              {!instances.length ? <p className="text-xs text-slate-500">Sem números cadastrados.</p> : null}
+              {!instances.length ? <p className="text-xs text-atlas-muted">{MODULE_COPY.dashboard.noInstances}</p> : null}
             </div>
           </Card>
         </div>
@@ -563,7 +582,7 @@ export function DashboardView({ token, user }: Props) {
               <div key={row.name} className="rounded-xl border border-white bg-white/90 p-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-slate-800">{row.name}</p>
-                  <p className="text-xs text-slate-500">{toPercent(Number(row.conversionRate ?? 0))} conversao</p>
+                  <p className="text-xs text-atlas-muted">{toPercent(Number(row.conversionRate ?? 0))} {MODULE_COPY.dashboard.conversion}</p>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {row.leads} leads · {row.closed} fechados · {toMoney(Number(row.revenue ?? 0))}
@@ -576,7 +595,7 @@ export function DashboardView({ token, user }: Props) {
                 </div>
               </div>
             ))}
-            {!teamRows.length ? <p className="text-xs text-slate-500">Sem dados de desempenho ainda.</p> : null}
+            {!teamRows.length ? <p className="text-xs text-atlas-muted">{MODULE_COPY.dashboard.noTeam}</p> : null}
           </div>
         </Card>
         </div>

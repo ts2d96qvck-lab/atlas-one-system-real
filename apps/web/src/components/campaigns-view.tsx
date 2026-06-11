@@ -8,9 +8,12 @@ import type { SessionUser } from "../lib/api";
 import { hasPermission } from "../lib/session-user";
 import { AtlasViewHeader } from "./atlas-view-header";
 import { EmptyState } from "./empty-state";
+import { ModuleListSkeleton } from "./ui/module-list-skeleton";
+import { ViewStateBanner } from "./ui/view-state-banner";
 import { AtlasAiCampaignsPanel } from "./atlas-ai/atlas-ai-campaigns-panel";
 import { useAppDialogs } from "./ui/dialog-provider";
 import { notify } from "../lib/notify";
+import { EMPTY_COPY, MODULE_COPY } from "../lib/product-copy";
 
 const MESSAGE_KIND_LABEL: Record<string, string> = {
   session: "Mensagem livre",
@@ -46,8 +49,7 @@ export function CampaignsView({ token, user }: Props) {
   const [items, setItems] = useState<Campaign[]>([]);
   const [instances, setInstances] = useState<Instance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState({
     name: "",
     instanceId: "",
@@ -64,16 +66,17 @@ export function CampaignsView({ token, user }: Props) {
   const jsonHeaders = { ...headers, "content-type": "application/json" };
 
   async function load() {
+    setLoading(true);
     const [campaignRes, instanceRes] = await Promise.all([
       fetch(`${apiUrl()}/campaigns`, { headers }),
       fetch(`${apiUrl()}/whatsapp/instances`, { headers })
     ]);
     if (campaignRes.ok) {
       setItems(await campaignRes.json());
-      setError("");
+      setLoadError("");
     } else {
       const body = await campaignRes.json().catch(() => ({}));
-      setError(body?.error ?? "Falha ao carregar campanhas");
+      setLoadError(body?.error ?? MODULE_COPY.loadFailed.campaigns);
     }
     if (instanceRes.ok) {
       const list = await instanceRes.json();
@@ -91,15 +94,15 @@ export function CampaignsView({ token, user }: Props) {
 
   async function create() {
     if (!form.name.trim()) {
-      setError("Informe o nome da campanha.");
+      notify.error("Informe o nome da campanha.");
       return;
     }
     if (!form.instanceId) {
-      setError("Selecione a instância WhatsApp.");
+      notify.error("Selecione a instância WhatsApp.");
       return;
     }
     if (!form.recipientsText.trim()) {
-      setError("Informe os destinatários (um telefone por linha).");
+      notify.error("Informe os destinatários (um telefone por linha).");
       return;
     }
     const response = await fetch(`${apiUrl()}/campaigns`, {
@@ -122,7 +125,7 @@ export function CampaignsView({ token, user }: Props) {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      setError(body?.error ?? body?.details ?? "Falha ao criar campanha");
+      notify.error(body?.error ?? body?.details ?? "Falha ao criar campanha");
       return;
     }
     setForm({
@@ -137,8 +140,6 @@ export function CampaignsView({ token, user }: Props) {
       onlyBusinessHours: true
     });
     notify.success("Campanha criada", "Clique em Iniciar para disparar os envios.");
-    setInfo("");
-    setError("");
     await load();
   }
 
@@ -171,7 +172,7 @@ export function CampaignsView({ token, user }: Props) {
             ? "Campanha cancelada."
             : "Campanha excluída."
     );
-    setError("");
+    setLoadError("");
     await load();
   }
 
@@ -307,19 +308,19 @@ export function CampaignsView({ token, user }: Props) {
           <Button className="mt-4" onClick={create}>
             <Plus size={16} /> Criar campanha
           </Button>
-          {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
-          {!error && info ? <p className="mt-2 text-xs text-emerald-700">{info}</p> : null}
         </Card>
 
+        {loadError ? <ViewStateBanner message={loadError} onRetry={() => void load()} tone="danger" /> : null}
+
         {loading ? (
-          <Loader2 className="animate-spin" />
+          <ModuleListSkeleton rows={3} />
         ) : (
           <div className="space-y-3">
             {items.length === 0 ? (
               <EmptyState
-                title="Nenhuma campanha"
-                description="Crie uma campanha para disparar mensagens em massa pelo WhatsApp."
-                actionLabel="Nova campanha"
+                title={EMPTY_COPY.campaigns.title}
+                description={EMPTY_COPY.campaigns.description}
+                actionLabel={EMPTY_COPY.campaigns.action}
                 onAction={() => {
                   const first = document.querySelector<HTMLInputElement>('input[placeholder="Ex.: Promoção março"]');
                   first?.focus();
