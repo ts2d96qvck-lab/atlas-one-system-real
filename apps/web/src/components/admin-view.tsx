@@ -579,15 +579,39 @@ export function AdminView({ token, user }: Props) {
     }
   }, [token, auditFilter, auditEntityFilter]);
 
+  /** Lightweight poll: WhatsApp connection + API health only (skip when tab hidden). */
+  const refreshLivePoll = useCallback(async () => {
+    try {
+      const health = await fetch(`${apiUrl()}/health`);
+      setApiHealth(health.ok ? "ok" : "down");
+    } catch {
+      setApiHealth("down");
+    }
+    try {
+      const rows = normalizeWhatsAppInstances(await listInstances(token));
+      setInstances(rows);
+      setSelectedInstance((current) => {
+        if (current && rows.some((item) => item.name === current)) return current;
+        return rows[0]?.name ?? "";
+      });
+    } catch {
+      setInstances([]);
+      setSelectedInstance("");
+    }
+  }, [token]);
+
   useEffect(() => {
     void bootstrapAdminForms().finally(() => setLoading(false));
   }, [bootstrapAdminForms]);
 
   useEffect(() => {
     void refreshSnapshot();
-    const t = setInterval(refreshSnapshot, 45000);
-    return () => clearInterval(t);
-  }, [refreshSnapshot]);
+    const t = window.setInterval(() => {
+      if (document.hidden) return;
+      void refreshLivePoll();
+    }, 45000);
+    return () => window.clearInterval(t);
+  }, [refreshSnapshot, refreshLivePoll]);
 
   useEffect(() => {
     void refreshAuditLogs();
