@@ -4,17 +4,17 @@ import { ZodError } from "zod";
 import {
   bootstrapOwnerAccount,
   confirmPasswordReset,
-  getBootstrapStatus,
   login,
   logout,
   publicUser,
   requestPasswordReset,
   requestTenantAccess,
+  resolveBootstrapStatus,
   verifyLoginCode
 } from "../services/auth.service";
 import { acceptUserInvite, previewUserInvite } from "../services/invite.service";
 import { requireAuth, requireUser } from "../plugins/auth";
-import { sendError, clientMessage } from "../utils/http";
+import { sendError, clientMessage, safeClientMessage } from "../utils/http";
 import { listAuthProviders } from "../lib/auth";
 import {
   buildOidcStartRedirect,
@@ -24,10 +24,18 @@ import {
   listSsoProvidersForTenant
 } from "../services/sso/sso.service";
 import { env } from "../config/env";
-import { assertSetupToken } from "../lib/security/validate-env";
+import { isSetupAuthorizedForTenant } from "../lib/security/validate-env";
 import { prisma } from "../lib/prisma";
 import { resolveClientIp } from "../lib/client-ip";
 import { AuthLoginError, formatZodIssues } from "../lib/auth-login-errors";
+
+function readSetupCredential(request: { headers: Record<string, unknown>; query?: unknown }) {
+  const header = request.headers["x-setup-token"];
+  if (typeof header === "string" && header.trim()) return header.trim();
+  const query = request.query as { setup?: string };
+  if (typeof query.setup === "string" && query.setup.trim()) return query.setup.trim();
+  return undefined;
+}
 import { appLog } from "../lib/app-log";
 
 export async function authRoutes(app: FastifyInstance) {
@@ -156,24 +164,34 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     publicApp.post("/bootstrap-owner", async (request, reply) => {
-      const setupHeader = request.headers["x-setup-token"];
-      if (!assertSetupToken(typeof setupHeader === "string" ? setupHeader : undefined)) {
-        return sendError(reply, 403, "Bootstrap publico desabilitado em producao");
-      }
       const body = request.body as { tenantSlug?: string };
-      const status = await getBootstrapStatus(body.tenantSlug);
+      const credential = readSetupCredential(request);
+      if (!isSetupAuthorizedForTenant(credential, body.tenantSlug)) {
+        return sendError(
+          reply,
+          403,
+          "Cadastro requer link de onboarding valido",
+          "Solicite um novo link de onboarding enviado pela Atlas."
+        );
+      }
+      const status = await resolveBootstrapStatus(body.tenantSlug, true);
       if (!status.canBootstrap) {
         return sendError(
           reply,
           400,
-          "Esta empresa ja possui cadastro. Entre com sua conta ou solicite acesso como equipe."
+          status.blockedReason ?? "Esta empresa ja possui cadastro. Entre com sua conta ou solicite acesso como equipe."
         );
       }
       try {
         const created = await bootstrapOwnerAccount(request.body);
         return reply.status(201).send(created);
       } catch (error) {
-        return sendError(reply, 400, "Nao foi possivel criar conta dona", error instanceof Error ? error.message : error);
+        return sendError(
+          reply,
+          400,
+          "Nao foi possivel criar conta dona",
+          safeClientMessage(error, "Nao foi possivel criar conta dona")
+        );
       }
     });
 
@@ -186,15 +204,13 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     publicApp.get("/bootstrap-status", async (request, reply) => {
-      const setupHeader = request.headers["x-setup-token"];
-      if (!assertSetupToken(typeof setupHeader === "string" ? setupHeader : undefined)) {
-        return reply.send({ canBootstrap: false });
-      }
       try {
         const query = request.query as { tenantSlug?: string };
-        return reply.send(await getBootstrapStatus(query.tenantSlug));
+        const credential = readSetupCredential(request);
+        const setupAuthorized = isSetupAuthorizedForTenant(credential, query.tenantSlug);
+        return reply.send(await resolveBootstrapStatus(query.tenantSlug, setupAuthorized));
       } catch (error) {
-        return sendError(reply, 400, "Nao foi possivel verificar status", error instanceof Error ? error.message : error);
+        return sendError(reply, 400, "Nao foi possivel verificar status", safeClientMessage(error, "Nao foi possivel verificar status"));
       }
     });
 

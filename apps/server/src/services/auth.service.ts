@@ -92,8 +92,14 @@ export function publicUser(user: SessionUser) {
     name: user.name,
     email: user.email,
     role: user.role,
-    permissions: user.permissions
+    permissions: user.permissions,
+    platformAdmin: isPlatformAdminEmail(user.email)
   };
+}
+
+function isPlatformAdminEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  return env.platformAdminEmails.includes(normalized);
 }
 
 function hashCode(code: string) {
@@ -652,8 +658,36 @@ export async function requestTenantAccess(input: unknown): Promise<{ ok: true; m
 }
 
 export async function getBootstrapStatus(tenantSlug?: string): Promise<{ canBootstrap: boolean }> {
+  const status = await resolveBootstrapStatus(tenantSlug, true);
+  return { canBootstrap: status.canBootstrap };
+}
+
+export type BootstrapStatusResponse = {
+  canBootstrap: boolean;
+  signupRequiresLink: boolean;
+  blockedReason?: string;
+};
+
+export async function resolveBootstrapStatus(
+  tenantSlug: string | undefined,
+  setupAuthorized: boolean
+): Promise<BootstrapStatusResponse> {
+  if (!setupAuthorized) {
+    return {
+      canBootstrap: false,
+      signupRequiresLink: true,
+      blockedReason: "Cadastro disponivel apenas por link de onboarding enviado pela Atlas."
+    };
+  }
+
   const slug = (tenantSlug ?? "").trim().toLowerCase();
-  if (!slug) return { canBootstrap: false };
+  if (!slug) {
+    return {
+      canBootstrap: false,
+      signupRequiresLink: false,
+      blockedReason: "Informe o identificador da empresa."
+    };
+  }
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
@@ -666,8 +700,19 @@ export async function getBootstrapStatus(tenantSlug?: string): Promise<{ canBoot
     }
   });
 
-  if (!tenant) return { canBootstrap: true };
-  return { canBootstrap: !tenant.users[0] };
+  if (!tenant) {
+    return { canBootstrap: true, signupRequiresLink: false };
+  }
+
+  if (tenant.users[0]) {
+    return {
+      canBootstrap: false,
+      signupRequiresLink: false,
+      blockedReason: "Esta empresa ja possui cadastro. Entre com sua conta ou solicite acesso como equipe."
+    };
+  }
+
+  return { canBootstrap: true, signupRequiresLink: false };
 }
 
 export async function logout(user: SessionUser, context?: AccessContext) {

@@ -27,7 +27,7 @@ import { saveUserAvatar } from "../services/user-avatar.service";
 import { getTenantSsoSettings, updateTenantSsoSettings } from "../services/sso/sso.service";
 import { createUserInvite } from "../services/invite.service";
 import { auditLog, AUDIT_ACTIONS, listAuditLogsDetailed, exportAuditLogsCsv } from "../services/audit.service";
-import { listTenants, onboardTenant, ownerTenantOverview, updateTenantBilling, updateTenantControls } from "../services/tenant-onboarding.service";
+import { listTenants, onboardTenant, ownerTenantOverview, updateTenantBilling, updateTenantControls, createBootstrapOnboardingLink } from "../services/tenant-onboarding.service";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { sendError } from "../utils/http";
@@ -235,6 +235,34 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.send(removed);
       } catch (error) {
         return sendError(reply, 400, "Nao foi possivel excluir usuario", error instanceof Error ? error.message : error);
+      }
+    }
+  );
+
+  app.post(
+    "/onboarding/bootstrap-link",
+    { preHandler: [requireAuth, requirePlatformAdmin()] },
+    async (request, reply) => {
+      const user = requireUser(request);
+      const body = request.body as { tenantSlug?: string };
+      try {
+        const link = createBootstrapOnboardingLink({ tenantSlug: body.tenantSlug });
+        await auditLog({
+          tenantId: user.tenantId,
+          actorId: user.id,
+          entity: "Auth",
+          entityId: user.id,
+          action: "bootstrap_link_created",
+          metadata: { tenantSlug: body.tenantSlug?.trim().toLowerCase() ?? null }
+        });
+        return reply.send(link);
+      } catch (error) {
+        return sendError(
+          reply,
+          400,
+          "Nao foi possivel gerar link de onboarding",
+          error instanceof Error ? error.message : error
+        );
       }
     }
   );

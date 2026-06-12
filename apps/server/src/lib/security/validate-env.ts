@@ -1,4 +1,5 @@
 import { env } from "../../config/env";
+import { isBootstrapTicketValid, verifyBootstrapTicket } from "./bootstrap-ticket";
 
 const WEAK_SECRETS = new Set(["atlas-one-dev-secret", "CHANGE_ME", "change-me", ""]);
 
@@ -68,9 +69,24 @@ export function validateProductionEnv() {
   }
 }
 
-export function assertSetupToken(headerValue: string | undefined) {
+export function isSetupAuthorized(credential: string | undefined) {
   if (!env.isProduction && !env.enterpriseMode) return true;
   if (env.allowPublicBootstrap) return true;
-  if (!env.setupToken) return false;
-  return headerValue === env.setupToken;
+  if (!env.setupToken && !credential) return false;
+  return isBootstrapTicketValid(credential);
+}
+
+/** Validates setup credential and, for slug-bound tickets, enforces tenant slug match. */
+export function isSetupAuthorizedForTenant(credential: string | undefined, tenantSlug?: string) {
+  if (!env.isProduction && !env.enterpriseMode) return true;
+  if (env.allowPublicBootstrap) return true;
+
+  const token = credential?.trim();
+  if (!token) return false;
+  if (env.setupToken && token === env.setupToken) return true;
+  return verifyBootstrapTicket(token, { tenantSlug }).ok;
+}
+
+export function assertSetupToken(headerValue: string | undefined) {
+  return isSetupAuthorized(headerValue);
 }
