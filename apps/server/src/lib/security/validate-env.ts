@@ -1,4 +1,5 @@
 import { env } from "../../config/env";
+import { isBootstrapTicketValid } from "./bootstrap-ticket";
 
 const WEAK_SECRETS = new Set(["atlas-one-dev-secret", "CHANGE_ME", "change-me", ""]);
 
@@ -68,9 +69,13 @@ export function validateProductionEnv() {
   }
 }
 
-export function assertSetupToken(headerValue: string | undefined) {
+export function isSetupAuthorized(credential: string | undefined) {
   if (!env.isProduction && !env.enterpriseMode) return true;
   if (env.allowPublicBootstrap) return true;
-  if (!env.setupToken) return false;
-  return headerValue === env.setupToken;
+  if (!env.setupToken && !credential) return false;
+  return isBootstrapTicketValid(credential);
+}
+
+export function assertSetupToken(headerValue: string | undefined) {
+  return isSetupAuthorized(headerValue);
 }

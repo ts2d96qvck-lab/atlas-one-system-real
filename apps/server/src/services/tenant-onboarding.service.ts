@@ -3,6 +3,9 @@ import { isTrialExpiredForTenant } from "../services/billing/billing.service";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { env } from "../config/env";
+import { assertPassword } from "../lib/security/password-policy";
+import { signBootstrapTicket } from "../lib/security/bootstrap-ticket";
 
 const onboardingSchema = z.object({
   companyName: z.string().min(2),
@@ -10,7 +13,7 @@ const onboardingSchema = z.object({
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/),
   ownerName: z.string().min(2),
   ownerEmail: z.string().email(),
-  ownerPassword: z.string().min(8),
+  ownerPassword: z.string().min(12),
   maxUsers: z.coerce.number().int().min(1).max(1000).default(5),
   maxInstances: z.coerce.number().int().min(1).max(200).default(1),
   allowManagerAccess: z.boolean().default(true),
@@ -238,6 +241,7 @@ const DEFAULT_STAGES = [
 
 export async function onboardTenant(input: unknown) {
   const data = onboardingSchema.parse(input);
+  assertPassword(data.ownerPassword);
 
   const existing = await prisma.tenant.findUnique({ where: { slug: data.slug } });
   if (existing) throw new Error("Slug de tenant ja existe");
@@ -324,4 +328,13 @@ export async function onboardTenant(input: unknown) {
       owner: { id: owner.id, name: owner.name, email: owner.email }
     };
   });
+}
+
+export function createBootstrapOnboardingLink(input: { tenantSlug?: string; baseUrl?: string }) {
+  const signed = signBootstrapTicket({ tenantSlug: input.tenantSlug, ttlHours: 72 });
+  const base = (input.baseUrl ?? env.appPublicUrl).replace(/\/$/, "");
+  const params = new URLSearchParams({ auth: "register", setup: signed.token });
+  const slug = input.tenantSlug?.trim().toLowerCase();
+  if (slug) params.set("tenant", slug);
+  return { url: `${base}/?${params.toString()}`, expiresAt: signed.expiresAt };
 }

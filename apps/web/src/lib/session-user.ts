@@ -26,7 +26,8 @@ export function normalizeSessionUser(user: Partial<SessionUser> | null | undefin
     name: String(user?.name ?? "Usuario"),
     email: String(user?.email ?? ""),
     role: String(user?.role ?? "agent").trim().toLowerCase(),
-    permissions: normalizePermissions(user?.permissions)
+    permissions: normalizePermissions(user?.permissions),
+    platformAdmin: Boolean(user?.platformAdmin)
   };
 }
 

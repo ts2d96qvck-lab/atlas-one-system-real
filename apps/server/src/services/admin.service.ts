@@ -21,7 +21,7 @@ export const createUserSchema = z.object({
 });
 
 export const updateUserSchema = createUserSchema.partial().omit({ password: true }).extend({
-  password: z.string().min(6).optional(),
+  password: z.string().min(12).optional(),
   status: z.enum(["active", "inactive", "invited"]).optional()
 });
 

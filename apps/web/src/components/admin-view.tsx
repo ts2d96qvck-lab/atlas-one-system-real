@@ -30,6 +30,7 @@ import {
   ownerTenantsOverview,
   listTenants,
   onboardTenant,
+  createBootstrapOnboardingLink,
   rejectAccessRequest,
   syncWebhook,
   updateCompanySettings,
@@ -74,6 +75,7 @@ import {
 import { EmptyState } from "./empty-state";
 import { OwnerClientsPanel } from "./owner-clients-panel";
 import { useAppDialogs } from "./ui/dialog-provider";
+import { PASSWORD_POLICY_HINT, validatePassword } from "../lib/password-policy";
 import { notify } from "../lib/notify";
 import { tagChipStyle } from "../lib/inbox-tags";
 import {
@@ -270,7 +272,9 @@ export function AdminView({ token, user }: Props) {
   }, []);
   const [billingBusyId, setBillingBusyId] = useState<string | null>(null);
   const [savingControlsId, setSavingControlsId] = useState<string | null>(null);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(Boolean(user?.platformAdmin));
+  const [bootstrapLink, setBootstrapLink] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [bootstrapLinkLoading, setBootstrapLinkLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -356,6 +360,10 @@ export function AdminView({ token, user }: Props) {
 
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   const isOwner = user?.role === "owner";
+
+  useEffect(() => {
+    setIsPlatformAdmin(Boolean(user?.platformAdmin));
+  }, [user?.platformAdmin]);
   const activeInstance = instances.find((item) => item.name === selectedInstance) ?? null;
   const activeStatus = normalizeInstanceStatus(activeInstance?.status);
   const isConnected = isInstanceConnected(activeStatus);
@@ -1138,6 +1146,11 @@ export function AdminView({ token, user }: Props) {
       setMessage("Preencha todos os campos obrigatórios para liberar acesso do cliente.");
       return;
     }
+    const passwordCheck = validatePassword(tenantForm.ownerPassword);
+    if (!passwordCheck.ok) {
+      setMessage(passwordCheck.message);
+      return;
+    }
     try {
       const result = await onboardTenant(token, tenantForm);
       setMessage("Empresa onboarded com sucesso para revenda.");
@@ -1159,6 +1172,31 @@ export function AdminView({ token, user }: Props) {
       await refreshSnapshot();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erro ao onboard tenant");
+    }
+  }
+
+  async function generateBootstrapLink() {
+    setBootstrapLinkLoading(true);
+    try {
+      const link = await createBootstrapOnboardingLink(token, {
+        tenantSlug: tenantForm.slug.trim() || undefined
+      });
+      setBootstrapLink(link);
+      setMessage("Link de onboarding gerado. Envie ao cliente para concluir o cadastro.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Falha ao gerar link de onboarding");
+    } finally {
+      setBootstrapLinkLoading(false);
+    }
+  }
+
+  async function copyBootstrapLink() {
+    if (!bootstrapLink?.url) return;
+    try {
+      await navigator.clipboard.writeText(bootstrapLink.url);
+      setMessage("Link de onboarding copiado.");
+    } catch {
+      setMessage("Não foi possível copiar o link automaticamente.");
     }
   }
 
@@ -2627,7 +2665,17 @@ export function AdminView({ token, user }: Props) {
         </Card>
         ) : null}
 
-        {isOwner ? <Card className="atlas-v5-card-pad">
+        {isOwner && !isPlatformAdmin ? (
+          <Card className="atlas-v5-card-pad">
+            <p className="font-semibold">Onboarding de novas empresas</p>
+            <p className="mt-1 text-xs text-atlas-muted">
+              O cadastro de novas empresas é feito pela Atlas. Solicite ao administrador da plataforma um link de onboarding
+              para o cliente.
+            </p>
+          </Card>
+        ) : null}
+
+        {isPlatformAdmin ? <Card className="atlas-v5-card-pad">
           <p className="font-semibold">Revenda multiempresa (onboarding)</p>
           <p className="mt-1 text-xs text-atlas-muted">Crie o cliente e libere o acesso do dono em poucos cliques.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -2665,9 +2713,11 @@ export function AdminView({ token, user }: Props) {
               className="rounded-xl bg-white/80 px-3 py-2 text-sm"
               placeholder="Senha inicial"
               type="password"
+              minLength={12}
               value={tenantForm.ownerPassword}
               onChange={(e) => setTenantForm((s) => ({ ...s, ownerPassword: e.target.value }))}
             />
+            <p className="sm:col-span-2 text-[11px] text-atlas-muted">{PASSWORD_POLICY_HINT}</p>
             <input
               className="rounded-xl bg-white/80 px-3 py-2 text-sm"
               placeholder="Instância WhatsApp"
@@ -2675,9 +2725,23 @@ export function AdminView({ token, user }: Props) {
               onChange={(e) => setTenantForm((s) => ({ ...s, whatsappInstanceName: e.target.value }))}
             />
           </div>
-          <Button className="mt-4" onClick={createTenant}>
-            Onboard empresa para revenda
-          </Button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button onClick={createTenant}>Onboard empresa para revenda</Button>
+            <Button variant="glass" onClick={() => void generateBootstrapLink()} disabled={bootstrapLinkLoading}>
+              {bootstrapLinkLoading ? <Loader2 className="animate-spin" size={16} /> : <Link2 size={16} />}
+              Gerar link de onboarding
+            </Button>
+          </div>
+          {bootstrapLink ? (
+            <div className="mt-4 rounded-2xl border border-blue-200/80 bg-blue-50/70 p-3 text-xs text-blue-900">
+              <p className="font-semibold">Link de cadastro do cliente</p>
+              <p className="mt-1 break-all">{bootstrapLink.url}</p>
+              <p className="mt-1 text-[10px] opacity-80">Valido ate {new Date(bootstrapLink.expiresAt).toLocaleString("pt-BR")}</p>
+              <Button className="mt-2" variant="glass" onClick={() => void copyBootstrapLink()}>
+                Copiar link
+              </Button>
+            </div>
+          ) : null}
           {lastOnboarded ? (
             <div className="mt-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs text-emerald-900">
               <p className="font-semibold">Cliente pronto para liberar acesso</p>

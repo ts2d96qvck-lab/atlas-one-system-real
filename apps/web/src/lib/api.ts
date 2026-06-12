@@ -25,7 +25,36 @@ export type SessionUser = {
   email: string;
   role: string;
   permissions: string[];
+  platformAdmin?: boolean;
 };
+
+export type BootstrapStatusResponse = {
+  canBootstrap: boolean;
+  signupRequiresLink: boolean;
+  blockedReason?: string;
+};
+
+const BOOTSTRAP_SETUP_STORAGE_KEY = "atlas-bootstrap-setup";
+
+export function getStoredBootstrapSetup() {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(BOOTSTRAP_SETUP_STORAGE_KEY);
+}
+
+export function storeBootstrapSetup(token: string) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(BOOTSTRAP_SETUP_STORAGE_KEY, token);
+}
+
+export function clearBootstrapSetup() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(BOOTSTRAP_SETUP_STORAGE_KEY);
+}
+
+function bootstrapSetupHeaders(): Record<string, string> {
+  const ticket = getStoredBootstrapSetup();
+  return ticket ? { "X-Setup-Token": ticket } : {};
+}
 
 export type LoginResponse =
   | {
@@ -317,12 +346,16 @@ export async function bootstrapOwnerAccount(payload: {
 }) {
   const response = await fetchWithTimeout(`${apiUrl()}/auth/bootstrap-owner`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...bootstrapSetupHeaders() },
     body: JSON.stringify(payload)
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body?.message ?? body?.error ?? "Falha ao criar conta dona");
+    const message = typeof body?.message === "string" ? body.message : typeof body?.error === "string" ? body.error : "Falha ao criar conta dona";
+    if (response.status === 403) {
+      throw new Error("Cadastro requer link de onboarding valido. Solicite um novo link enviado pela Atlas.");
+    }
+    throw new Error(message);
   }
   return response.json() as Promise<{ ok: true; tenant: { id: string; slug: string; name: string } }>;
 }
@@ -348,12 +381,22 @@ export async function requestTenantAccess(payload: {
 
 export async function getBootstrapStatus(tenantSlug: string) {
   const query = new URLSearchParams({ tenantSlug }).toString();
-  const response = await fetchWithTimeout(`${apiUrl()}/auth/bootstrap-status?${query}`);
+  const response = await fetchWithTimeout(`${apiUrl()}/auth/bootstrap-status?${query}`, {
+    headers: bootstrapSetupHeaders()
+  });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body?.message ?? body?.error ?? "Falha ao consultar status");
   }
-  return response.json() as Promise<{ canBootstrap: boolean }>;
+  return response.json() as Promise<BootstrapStatusResponse>;
+}
+
+export async function createBootstrapOnboardingLink(token: string, payload: { tenantSlug?: string }) {
+  return request<{ url: string; expiresAt: string }>("/admin/onboarding/bootstrap-link", token, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
 }
 
 export function listConversations(token: string, bucket: "active" | "history" | "all" = "all") {

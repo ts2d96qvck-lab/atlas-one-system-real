@@ -7,13 +7,16 @@ import {
   acceptInvite,
   bootstrapOwnerAccount,
   buildOidcLoginUrl,
+  clearBootstrapSetup,
   confirmPasswordReset,
   getAuthProviders,
   getBootstrapStatus,
+  getStoredBootstrapSetup,
   login,
   previewInvite,
   requestTenantAccess,
   requestPasswordReset,
+  storeBootstrapSetup,
   verifyLoginCode,
   type AuthProviderInfo,
   type InvitePreview,
@@ -21,6 +24,7 @@ import {
 } from "../lib/api";
 import dynamic from "next/dynamic";
 import { friendlyError } from "../lib/friendly-errors";
+import { PASSWORD_POLICY_HINT, validatePassword } from "../lib/password-policy";
 import { hasPermission, normalizeSessionUser, toAppSession, type AppSession } from "../lib/session-user";
 import { AtlasApp } from "./atlas-app";
 import { NAV, roleLabel } from "../lib/product-copy";
@@ -121,7 +125,9 @@ export function AtlasShell() {
   const [ownerPhone, setOwnerPhone] = useState("");
   const [requestName, setRequestName] = useState("");
   const [requestPhone, setRequestPhone] = useState("");
-  const [canCreateOwner, setCanCreateOwner] = useState(true);
+  const [canCreateOwner, setCanCreateOwner] = useState(false);
+  const [signupAuthorized, setSignupAuthorized] = useState(false);
+  const [signupBlockedMessage, setSignupBlockedMessage] = useState<string | null>(null);
   const [resetChallengeId, setResetChallengeId] = useState("");
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -183,16 +189,42 @@ export function AtlasShell() {
     const invite = params.get("invite");
     const tenant = params.get("tenant");
     const auth = params.get("auth");
+    const setup = params.get("setup");
+    let urlChanged = false;
+
+    if (setup) {
+      storeBootstrapSetup(setup);
+      params.delete("setup");
+      urlChanged = true;
+      setSignupAuthorized(true);
+    }
+
+    if (tenant) setTenantSlug(tenant);
+
     if (invite && tenant) {
       setInviteToken(invite);
-      setTenantSlug(tenant);
       setAuthMode("invite");
     } else if (auth === "equipe" || auth === "team") {
       setAuthMode("team");
-      if (tenant) setTenantSlug(tenant);
     } else if (auth === "register" || auth === "cadastro") {
-      setAuthMode("register");
+      if (setup || getStoredBootstrapSetup() || process.env.NODE_ENV === "development") {
+        setAuthMode("register");
+        setSignupAuthorized(true);
+      } else {
+        setAuthMode("login");
+        setInfo("Cadastro disponível apenas por link de onboarding enviado pela Atlas.");
+      }
     }
+
+    if (urlChanged) {
+      const next = params.toString();
+      window.history.replaceState({}, "", `${window.location.pathname}${next ? `?${next}` : ""}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (getStoredBootstrapSetup()) setSignupAuthorized(true);
+    if (process.env.NODE_ENV === "development") setSignupAuthorized(true);
   }, []);
 
   useEffect(() => {
@@ -306,26 +338,45 @@ export function AtlasShell() {
   useEffect(() => {
     let cancelled = false;
     const slug = tenantSlug.trim().toLowerCase();
-    if (!slug) {
-      setCanCreateOwner(true);
-      return;
+    const authorized =
+      signupAuthorized || Boolean(getStoredBootstrapSetup()) || process.env.NODE_ENV === "development";
+
+    if (!authorized) {
+      setCanCreateOwner(false);
+      setSignupBlockedMessage("Cadastro disponível apenas por link de onboarding enviado pela Atlas.");
+      return () => {
+        cancelled = true;
+      };
     }
+
+    if (!slug) {
+      setCanCreateOwner(false);
+      setSignupBlockedMessage(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     getBootstrapStatus(slug)
       .then((status) => {
         if (cancelled) return;
         setCanCreateOwner(status.canBootstrap);
+        setSignupBlockedMessage(status.blockedReason ?? null);
         if (!status.canBootstrap && authMode === "register") {
-          setAuthMode("login");
-          setInfo("Esta empresa já possui cadastro. Entre ou solicite acesso como equipe.");
+          setInfo(status.blockedReason ?? "Este identificador de empresa não está disponível para cadastro.");
         }
       })
       .catch(() => {
-        if (!cancelled) setCanCreateOwner(true);
+        if (cancelled) return;
+        setCanCreateOwner(false);
+        setSignupBlockedMessage(
+          "Não foi possível verificar o cadastro agora. Tente novamente ou use o link enviado pela Atlas."
+        );
       });
     return () => {
       cancelled = true;
     };
-  }, [tenantSlug, authMode]);
+  }, [tenantSlug, signupAuthorized, authMode]);
 
   useEffect(() => {
     if (authMode !== "login" || !tenantSlug.trim() || session) {
@@ -375,6 +426,11 @@ export function AtlasShell() {
     async (event: React.FormEvent) => {
       event.preventDefault();
       if (!inviteToken || !tenantSlug.trim()) return;
+      const passwordCheck = validatePassword(invitePassword);
+      if (!passwordCheck.ok) {
+        setError(passwordCheck.message);
+        return;
+      }
       setLoading(true);
       setError("");
       setInfo("");
@@ -437,6 +493,11 @@ export function AtlasShell() {
 
   const handleConfirmReset = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
+    const passwordCheck = validatePassword(newPassword);
+    if (!passwordCheck.ok) {
+      setError(passwordCheck.message);
+      return;
+    }
     setLoading(true);
     setError("");
     setInfo("");
@@ -457,6 +518,11 @@ export function AtlasShell() {
   const handleBootstrapOwner = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
+      const passwordCheck = validatePassword(password);
+      if (!passwordCheck.ok) {
+        setError(passwordCheck.message);
+        return;
+      }
       setLoading(true);
       setError("");
       setInfo("");
@@ -469,10 +535,16 @@ export function AtlasShell() {
           ownerPassword: password,
           ownerPhone
         });
-        setInfo("Conta criada com sucesso. Faça login e confirme o código no WhatsApp.");
+        clearBootstrapSetup();
+        if (process.env.NODE_ENV !== "development") {
+          setSignupAuthorized(false);
+        }
+        setInfo(
+          "Empresa criada. Próximos passos: (1) Entrar com e-mail e senha, (2) Confirmar código no WhatsApp, (3) Conectar WhatsApp em Admin → WhatsApp."
+        );
         setAuthMode("login");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Falha ao criar conta da empresa");
+        setError(friendlyError(err instanceof Error ? err.message : "Falha ao criar conta da empresa"));
       } finally {
         setLoading(false);
       }
@@ -483,6 +555,11 @@ export function AtlasShell() {
   const handleRequestAccess = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
+      const passwordCheck = validatePassword(password);
+      if (!passwordCheck.ok) {
+        setError(passwordCheck.message);
+        return;
+      }
       setLoading(true);
       setError("");
       setInfo("");
@@ -525,12 +602,18 @@ export function AtlasShell() {
           </div>
 
           {!challengeId && authMode !== "forgot" && authMode !== "invite" ? (
-            <div className="mb-5 grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800/80">
-              {([
-                ["login", "Entrar"],
-                ["register", "Criar conta"],
-                ["team", "Equipe"]
-              ] as const).map(([mode, label]) => (
+            <div
+              className={`mb-5 grid gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800/80 ${
+                signupAuthorized ? "grid-cols-3" : "grid-cols-2"
+              }`}
+            >
+              {(
+                [
+                  ["login", "Entrar"],
+                  ...(signupAuthorized ? ([["register", "Criar conta"]] as const) : []),
+                  ["team", "Equipe"]
+                ] as const
+              ).map(([mode, label]) => (
                 <button
                   key={mode}
                   type="button"
@@ -549,6 +632,11 @@ export function AtlasShell() {
                 </button>
               ))}
             </div>
+          ) : null}
+          {!signupAuthorized && authMode === "login" && signupBlockedMessage ? (
+            <p className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+              {signupBlockedMessage}
+            </p>
           ) : null}
           {challengeId ? (
             <form className="space-y-4" onSubmit={handleVerifyCode}>
@@ -640,9 +728,10 @@ export function AtlasShell() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     type="password"
-                    minLength={8}
+                    minLength={12}
                     required
                   />
+                  <p className="mt-1 text-[11px] text-atlas-muted">{PASSWORD_POLICY_HINT}</p>
                 </label>
                 {error ? <p className="text-sm text-red-600">{error}</p> : null}
                 {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
@@ -668,16 +757,17 @@ export function AtlasShell() {
                 <p className="text-sm text-atlas-muted">Validando convite...</p>
               ) : null}
               <label className="block text-sm">
-                <span className="text-atlas-muted">Nova senha (min. 8 caracteres)</span>
+                <span className="text-atlas-muted">Nova senha</span>
                 <input
                   className="atlas-field mt-2 w-full rounded-2xl px-4 py-3 outline-none"
                   value={invitePassword}
                   onChange={(e) => setInvitePassword(e.target.value)}
                   type="password"
-                  minLength={8}
+                  minLength={12}
                   required
                   disabled={!invitePreview}
                 />
+                <p className="mt-1 text-[11px] text-atlas-muted">{PASSWORD_POLICY_HINT}</p>
               </label>
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
               {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
@@ -760,19 +850,18 @@ export function AtlasShell() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   type="password"
-                  minLength={8}
+                  minLength={12}
                   required
                 />
+                <p className="mt-1 text-[11px] text-atlas-muted">{PASSWORD_POLICY_HINT}</p>
               </label>
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
               {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
               <Button className="w-full" type="submit" disabled={loading || !canCreateOwner}>
                 {loading ? <Loader2 className="animate-spin" size={18} /> : "Criar conta da empresa"}
               </Button>
-              {!canCreateOwner ? (
-                <p className="text-xs text-amber-700 dark:text-amber-300">
-                  Este identificador de empresa já está em uso. Entre na aba Entrar ou use outro ID.
-                </p>
+              {!canCreateOwner && signupBlockedMessage ? (
+                <p className="text-xs text-amber-700 dark:text-amber-300">{signupBlockedMessage}</p>
               ) : null}
               <Button className="w-full" variant="glass" type="button" onClick={() => setAuthMode("login")}>
                 Já tenho conta
@@ -826,9 +915,10 @@ export function AtlasShell() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   type="password"
-                  minLength={8}
+                  minLength={12}
                   required
                 />
+                <p className="mt-1 text-[11px] text-atlas-muted">{PASSWORD_POLICY_HINT}</p>
               </label>
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
               {info ? <p className="text-sm text-emerald-700">{info}</p> : null}

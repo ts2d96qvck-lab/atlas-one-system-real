@@ -22,7 +22,7 @@ const inviteUserSchema = z.object({
 const acceptInviteSchema = z.object({
   token: z.string().min(20),
   tenantSlug: z.string().min(2),
-  password: z.string().min(8)
+  password: z.string().min(12)
 });
 
 function hashToken(token: string) {
