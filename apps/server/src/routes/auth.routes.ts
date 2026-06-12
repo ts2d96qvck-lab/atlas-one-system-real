@@ -24,7 +24,7 @@ import {
   listSsoProvidersForTenant
 } from "../services/sso/sso.service";
 import { env } from "../config/env";
-import { isSetupAuthorized } from "../lib/security/validate-env";
+import { isSetupAuthorizedForTenant } from "../lib/security/validate-env";
 import { prisma } from "../lib/prisma";
 import { resolveClientIp } from "../lib/client-ip";
 import { AuthLoginError, formatZodIssues } from "../lib/auth-login-errors";
@@ -164,8 +164,9 @@ export async function authRoutes(app: FastifyInstance) {
     });
 
     publicApp.post("/bootstrap-owner", async (request, reply) => {
+      const body = request.body as { tenantSlug?: string };
       const credential = readSetupCredential(request);
-      if (!isSetupAuthorized(credential)) {
+      if (!isSetupAuthorizedForTenant(credential, body.tenantSlug)) {
         return sendError(
           reply,
           403,
@@ -173,7 +174,6 @@ export async function authRoutes(app: FastifyInstance) {
           "Solicite um novo link de onboarding enviado pela Atlas."
         );
       }
-      const body = request.body as { tenantSlug?: string };
       const status = await resolveBootstrapStatus(body.tenantSlug, true);
       if (!status.canBootstrap) {
         return sendError(
@@ -207,7 +207,7 @@ export async function authRoutes(app: FastifyInstance) {
       try {
         const query = request.query as { tenantSlug?: string };
         const credential = readSetupCredential(request);
-        const setupAuthorized = isSetupAuthorized(credential);
+        const setupAuthorized = isSetupAuthorizedForTenant(credential, query.tenantSlug);
         return reply.send(await resolveBootstrapStatus(query.tenantSlug, setupAuthorized));
       } catch (error) {
         return sendError(reply, 400, "Nao foi possivel verificar status", safeClientMessage(error, "Nao foi possivel verificar status"));
