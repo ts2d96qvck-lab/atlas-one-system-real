@@ -2,6 +2,37 @@ import type { Message } from "./api";
 
 const MESSAGE_CLUSTER_WINDOW_MS = 5 * 60 * 1000;
 
+const DELIVERY_STATUS_RANK: Record<string, number> = {
+  failed: 1,
+  pending: 2,
+  queued: 2,
+  sending: 2,
+  sent: 3,
+  delivered: 4,
+  read: 5
+};
+
+function deliveryStatusRank(status: string) {
+  return DELIVERY_STATUS_RANK[status.toLowerCase()] ?? 0;
+}
+
+function mergeRawFields(existing: Record<string, unknown>, incoming: Record<string, unknown>) {
+  const next = { ...existing, ...incoming };
+  const existingDelivery =
+    typeof existing.deliveryStatus === "string" ? existing.deliveryStatus : "";
+  const incomingDelivery =
+    typeof incoming.deliveryStatus === "string" ? incoming.deliveryStatus : "";
+  if (deliveryStatusRank(incomingDelivery) >= deliveryStatusRank(existingDelivery)) {
+    next.deliveryStatus = incomingDelivery || existingDelivery;
+  } else {
+    next.deliveryStatus = existingDelivery || incomingDelivery;
+  }
+  if ("failureReason" in incoming) {
+    next.failureReason = incoming.failureReason;
+  }
+  return next;
+}
+
 export function mediaSrc(url: string | null | undefined, apiUrl: string, accessToken?: string) {
   if (!url) return undefined;
   if (url.startsWith("http") || url.startsWith("data:")) return url;
@@ -45,8 +76,18 @@ export function sanitizeMessageForViewer<T extends Message>(message: T, role: st
 export function mergeMessages(existing: Message[] = [], incoming: Message) {
   const index = existing.findIndex((item) => item.id === incoming.id);
   if (index >= 0) {
+    const prev = existing[index];
+    if (!prev) return [...existing, incoming].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const prevRaw =
+      prev.raw && typeof prev.raw === "object" ? (prev.raw as Record<string, unknown>) : {};
+    const nextRaw =
+      incoming.raw && typeof incoming.raw === "object" ? (incoming.raw as Record<string, unknown>) : {};
     const next = [...existing];
-    next[index] = { ...existing[index], ...incoming };
+    next[index] = {
+      ...prev,
+      ...incoming,
+      raw: mergeRawFields(prevRaw, nextRaw)
+    };
     return next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
@@ -63,10 +104,29 @@ export function mergeMessages(existing: Message[] = [], incoming: Message) {
   });
   if (dup) {
     const dupIndex = existing.findIndex((item) => item.id === dup.id);
-    if (dupIndex >= 0 && (incoming as Message & { providerId?: string }).providerId && !(dup as Message & { providerId?: string }).providerId) {
-      const next = [...existing];
-      next[dupIndex] = { ...dup, ...incoming, id: dup.id };
-      return next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    if (dupIndex >= 0) {
+      const incomingRank = deliveryStatusRank(messageDeliveryStatus(incoming));
+      const dupRank = deliveryStatusRank(messageDeliveryStatus(dup));
+      const incomingProviderId = (incoming as Message & { providerId?: string }).providerId;
+      const dupProviderId = (dup as Message & { providerId?: string }).providerId;
+      if (
+        incomingRank > dupRank ||
+        (incomingProviderId && !dupProviderId) ||
+        incoming.id === dup.id
+      ) {
+        const prevRaw =
+          dup.raw && typeof dup.raw === "object" ? (dup.raw as Record<string, unknown>) : {};
+        const nextRaw =
+          incoming.raw && typeof incoming.raw === "object" ? (incoming.raw as Record<string, unknown>) : {};
+        const next = [...existing];
+        next[dupIndex] = {
+          ...dup,
+          ...incoming,
+          id: dup.id,
+          raw: mergeRawFields(prevRaw, nextRaw)
+        };
+        return next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      }
     }
     return existing;
   }
@@ -76,12 +136,38 @@ export function mergeMessages(existing: Message[] = [], incoming: Message) {
   );
 }
 
+export function mergeMessageLists(existing: Message[] = [], incoming: Message[] = []) {
+  let merged = [...existing];
+  for (const message of incoming) {
+    merged = mergeMessages(merged, message);
+  }
+  return merged;
+}
+
 export function messageDeliveryStatus(message: Message) {
   const raw = message.raw && typeof message.raw === "object" ? (message.raw as Record<string, unknown>) : {};
   const fromRaw = typeof raw.deliveryStatus === "string" ? raw.deliveryStatus : null;
   const status = String(fromRaw ?? message.status ?? "").toLowerCase();
   if (status === "deleted" || status === "edited") return fromRaw ?? "sent";
   return status;
+}
+
+export function createClientMessageId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `cmid-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+export function getClientMessageId(message: Message) {
+  const raw = message.raw && typeof message.raw === "object" ? (message.raw as Record<string, unknown>) : {};
+  return typeof raw.clientMessageId === "string" ? raw.clientMessageId : null;
+}
+
+export function isOutboundSendFailed(message: Message) {
+  if (message.direction !== "out") return false;
+  if (message.status === "failed") return true;
+  return messageDeliveryStatus(message).includes("fail");
 }
 
 function messageSenderId(message: Message) {

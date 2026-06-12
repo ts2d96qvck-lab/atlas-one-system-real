@@ -172,19 +172,21 @@ model Conversation {
 }
 
 model Message {
-  id             String   @id @default(cuid())
-  conversationId String
-  direction      String
-  type           String   @default("text")
-  text           String?
-  mediaUrl       String?
-  providerId     String?
-  status         String   @default("queued")
-  raw            Json?
-  createdAt      DateTime @default(now())
+  id              String   @id @default(cuid())
+  conversationId  String
+  clientMessageId String?
+  direction       String
+  type            String   @default("text")
+  text            String?
+  mediaUrl        String?
+  providerId      String?
+  status          String   @default("queued")
+  raw             Json?
+  createdAt       DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id])
 
+  @@unique([conversationId, clientMessageId])
   @@index([conversationId, createdAt])
 }
 

@@ -510,7 +510,11 @@ export function deleteShortcut(token: string, tag: string) {
   });
 }
 
-export function sendMessage(token: string, conversationId: string, payload: { text: string; replyToMessageId?: string }) {
+export function sendMessage(
+  token: string,
+  conversationId: string,
+  payload: { text: string; replyToMessageId?: string; clientMessageId?: string }
+) {
   return request<Message>(`/inbox/conversations/${conversationId}/messages`, token, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -584,10 +588,17 @@ export function transcribeMessage(token: string, conversationId: string, message
 
 const MEDIA_UPLOAD_TIMEOUT_MS = 120_000;
 
-export async function sendMediaFile(token: string, conversationId: string, file: File, caption?: string) {
+export async function sendMediaFile(
+  token: string,
+  conversationId: string,
+  file: File,
+  caption?: string,
+  clientMessageId?: string
+) {
   const form = new FormData();
   form.append("file", file);
   if (caption) form.append("caption", caption);
+  if (clientMessageId) form.append("clientMessageId", clientMessageId);
   const response = await fetchWithTimeout(
     `${apiUrl()}/inbox/conversations/${conversationId}/messages/media`,
     {
